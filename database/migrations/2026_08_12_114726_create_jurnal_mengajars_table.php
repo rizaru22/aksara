@@ -21,6 +21,10 @@ return new class extends Migration
             $table->text('materi_pembahasan');
             $table->text('catatan_kejadian_kelas')->nullable();
             $table->string('foto_kegiatan')->nullable();
+            $table->timestamp('jam_mulai_realisasi')->nullable();   // Dicatat saat Check-in
+            $table->timestamp('jam_selesai_realisasi')->nullable(); // Dicatat saat Check-out
+            $table->enum('status_sesi', ['berlangsung', 'selesai', 'flagged'])->default('berlangsung');
+            $table->text('catatan_penutupan')->nullable();
             $table->timestamps();
         });
     }

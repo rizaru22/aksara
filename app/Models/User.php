@@ -2,25 +2,25 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Spatie\Permission\Traits\HasRoles;
+use NotificationChannels\WebPush\HasPushSubscriptions;
 
-#[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
-    /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasPushSubscriptions, HasApiTokens, HasFactory, Notifiable, HasRoles;
 
+    protected $fillable = ['nip', 'nama', 'email', 'password', 'foto_master'];
+
+    protected $hidden = ['password', 'remember_token'];
+
+  
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
+     * Cast tipe data.
      */
     protected function casts(): array
     {
@@ -28,5 +28,25 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function absensis(): HasMany
+    {
+        return $this->hasMany(Absensi::class);
+    }
+
+    public function jadwalPelajarans(): HasMany
+    {
+        return $this->hasMany(JadwalPelajaran::class);
+    }
+
+    public function jurnalMengajars(): HasMany
+    {
+        return $this->hasMany(JurnalMengajar::class);
+    }
+
+    public function pengajuanIzins(): HasMany
+    {
+        return $this->hasMany(PengajuanIzin::class);
     }
 }

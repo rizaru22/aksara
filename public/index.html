@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#06434b">
+    <title>Masuk — AKSARA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:22px;background:radial-gradient(ellipse at 90% 10%,#d7f0f1 0,transparent 36%),#eff7f8;color:#123b47;font-family:'DM Sans',system-ui,sans-serif}.login{width:min(100%,430px);background:#fff;border:1px solid #e5eff1;border-radius:28px;overflow:hidden;box-shadow:0 24px 80px #123f4b18}.top{padding:30px 30px 27px;background:linear-gradient(135deg,#06434b,#003640);color:white}.brand{display:flex;align-items:center;gap:13px}.brand-icon{font-size:45px;color:#35d2c2;line-height:1}.brand-name{font-size:29px;font-weight:800;line-height:1}.brand-sub{margin-top:6px;font-size:12px;line-height:1.35;color:#d7e9e9}.content{padding:28px 30px 30px}.content h1{font-size:22px;margin:0 0 5px}.intro{font-size:13px;color:#637984;margin:0 0 24px}.field{margin:0 0 16px}.field label{display:block;font-size:12px;font-weight:700;margin-bottom:7px}.input-wrap{position:relative}.input-wrap i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#6b8790}.field input{width:100%;height:48px;border:1px solid #dce8eb;border-radius:13px;background:#fbfdfe;padding:0 14px 0 42px;color:#143c47;font:inherit;font-size:14px;outline:none}.field input:focus{border-color:#0ba39c;box-shadow:0 0 0 3px #0ba39c1b}.password-wrap input{padding-right:48px}.toggle{position:absolute;right:5px;top:5px;width:38px;height:38px;border:0;background:none;color:#66808a;border-radius:10px;cursor:pointer}.remember{display:flex;align-items:center;gap:8px;font-size:12px;color:#58717b;margin:2px 0 20px}.remember input{accent-color:#078d87}.submit{height:49px;width:100%;border:0;border-radius:14px;background:linear-gradient(110deg,#079a78,#008a92);color:white;font:inherit;font-weight:700;cursor:pointer;box-shadow:0 8px 18px #008e812b}.submit:disabled{opacity:.65;cursor:wait}.alert{display:none;margin-bottom:16px;border-radius:12px;padding:11px 12px;font-size:12px;line-height:1.45}.alert.show{display:block}.alert.error{background:#fff3f1;color:#ab4038;border:1px solid #f4d6d2}.alert.success{background:#edf9f4;color:#18724d;border:1px solid #ccebdd}.foot{text-align:center;color:#7c9097;font-size:11px;margin:20px 0 0}@media(max-width:420px){.content{padding:24px 22px 26px}.top{padding:26px 22px}.login{border-radius:23px}}
+    </style>
+</head>
+<body>
+<main class="login">
+    <header class="top"><div class="brand"><i class="brand-icon bi bi-book-half" aria-hidden="true"></i><div><div class="brand-name">AKSARA</div><div class="brand-sub">Aktivitas Sekolah dan<br>Rekam Akademik</div></div></div></header>
+    <section class="content">
+        <h1>Selamat datang</h1><p class="intro">Masuk untuk melanjutkan ke dashboard sekolah.</p>
+        <div id="alert" class="alert" role="status" aria-live="polite"></div>
+        <form id="loginForm">
+            <div class="field"><label for="login">Email atau NIP</label><div class="input-wrap"><i class="bi bi-person" aria-hidden="true"></i><input type="text" id="login" name="login" placeholder="nama@sekolah.sch.id atau NIP" autocomplete="username" required></div></div>
+            <div class="field"><label for="password">Kata sandi</label><div class="input-wrap password-wrap"><i class="bi bi-lock" aria-hidden="true"></i><input type="password" id="password" name="password" placeholder="Masukkan kata sandi" autocomplete="current-password" required><button class="toggle" id="togglePassword" type="button" aria-label="Tampilkan kata sandi"><i class="bi bi-eye"></i></button></div></div>
+        <label class="remember"><input type="checkbox" id="remember"> Tetap masuk di perangkat ini</label>
+            <button class="submit" id="submit" type="submit">Masuk <i class="bi bi-arrow-right-short"></i></button>
+        </form>
+        <p class="foot">Aktivitas Sekolah dan Rekam Akademik</p>
+    </section>
+</main>
+<script>
+(() => {
+    const form = document.getElementById('loginForm');
+    const alertBox = document.getElementById('alert');
+    const button = document.getElementById('submit');
+    const password = document.getElementById('password');
+    if (localStorage.getItem('token') || sessionStorage.getItem('token')) window.location.replace('dashboard.html');
+
+    document.getElementById('togglePassword').addEventListener('click', (event) => {
+        const visible = password.type === 'password';
+        password.type = visible ? 'text' : 'password';
+        event.currentTarget.setAttribute('aria-label', visible ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi');
+        event.currentTarget.innerHTML = `<i class="bi ${visible ? 'bi-eye-slash' : 'bi-eye'}"></i>`;
+    });
+
+    function showAlert(message, type) {
+        alertBox.textContent = message;
+        alertBox.className = `alert show ${type}`;
+    }
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        button.disabled = true;
+        button.textContent = 'Memeriksa…';
+        alertBox.className = 'alert';
+        try {
+            const response = await fetch('/api/v1/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                body: JSON.stringify({ login: document.getElementById('login').value.trim(), password: password.value })
+            });
+            const result = await response.json();
+            const token = result.data?.token || result.token || result.access_token;
+            if (!response.ok || !token) {
+                const validation = result.errors?.login?.[0] || result.message || 'Email/NIP atau kata sandi tidak cocok.';
+                throw new Error(validation);
+            }
+            if (document.getElementById('remember').checked) {
+                localStorage.setItem('token', token);
+                sessionStorage.removeItem('token');
+            } else {
+                sessionStorage.setItem('token', token);
+                localStorage.removeItem('token');
+            }
+            window.location.replace('dashboard.html');
+        } catch (error) {
+            showAlert(error.message || 'Tidak dapat terhubung ke server. Silakan coba lagi.', 'error');
+            button.disabled = false;
+            button.innerHTML = 'Masuk <i class="bi bi-arrow-right-short"></i>';
+        }
+    });
+})();
+</script>
+</body>
+</html>

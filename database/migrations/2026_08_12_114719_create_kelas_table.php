@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('nama_kelas');
             $table->string('tingkat');
             $table->string('jurusan');
+            $table->foreignId('wali_kelas_id')->nullable()->constrained('users')->onDelete('set null');
             $table->timestamps();
         });
     }
