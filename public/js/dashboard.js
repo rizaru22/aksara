@@ -274,16 +274,30 @@
 
     async function openLeave(submitMode = false, page = 1, search = '', perPage = 20) {
         if (submitMode) {
-            setFeature('Pengajuan Izin, Cuti & Dinas Luar', `<div class="alert alert-info small">Pilih jenis pengajuan pada formulir. Untuk sakit, pilih Izin / Cuti dan tuliskan “sakit” pada alasan. Dinas luar tercatat setelah disetujui.</div><form id="leaveForm"><div class="mb-3"><label class="form-label">Jenis pengajuan</label><select name="jenis_pengajuan" class="form-select"><option value="CUTI">Izin / Cuti / Sakit</option><option value="DINAS">Dinas luar</option></select></div><div class="row g-3"><div class="col-sm-12 col-md-6"><label class="form-label">Tanggal mulai</label><input class="form-control" name="tanggal_mulai" type="date" required></div><div class="col-sm-12 col-md-6"><label class="form-label">Tanggal selesai</label><input class="form-control" name="tanggal_selesai" type="date" required></div></div><div class="my-3"><label class="form-label">Alasan</label><textarea name="alasan" class="form-control" rows="4" minlength="10" required></textarea></div><div class="mb-3"><label class="form-label">Lampiran PDF/JPG/PNG (opsional, max 5 MB)</label><input class="form-control" name="berkas_lampiran" type="file" accept=".pdf,image/png,image/jpeg"></div><button class="btn btn-success w-100">Kirim pengajuan</button></form>`);
+            const adminWorkspace = document.body.classList.contains('admin-mode');
+            if (adminWorkspace) setFeature('Ajukan Perizinan', '<div id="leaveSubmitContent"></div>');
+            else setPage('leave');
+            const leaveContent = adminWorkspace ? $('leaveSubmitContent') : $('leavePageContent');
+            $('leavePageContent').innerHTML = `<section class="card"><div class="card-body"><div class="alert alert-info small">Pilih jenis pengajuan pada formulir. Untuk sakit, pilih Izin / Cuti dan tuliskan “sakit” pada alasan. Dinas luar tercatat setelah disetujui.</div><form id="leaveForm"><div class="mb-3"><label class="form-label">Jenis pengajuan</label><select name="jenis_pengajuan" class="form-select"><option value="CUTI">Izin / Cuti / Sakit</option><option value="DINAS">Dinas luar</option></select></div><div class="row g-3"><div class="col-sm-12 col-md-6"><label class="form-label">Tanggal mulai</label><input class="form-control" name="tanggal_mulai" type="date" required></div><div class="col-sm-12 col-md-6"><label class="form-label">Tanggal selesai</label><input class="form-control" name="tanggal_selesai" type="date" required></div></div><div class="my-3"><label class="form-label">Alasan</label><textarea name="alasan" class="form-control" rows="4" minlength="10" required></textarea></div><div class="mb-3"><label class="form-label">Lampiran PDF/JPG/PNG (opsional, max 5 MB)</label><input class="form-control" name="berkas_lampiran" type="file" accept=".pdf,image/png,image/jpeg"></div><button class="btn btn-success w-100">Kirim pengajuan</button></form></div></section>`;
+            if (adminWorkspace) {
+                leaveContent.innerHTML = $('leavePageContent').innerHTML;
+                $('leavePageContent').replaceChildren();
+            }
             $('leaveForm').addEventListener('submit', async (event) => {
                 event.preventDefault();
                 const form = new FormData(event.currentTarget);
                 try {
                     await api('/api/v1/leave-requests', { method: 'POST', body: form });
-                    featureModal.hide();
-                    showToast('Pengajuan berhasil dikirim dan menunggu persetujuan.');
                 }
-                catch (error) { setFeatureError(error); }
+                catch (error) {
+                    leaveContent.insertAdjacentHTML('afterbegin', `<div class="alert alert-danger leave-error">${htmlSafe(error.message)}</div>`);
+                    return;
+                }
+                showToast('Pengajuan berhasil dikirim dan menunggu persetujuan.');
+                openMyLeaveRequests().catch((error) => {
+                    const target = adminWorkspace ? $('adminPanelContent') : $('leavePageContent');
+                    target.innerHTML = `<div class="alert alert-danger">Pengajuan terkirim, tetapi status belum dapat dimuat: ${htmlSafe(error.message)}</div>`;
+                });
             });
             return;
         }
@@ -325,6 +339,10 @@
     }
 
     async function openMyLeaveRequests() {
+        const adminWorkspace = document.body.classList.contains('admin-mode');
+        if (adminWorkspace) setFeature('Riwayat Pengajuan Saya', '<div id="myLeaveRequestsContent"></div>');
+        else setPage('leave');
+        const leaveContent = adminWorkspace ? $('myLeaveRequestsContent') : $('leavePageContent');
         const result = await api('/api/v1/leave-requests/mine');
         const items = result.data || [];
         const statusDetails = {
@@ -341,8 +359,10 @@
                 : `${status.detail}${item.approver?.nama ? ` Oleh ${htmlSafe(item.approver.nama)}.` : ''} · ${formatDateTime(item.updated_at)}`;
             return `<article class="card mb-3"><div class="card-body"><div class="d-flex flex-wrap justify-content-between align-items-start gap-2"><h3 class="h6 mb-0">${type}</h3><span class="badge ${status.badge}">${status.label}</span></div><p class="small text-secondary mt-2 mb-2">${htmlSafe(item.tanggal_mulai)} – ${htmlSafe(item.tanggal_selesai)}</p><p class="mb-2">${htmlSafe(item.alasan)}</p><div class="border-top pt-2 small"><strong>Progres:</strong> ${decision}<br><span class="text-secondary">Dikirim ${formatDateTime(item.created_at)}</span></div>${item.berkas_lampiran ? `<button class="btn btn-outline-secondary btn-sm mt-2" data-attachment="${item.id}">Unduh lampiran</button>` : ''}</div></article>`;
         }).join('');
-        setFeature('Status Pengajuan Saya', `<div class="d-flex justify-content-end mb-3"><button type="button" class="btn btn-outline-primary btn-sm" id="refreshMyLeaveRequests"><i class="bi bi-arrow-clockwise"></i> Perbarui status</button></div>${cards || '<div class="card"><div class="card-body text-center text-secondary">Belum ada pengajuan.</div></div>'}`);
-        $('refreshMyLeaveRequests')?.addEventListener('click', () => openMyLeaveRequests().catch((error) => setFeatureError(error)));
+        leaveContent.innerHTML = `<div class="d-flex justify-content-end mb-3"><button type="button" class="btn btn-outline-primary btn-sm" id="refreshMyLeaveRequests"><i class="bi bi-arrow-clockwise"></i> Perbarui status</button></div>${cards || '<div class="card"><div class="card-body text-center text-secondary">Belum ada pengajuan.</div></div>'}`;
+        $('refreshMyLeaveRequests')?.addEventListener('click', () => openMyLeaveRequests().catch((error) => {
+            leaveContent.innerHTML = `<div class="alert alert-danger">${htmlSafe(error.message)}</div>`;
+        }));
         document.querySelectorAll('[data-attachment]').forEach((button) => button.addEventListener('click', async () => {
             try {
                 const response = await fetch(window.aksaraApiUrl(`/api/v1/leave-requests/${button.dataset.attachment}/attachment`), { headers: { Authorization: `Bearer ${token}` } });
@@ -433,7 +453,7 @@
     }
 
     function setPage(page) {
-        if (!['home', 'notifications', 'reports', 'profile'].includes(page)) page = 'home';
+        if (!['home', 'leave', 'notifications', 'reports', 'profile'].includes(page)) page = 'home';
         if (page === 'notifications') {
             navigator.serviceWorker?.controller?.postMessage({ type: 'aksara:mark-notifications-read' });
         }
@@ -465,8 +485,15 @@
         if (!$('checkOut').disabled) teacherAttendance.attendanceDialog('check-out');
         else showToast($('attendanceState').textContent);
     });
-    $('requestLeaveButton')?.addEventListener('click', () => openLeave(true));
-    $('viewLeaveStatusButton')?.addEventListener('click', () => openMyLeaveRequests().catch((error) => setFeature('Status Pengajuan Saya', `<div class="alert alert-danger mb-0">${htmlSafe(error.message)}</div>`)));
+    $('openLeavePageButton')?.addEventListener('click', () => openMyLeaveRequests().catch((error) => {
+        setPage('leave');
+        $('leavePageContent').innerHTML = `<div class="alert alert-danger">${htmlSafe(error.message)}</div>`;
+    }));
+    $('leaveBackButton')?.addEventListener('click', () => setPage('home'));
+    $('leavePageRequestButton')?.addEventListener('click', () => openLeave(true));
+    $('leavePageHistoryButton')?.addEventListener('click', () => openMyLeaveRequests().catch((error) => {
+        $('leavePageContent').innerHTML = `<div class="alert alert-danger">${htmlSafe(error.message)}</div>`;
+    }));
     const dateFormatter = new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' });
     const clockFormatter = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Jakarta' });
     function updateHeaderDateTime() {
@@ -487,15 +514,15 @@
         const permissions = new Set(Array.isArray(user.permissions) ? user.permissions : []);
         const is = (role) => roles.includes(role);
         const has = (permission) => permissions.has(permission);
+        const canSubmitLeave = has('ajukan-pengajuan-izin') || roles.some((role) => ['guru', 'tendik', 'admin', 'kurikulum'].includes(role));
         const modules = [];
         const add = (key, permission, icon, title, description, condition = true) => {
-            if (condition && has(permission)) modules.push({ key, icon, title, description });
+            if (condition && has(permission) && !modules.some((module) => module.key === key)) modules.push({ key, icon, title, description });
         };
 
         if (is('guru')) {
             add('journal', 'isi-ejurnal', 'bi-journal-text', 'E-Jurnal & Presensi Kelas', 'Pilih jadwal aktif, isi presensi siswa, dan catat materi mengajar.');
             add('student-attendance', 'kelola-presensi-siswa', 'bi-people', 'Koreksi Presensi Siswa', 'Koreksi status pada sesi jurnal di kelas yang Anda ampu.', Boolean(user.is_wali_kelas));
-            add('leave-submit', 'ajukan-pengajuan-izin', 'bi-file-earmark-plus', 'Pengajuan Izin', 'Ajukan cuti atau dinas dan pantau status permohonan.');
         }
         if (is('kurikulum')) {
             add('journal', 'isi-ejurnal', 'bi-journal-text', 'E-Jurnal & Presensi Kelas', 'Isi jurnal dan presensi siswa pada jadwal mengajar yang ditugaskan.');
@@ -526,21 +553,25 @@
             add('settings', 'kelola-master-data', 'bi-sliders', 'Pengaturan Sekolah', 'Atur geofence, semester aktif, dan batas presensi.');
         }
 
+        if (canSubmitLeave && !modules.some((module) => module.key === 'leave-submit')) {
+            modules.push({ key: 'leave-submit', icon: 'bi-file-earmark-plus', title: 'Pengajuan Izin', description: 'Ajukan cuti atau dinas dan pantau status permohonan.' });
+        }
+
         dashboardModules = modules;
         const canAdminDashboard = is('admin') || is('kurikulum');
         document.body.classList.toggle('kepsek-dashboard', is('kepsek') && !canAdminDashboard);
         $('adminDashboardEntry').hidden = !canAdminDashboard;
-        $('teacherLeaveCard').hidden = !has('ajukan-pengajuan-izin');
-        $('roleIntro').hidden = canAdminDashboard || is('guru');
-        $('roleModules').hidden = canAdminDashboard || is('guru');
+        $('teacherLeaveCard').hidden = !canSubmitLeave;
+        $('roleIntro').hidden = canAdminDashboard || is('guru') && !is('tendik');
+        $('roleModules').hidden = canAdminDashboard || is('guru') && !is('tendik');
         $('adminSideModules').innerHTML = modules.filter((module) => module.key !== 'academic-master').map((module) => `<button class="admin-side-link" data-admin-action="${htmlSafe(module.key)}"><i class="bi ${htmlSafe(module.icon)}"></i> ${htmlSafe(module.title)}</button>`).join('');
         $('adminSideModules').querySelectorAll('[data-admin-action]').forEach((button) => button.addEventListener('click', () => {
             document.body.classList.remove('sidebar-open');
             adminAction(button.dataset.adminAction);
         }));
 
-        const labels = { guru: 'Dashboard Guru', kurikulum: 'Dashboard Kurikulum', kepsek: 'Dashboard Kepala Sekolah', admin: 'Dashboard Admin / TU' };
-        const dashboardLabel = ['admin', 'guru', 'kurikulum', 'kepsek'].filter((role) => is(role)).map((role) => labels[role]);
+        const labels = { guru: 'Dashboard Guru', tendik: 'Dashboard Tenaga Kependidikan', kurikulum: 'Dashboard Kurikulum', kepsek: 'Dashboard Kepala Sekolah', admin: 'Dashboard Admin / TU' };
+        const dashboardLabel = ['admin', 'kurikulum', 'kepsek', 'guru', 'tendik'].filter((role) => is(role)).map((role) => labels[role]);
         $('roleDashboardTitle').textContent = dashboardLabel[0] || 'Dashboard Pengguna';
         $('roleDashboardSubtitle').textContent = modules.length ? `${modules.length} menu tersedia untuk akses akun Anda` : 'Belum ada menu yang diberikan untuk akun ini';
 

@@ -40,8 +40,9 @@ Untuk MySQL, isi `DB_CONNECTION=mysql`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB
 
 - Login dan logout berbasis token API Sanctum.
 - Pengaturan role dan permission; menu pada dashboard mengikuti role/permission akun.
-- Admin dapat membuat, mengubah, menghapus, dan mengelola akun, role, serta permission tambahan.
-- Admin dapat mengimpor akun secara batch dari Excel `.xlsx` dengan kolom `nama`, `email`, `nip`, `jenis_kelamin`, dan `sandi`; role dipilih sekali untuk seluruh file. Impor maksimal 2.000 baris dan dibatalkan seluruhnya jika ada kesalahan. Sandi harus minimal 12 karakter. File Excel memuat sandi teks biasa, jadi lindungi dan hapus setelah impor.
+- Lima role tersedia: `guru`, `tendik`, `admin`, `kurikulum`, dan `kepsek`. Satu akun dapat memegang beberapa role; `guru+tendik` tidak diperbolehkan dan `kepsek` harus menjadi role tunggal.
+- Admin dapat membuat, mengubah, menghapus, dan mengelola akun. Formulir akun dan impor Excel menerima beberapa role sekaligus; permission tambahan per akun tetap tersedia.
+- Admin dapat mengimpor akun secara batch dari Excel `.xlsx` dengan kolom `nama`, `email`, `nip`, `jenis_kelamin`, dan `sandi`; satu atau beberapa role dipilih untuk seluruh file. Impor maksimal 2.000 baris dan dibatalkan seluruhnya jika ada kesalahan. Sandi harus minimal 12 karakter. File Excel memuat sandi teks biasa, jadi lindungi dan hapus setelah impor.
 - Lupa kata sandi dan reset melalui tautan email. Admin juga dapat meminta tautan reset untuk akun pengguna.
 - Pengguna dapat mengunggah atau mengganti foto profil.
 - Pembatasan laju permintaan diterapkan pada endpoint sensitif seperti login, reset kata sandi, presensi, dan impor.
@@ -75,7 +76,8 @@ Untuk MySQL, isi `DB_CONNECTION=mysql`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB
 
 - Dashboard menampilkan pengumuman/agenda sekolah yang masih berlaku.
 - Kalender hari libur sekolah dapat dilihat pengguna dan dikelola oleh pemegang permission agenda sekolah.
-- Guru dapat mengaktifkan atau menonaktifkan browser push pada perangkatnya.
+- Pengguna dengan salah satu dari lima role dapat mengaktifkan atau menonaktifkan browser push pada perangkatnya.
+- Guru, tendik, admin, kurikulum, dan kepala sekolah dapat menerima pengingat presensi masuk/pulang. Pengingat jurnal dan foto kegiatan dikirim kepada pengguna yang memiliki izin jurnal dan jadwal mengajar.
 - Pengingat terjadwal meliputi: 10 menit sebelum batas absen masuk, saat batas akhir absen pulang, 15 menit setelah pelajaran dimulai bila jurnal belum dibuat, dan 5 menit sebelum pelajaran berakhir bila foto kegiatan belum diunggah.
 - Badge notifikasi menampilkan jumlah push yang belum dibuka pada browser/perangkat tersebut. Push memerlukan izin browser, dukungan service worker, dan HTTPS.
 

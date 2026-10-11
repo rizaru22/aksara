@@ -32,7 +32,7 @@ class TeacherPushReminderService
         }
 
         $recipients = User::query()
-            ->role(['guru', 'admin', 'kepsek', 'kurikulum'])
+            ->role(['guru', 'tendik', 'admin', 'kepsek', 'kurikulum'])
             ->whereHas('pushSubscriptions')
             ->with('pushSubscriptions')
             ->get();
@@ -57,7 +57,7 @@ class TeacherPushReminderService
         $this->sendAttendanceReminders($recipients, $onLeave, $attendanceSchedule, $now, $sent);
 
         $teachingStaff = $recipients
-            ->filter(fn (User $user) => $user->hasAnyRole(['guru', 'admin', 'kurikulum']))
+            ->filter(fn (User $user) => $user->can('isi-ejurnal'))
             ->values();
         $this->sendLessonReminders($teachingStaff, $onLeave, $weekday, $now, $sent);
 

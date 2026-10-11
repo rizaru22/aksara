@@ -57,6 +57,15 @@ class RoleAndPermissionSeeder extends Seeder
             'absen-pulang',
             'isi-ejurnal',
             'kelola-presensi-siswa',
+            'ajukan-pengajuan-izin',
+        ]);
+
+        // Tenaga kependidikan memiliki akses presensi dan pengajuan izin, tanpa akses jurnal.
+        $roleTendik = Role::firstOrCreate(['name' => 'tendik', 'guard_name' => 'web']);
+        $roleTendik->syncPermissions([
+            'absen-masuk',
+            'absen-pulang',
+            'ajukan-pengajuan-izin',
         ]);
 
         // Role Waka Kurikulum
@@ -72,6 +81,7 @@ class RoleAndPermissionSeeder extends Seeder
             'kelola-agenda-sekolah',
             'kelola-tahun-ajaran',
             'kelola-master-data',
+            'ajukan-pengajuan-izin',
         ]);
 
         // Role Kepala Sekolah

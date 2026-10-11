@@ -134,7 +134,7 @@ class AcademicImportController extends Controller
     private function scheduleRow(array $row): array
     {
         $year = TahunAjaran::query()->where('tahun_ajaran', trim($row['tahun_ajaran'] ?? ''))->first();
-        $teacher = User::query()->where('nip', trim($row['nip_guru'] ?? ''))->role('guru')->first();
+        $teacher = User::query()->where('nip', trim($row['nip_guru'] ?? ''))->role(['guru', 'admin', 'kurikulum', 'kepsek'])->first();
         $class = Kelas::query()->where('nama_kelas', trim($row['nama_kelas'] ?? ''))->first();
         $subject = MataPelajaran::query()->where('kode_mapel', trim($row['kode_mapel'] ?? ''))->first();
         if (! $year) throw new RuntimeException('Tahun ajaran tidak ditemukan; gunakan format yang sama seperti data master.');
@@ -153,7 +153,7 @@ class AcademicImportController extends Controller
     private function optionalTeacher(string $nip): ?User
     {
         if (trim($nip) === '') return null;
-        $teacher = User::query()->where('nip', trim($nip))->role('guru')->first();
+        $teacher = User::query()->where('nip', trim($nip))->role(['guru', 'admin', 'kurikulum', 'kepsek'])->first();
         if (! $teacher) throw new RuntimeException('Wali kelas dengan NIP "'.$nip.'" tidak ditemukan.');
         return $teacher;
     }

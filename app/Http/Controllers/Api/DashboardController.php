@@ -30,7 +30,7 @@ class DashboardController extends Controller
         if (! $holiday && $now->isSunday()) {
             $holiday = (object) ['nama' => 'Hari Minggu', 'jenis' => 'MINGGU'];
         }
-        $teachers = User::role('guru')->orderBy('nama')->get(['id', 'nama', 'nip']);
+        $teachers = User::role(['guru', 'tendik', 'admin', 'kurikulum', 'kepsek'])->orderBy('nama')->get(['id', 'nama', 'nip']);
         $teacherIds = $teachers->pluck('id');
         $attendanceByUser = Absensi::query()->whereDate('tanggal', $date)->whereIn('user_id', $teacherIds)->get()->keyBy('user_id');
         $approvedLeaves = PengajuanIzin::query()

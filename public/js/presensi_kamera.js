@@ -81,11 +81,9 @@ window.createAksaraAttendanceCapture = function () {
             throw new Error(`Kamera atau pendeteksi wajah tidak dapat dijalankan: ${error.message || error}`);
         }
 
-        const challenge = Math.random() < 0.5 ? 'BLINK' : 'TURN_HEAD';
+        const challenge = 'BLINK';
         let blinkOpened = false;
         let blinkClosed = false;
-        let neutralYaw = null;
-        let neutralCount = 0;
         let challengePassed = false;
         let clearFrames = 0;
         let lastTimestamp = -1;
@@ -193,27 +191,13 @@ window.createAksaraAttendanceCapture = function () {
                     }
 
                     if (!challengePassed) {
-                        if (challenge === 'BLINK') {
-                            const left = eyeRatio(points, [33, 133], 159, 145, 158, 153);
-                            const right = eyeRatio(points, [362, 263], 386, 374, 387, 373);
-                            const ratio = (left + right) / 2;
-                            if (ratio > 0.19) blinkOpened = true;
-                            if (blinkOpened && ratio < 0.14) blinkClosed = true;
-                            if (blinkOpened && blinkClosed && ratio > 0.19) challengePassed = true;
-                            status.textContent = challengePassed ? 'Liveness terdeteksi. Tahan wajah tetap di dalam lingkaran…' : 'Kedipkan mata satu kali untuk verifikasi liveness.';
-                        } else {
-                            const yaw = (points[1].x - ((points[33].x + points[263].x) / 2)) / Math.max(0.01, Math.abs(points[33].x - points[263].x));
-                            if (neutralCount < 8) {
-                                neutralCount++;
-                                neutralYaw = neutralYaw === null ? yaw : neutralYaw + ((yaw - neutralYaw) / neutralCount);
-                            } else if (Math.abs(yaw - neutralYaw) > 0.12) challengePassed = true;
-                            status.textContent = challengePassed ? 'Liveness terdeteksi. Kembalikan wajah ke tengah…' : 'Tengokkan kepala sedikit ke kiri atau kanan, lalu kembali ke tengah.';
-                        }
-                    } else if (challenge === 'TURN_HEAD') {
-                        const yaw = (points[1].x - ((points[33].x + points[263].x) / 2)) / Math.max(0.01, Math.abs(points[33].x - points[263].x));
-                        if (Math.abs(yaw - neutralYaw) < 0.06) clearFrames++;
-                        else clearFrames = 0;
-                        status.textContent = clearFrames >= 8 ? 'Liveness berhasil. Mengambil foto…' : 'Kembalikan wajah ke tengah dan tahan sebentar.';
+                        const left = eyeRatio(points, [33, 133], 159, 145, 158, 153);
+                        const right = eyeRatio(points, [362, 263], 386, 374, 387, 373);
+                        const ratio = (left + right) / 2;
+                        if (ratio > 0.19) blinkOpened = true;
+                        if (blinkOpened && ratio < 0.14) blinkClosed = true;
+                        if (blinkOpened && blinkClosed && ratio > 0.19) challengePassed = true;
+                        status.textContent = challengePassed ? 'Liveness terdeteksi. Tahan wajah tetap di dalam lingkaran…' : 'Kedipkan mata satu kali untuk verifikasi liveness.';
                     } else {
                         clearFrames++;
                         status.textContent = clearFrames >= 8 ? 'Liveness berhasil. Mengambil foto…' : 'Liveness terdeteksi. Tahan wajah tetap di dalam lingkaran…';

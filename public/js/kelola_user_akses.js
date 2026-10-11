@@ -33,23 +33,24 @@ window.createAksaraUserAccess = function ({ $, api, htmlSafe, setFeature, setFea
 
         const importPanel = document.createElement('section');
         importPanel.className = 'border rounded p-3 mb-3';
-        importPanel.innerHTML = `<div class="row g-2 align-items-end"><div class="col-12 col-md-4"><label class="form-label" for="userImportRole">Role untuk semua akun di file</label><select class="form-select" id="userImportRole"><option value="">Pilih satu role</option>${(roleResult.roles || []).map((role) => `<option value="${htmlSafe(role)}">${htmlSafe(role)}</option>`).join('')}</select></div><div class="col-12 col-md-8"><p class="small text-secondary mb-0">Kolom Excel: <code>nama</code>, <code>email</code>, <code>nip</code>, <code>jenis_kelamin</code>, <code>sandi</code>. Sandi minimal 12 karakter; jenis kelamin L/P atau Laki-laki/Perempuan. Maksimal 2.000 akun per file; jika ada data tidak valid, seluruh impor dibatalkan.</p></div></div><div class="alert alert-warning small mt-3 mb-0">File Excel berisi sandi dalam teks biasa. Simpan dengan aman dan hapus file setelah impor selesai.</div><input class="d-none" type="file" id="userImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><div id="userImportResult" class="mt-3" aria-live="polite"></div>`;
+        importPanel.innerHTML = `<fieldset class="mb-3"><legend class="form-label fs-6">Role untuk semua akun di file</legend><div class="d-flex flex-wrap gap-3">${(roleResult.roles || []).map((role) => `<label class="form-check"><input class="form-check-input" type="checkbox" name="userImportRoles" value="${htmlSafe(role)}"><span class="form-check-label">${htmlSafe(role)}</span></label>`).join('')}</div><div class="form-text">Pilih satu atau beberapa role. Kepsek berdiri sendiri; guru tidak dapat digabung dengan tendik.</div></fieldset><p class="small text-secondary mb-0">Kolom Excel: <code>nama</code>, <code>email</code>, <code>nip</code>, <code>jenis_kelamin</code>, <code>sandi</code>. Sandi minimal 12 karakter; jenis kelamin L/P atau Laki-laki/Perempuan. Maksimal 2.000 akun per file; jika ada data tidak valid, seluruh impor dibatalkan.</p><div class="alert alert-warning small mt-3 mb-0">File Excel berisi sandi dalam teks biasa. Simpan dengan aman dan hapus file setelah impor selesai.</div><input class="d-none" type="file" id="userImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><div id="userImportResult" class="mt-3" aria-live="polite"></div>`;
         toolbar.parentElement.insertBefore(importPanel, toolbar.nextSibling);
         importButton.addEventListener('click', () => $('userImportFile').click());
         $('userImportFile').addEventListener('change', async (event) => {
             const file = event.currentTarget.files?.[0];
             if (!file) return;
             const resultBox = $('userImportResult');
-            const role = $('userImportRole').value;
-            if (!role) {
-                resultBox.innerHTML = '<div class="alert alert-danger mb-0">Pilih role untuk akun yang akan diimpor.</div>';
+            const roles = [...importPanel.querySelectorAll('[name="userImportRoles"]:checked')].map((input) => input.value);
+            const roleError = getRoleCombinationError(roles);
+            if (roleError) {
+                resultBox.innerHTML = `<div class="alert alert-danger mb-0">${htmlSafe(roleError)}</div>`;
                 event.currentTarget.value = '';
                 return;
             }
             resultBox.innerHTML = '<div class="alert alert-info mb-0">Memvalidasi dan mengimpor akun...</div>';
             const form = new FormData();
             form.append('file', file);
-            form.append('role', role);
+            roles.forEach((role) => form.append('roles[]', role));
             try {
                 const imported = await api('/api/v1/admin/users/import', { method: 'POST', body: form });
                 await openUsers(1);
@@ -75,16 +76,17 @@ window.createAksaraUserAccess = function ({ $, api, htmlSafe, setFeature, setFea
 
     async function openUserForm(user = null) {
         const lists = await api('/api/v1/admin/users/roles');
-        const selectedRole = (user?.roles || [])[0]?.name || '';
+        const selectedRoles = (user?.roles || []).map((role) => typeof role === 'string' ? role : role.name);
         const roleDescriptions = {
             admin: 'Akses administrasi, dashboard admin, absensi, serta jurnal dan presensi siswa saat mengajar.',
             guru: 'Absensi masuk/pulang, jurnal mengajar, dan presensi siswa pada jadwal yang diampu.',
-            kepsek: 'Dashboard eksekutif, absensi, jurnal dan presensi siswa saat mengajar, serta persetujuan izin.',
+            tendik: 'Absensi masuk/pulang dan pengajuan izin/cuti/dinas; tidak mendapat menu jurnal mengajar.',
+            kepsek: 'Dashboard eksekutif, absensi, jurnal dan presensi siswa saat mengajar, serta persetujuan izin. Role ini berdiri sendiri.',
             kurikulum: 'Dashboard kurikulum, absensi, jurnal dan presensi siswa saat mengajar, serta pengelolaan akademik.',
         };
-        const roleChecks = lists.roles.map((role) => `<label class="form-check d-flex align-items-start gap-2 border rounded p-3 m-0"><input class="form-check-input mt-1 flex-shrink-0" type="radio" name="role" value="${htmlSafe(role)}" required ${selectedRole === role ? 'checked' : ''}><span class="form-check-label"><span class="fw-semibold d-block">${htmlSafe(role)}</span><span class="small text-secondary">${htmlSafe(roleDescriptions[role] || 'Akses akun mengikuti izin yang ditetapkan untuk role ini.')}</span></span></label>`).join('');
+        const roleChecks = lists.roles.map((role) => `<label class="form-check d-flex align-items-start gap-2 border rounded p-3 m-0"><input class="form-check-input mt-1 flex-shrink-0" type="checkbox" name="roles" value="${htmlSafe(role)}" ${selectedRoles.includes(role) ? 'checked' : ''}><span class="form-check-label"><span class="fw-semibold d-block">${htmlSafe(role)}</span><span class="small text-secondary">${htmlSafe(roleDescriptions[role] || 'Akses akun mengikuti izin yang ditetapkan untuk role ini.')}</span></span></label>`).join('');
         const permissionChecks = lists.permissions.map((permission) => `<label class="form-check d-flex align-items-center gap-2 border rounded p-3 m-0"><input class="form-check-input mt-0 flex-shrink-0" type="checkbox" name="permissions" value="${htmlSafe(permission)}" ${user?.permissions?.some((item) => item.name === permission) ? 'checked' : ''}><span class="form-check-label">${htmlSafe(permission.replaceAll('-', ' '))}<span class="d-block small text-secondary">Izin tambahan untuk akun ini</span></span></label>`).join('');
-        setFeature(user ? `Ubah Akun: ${user.nama}` : 'Tambah Akun', `<form class="admin-form-card" id="userForm" data-id="${user?.id || ''}"><div class="row g-3 admin-form-grid"><div class="col-sm-12"><label class="form-label">Nama</label><input class="form-control" name="nama" required value="${htmlSafe(user?.nama)}"></div><div class="col-sm-12"><label class="form-label">Jenis kelamin</label><select class="form-select" id="userGender" name="jenis_kelamin"><option value="">Belum diatur</option><option value="L">Laki-laki</option><option value="P">Perempuan</option></select></div><div class="col-sm-12"><label class="form-label">Email</label><input class="form-control" type="email" name="email" required value="${htmlSafe(user?.email)}"></div><div class="col-sm-12"><label class="form-label">NIP (opsional)</label><input class="form-control" name="nip" value="${htmlSafe(user?.nip)}"></div>${user ? '<div class="col-sm-12"><div class="alert alert-info small">Reset kata sandi dikirim melalui tautan email dari daftar pengguna.</div></div>' : '<div class="col-sm-12"><label class="form-label" for="initialPassword">Kata sandi awal (min. 12 karakter)</label><div class="input-group"><input class="form-control" id="initialPassword" type="password" name="password" required minlength="12" autocomplete="new-password"><button class="btn btn-outline-secondary" type="button" data-toggle-password="initialPassword" aria-label="Lihat kata sandi" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></div></div><div class="col-sm-12"><label class="form-label" for="passwordConfirmation">Ulangi kata sandi</label><div class="input-group"><input class="form-control" id="passwordConfirmation" type="password" name="password_confirmation" required minlength="12" autocomplete="new-password"><button class="btn btn-outline-secondary" type="button" data-toggle-password="passwordConfirmation" aria-label="Lihat kata sandi" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></div><div class="form-text">Masukkan sandi yang sama untuk menghindari kesalahan pengetikan.</div></div>'}<div class="col-sm-12 form-span-all"><fieldset class="border rounded p-3"><legend class="float-none w-auto px-2 fs-6 fw-bold mb-1">Pilih satu role</legend><p class="small text-secondary mb-3">Satu akun hanya memiliki satu role. Role menentukan akses utama dan menu dashboard yang tersedia.</p><div class="row g-2">${roleChecks}</div></fieldset></div><div class="col-sm-12 form-span-all"><details class="border rounded p-3" ${user?.permissions?.length ? 'open' : ''}><summary class="fw-semibold">Pengaturan lanjutan: permission tambahan (opsional)</summary><p class="small text-secondary mt-3 mb-2">Permission yang dipilih di sini menambahkan akses di atas akses dari role. Gunakan hanya jika akun ini perlu pengecualian khusus; permission tidak mencabut akses dari role.</p><div class="row g-2">${permissionChecks}</div></details></div><div class="col-sm-12 form-actions"><button class="btn btn-primary">Simpan akun</button></div></div></form>`);
+        setFeature(user ? `Ubah Akun: ${user.nama}` : 'Tambah Akun', `<form class="admin-form-card" id="userForm" data-id="${user?.id || ''}"><div class="row g-3 admin-form-grid"><div class="col-sm-12"><label class="form-label">Nama</label><input class="form-control" name="nama" required value="${htmlSafe(user?.nama)}"></div><div class="col-sm-12"><label class="form-label">Jenis kelamin</label><select class="form-select" id="userGender" name="jenis_kelamin"><option value="">Belum diatur</option><option value="L">Laki-laki</option><option value="P">Perempuan</option></select></div><div class="col-sm-12"><label class="form-label">Email</label><input class="form-control" type="email" name="email" required value="${htmlSafe(user?.email)}"></div><div class="col-sm-12"><label class="form-label">NIP (opsional)</label><input class="form-control" name="nip" value="${htmlSafe(user?.nip)}"></div>${user ? '<div class="col-sm-12"><div class="alert alert-info small">Reset kata sandi dikirim melalui tautan email dari daftar pengguna.</div></div>' : '<div class="col-sm-12"><label class="form-label" for="initialPassword">Kata sandi awal (min. 12 karakter)</label><div class="input-group"><input class="form-control" id="initialPassword" type="password" name="password" required minlength="12" autocomplete="new-password"><button class="btn btn-outline-secondary" type="button" data-toggle-password="initialPassword" aria-label="Lihat kata sandi" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></div></div><div class="col-sm-12"><label class="form-label" for="passwordConfirmation">Ulangi kata sandi</label><div class="input-group"><input class="form-control" id="passwordConfirmation" type="password" name="password_confirmation" required minlength="12" autocomplete="new-password"><button class="btn btn-outline-secondary" type="button" data-toggle-password="passwordConfirmation" aria-label="Lihat kata sandi" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></div><div class="form-text">Masukkan sandi yang sama untuk menghindari kesalahan pengetikan.</div></div>'}<div class="col-sm-12 form-span-all"><fieldset class="border rounded p-3"><legend class="float-none w-auto px-2 fs-6 fw-bold mb-1">Pilih satu atau beberapa role</legend><p class="small text-secondary mb-3">Role menentukan gabungan akses akun. Kepsek tidak dapat digabung; guru dan tendik juga tidak dapat dipasangkan.</p><div class="row g-2">${roleChecks}</div></fieldset></div><div class="col-sm-12 form-span-all"><details class="border rounded p-3" ${user?.permissions?.length ? 'open' : ''}><summary class="fw-semibold">Pengaturan lanjutan: permission tambahan (opsional)</summary><p class="small text-secondary mt-3 mb-2">Permission yang dipilih di sini menambahkan akses di atas akses dari role. Gunakan hanya jika akun ini perlu pengecualian khusus; permission tidak mencabut akses dari role.</p><div class="row g-2">${permissionChecks}</div></details></div><div class="col-sm-12 form-actions"><button class="btn btn-primary">Simpan akun</button></div></div></form>`);
         $('userGender').value = user?.jenis_kelamin || '';
         document.querySelectorAll('[data-toggle-password]').forEach((button) => button.addEventListener('click', () => {
             const input = $(button.dataset.togglePassword);
@@ -111,8 +113,11 @@ window.createAksaraUserAccess = function ({ $, api, htmlSafe, setFeature, setFea
                 confirmationInput.reportValidity();
                 return;
             }
+            const roles = form.getAll('roles');
+            const roleError = getRoleCombinationError(roles);
+            if (roleError) { setFeatureError(new Error(roleError)); return; }
             const body = { nama: form.get('nama'), email: form.get('email'), nip: form.get('nip') || null, jenis_kelamin: form.get('jenis_kelamin') || null,
-                roles: [form.get('role')], permissions: form.getAll('permissions') };
+                roles, permissions: form.getAll('permissions') };
             if (form.get('password')) {
                 body.password = form.get('password');
                 body.password_confirmation = form.get('password_confirmation');
@@ -120,6 +125,13 @@ window.createAksaraUserAccess = function ({ $, api, htmlSafe, setFeature, setFea
             try { await api(`/api/v1/admin/users${user ? `/${user.id}` : ''}`, { method: user ? 'PATCH' : 'POST', body }); showToast('Akun tersimpan.'); openUsers(); }
             catch (error) { setFeatureError(error); }
         });
+    }
+
+    function getRoleCombinationError(roles) {
+        if (!roles.length) return 'Pilih minimal satu role.';
+        if (roles.includes('kepsek') && roles.length > 1) return 'Role kepsek tidak dapat digabung dengan role lain.';
+        if (roles.includes('guru') && roles.includes('tendik')) return 'Role guru tidak dapat digabung dengan role tendik.';
+        return '';
     }
     return { openUsers, openUserForm };
 };

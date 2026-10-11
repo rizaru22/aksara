@@ -83,7 +83,7 @@ class TeacherAttendanceController extends Controller
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'accuracy' => ['required', 'numeric', 'min:0', 'max:3'],
             'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'liveness_type' => ['required', 'in:BLINK,TURN_HEAD'],
+            'liveness_type' => ['required', 'in:BLINK'],
         ]);
 
         $now = now(config('app.timezone'));
@@ -167,7 +167,7 @@ class TeacherAttendanceController extends Controller
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'accuracy' => ['required', 'numeric', 'min:0', 'max:3'],
             'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'liveness_type' => ['required', 'in:BLINK,TURN_HEAD'],
+            'liveness_type' => ['required', 'in:BLINK'],
             'reason' => ['nullable', 'string', 'max:2000'],
         ]);
 

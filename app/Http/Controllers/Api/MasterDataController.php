@@ -33,7 +33,7 @@ class MasterDataController extends Controller
     {
         abort_unless($request->user()->can('kelola-master-data'), 403);
 
-        return response()->json(['data' => User::role('guru')->orderBy('nama')->get(['id', 'nama', 'nip'])]);
+        return response()->json(['data' => User::role(['guru', 'admin', 'kurikulum', 'kepsek'])->orderBy('nama')->get(['id', 'nama', 'nip'])]);
     }
 
     public function index(Request $request, string $resource)

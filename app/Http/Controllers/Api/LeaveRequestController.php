@@ -16,6 +16,8 @@ use Throwable;
 
 class LeaveRequestController extends Controller
 {
+    private const SUBMITTER_ROLES = ['guru', 'tendik', 'admin', 'kurikulum'];
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -28,7 +30,7 @@ class LeaveRequestController extends Controller
             ->latest('created_at')
             ->orderByDesc('id');
         if (! $user->can('kelola-pengajuan-izin')) {
-            abort_unless($user->can('ajukan-pengajuan-izin'), 403);
+            abort_unless($this->canSubmitLeave($user), 403);
             $query->where('user_id', $user->id);
         }
 
@@ -49,7 +51,7 @@ class LeaveRequestController extends Controller
 
     public function mine(Request $request)
     {
-        abort_unless($request->user()->can('ajukan-pengajuan-izin'), 403);
+        abort_unless($this->canSubmitLeave($request->user()), 403);
 
         $items = PengajuanIzin::query()
             ->with('approver:id,nama')
@@ -62,7 +64,7 @@ class LeaveRequestController extends Controller
 
     public function store(Request $request)
     {
-        abort_unless($request->user()->can('ajukan-pengajuan-izin'), 403);
+        abort_unless($this->canSubmitLeave($request->user()), 403);
         $data = $request->validate([
             'jenis_pengajuan' => ['required', 'in:CUTI,DINAS'],
             'tanggal_mulai' => ['required', 'date'],
@@ -122,7 +124,7 @@ class LeaveRequestController extends Controller
 
     private function notifyApprovers(PengajuanIzin $leaveRequest, User $submitter): void
     {
-        if (! $submitter->hasRole('guru')
+        if (! $this->canSubmitLeave($submitter)
             || ! config('webpush.vapid.public_key')
             || ! config('webpush.vapid.private_key')) {
             return;
@@ -155,6 +157,11 @@ class LeaveRequestController extends Controller
                 ]);
             }
         }
+    }
+
+    private function canSubmitLeave(User $user): bool
+    {
+        return $user->can('ajukan-pengajuan-izin') || $user->hasAnyRole(self::SUBMITTER_ROLES);
     }
 
     public function decide(Request $request, PengajuanIzin $pengajuanIzin)

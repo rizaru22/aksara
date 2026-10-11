@@ -33,12 +33,22 @@
             <section class="page active" id="page-home">
                 <div class="welcome"><div class="welcome-copy"><div class="eyebrow" id="greeting">Selamat pagi,</div><h1 id="userName">Pengguna</h1></div><div class="avatar-wrap"><div class="avatar" id="welcomeAvatar"><i class="bi bi-person-fill" aria-hidden="true"></i><img id="welcomePhotoImage" alt="Foto profil guru" hidden></div><div class="avatar-label">Foto</div></div></div>
                 <div class="row g-3 mb-3"><div class="col-sm-12"><section class="card"><div class="card-body"><h2 class="card-heading"><span class="heading-icon"><i class="bi bi-clock-history"></i></span><span class="card-heading-copy"><span>Presensi Harian</span></span></h2><p class="attendance-state" id="attendanceState">Memuat status hari ini</p><div class="row g-3 action-card"><div class="col-sm-6 col-md-6 col-xl-6"><button class="btn btn-success w-100" id="checkIn"><i class="bi bi-box-arrow-in-right"></i> Absen Masuk</button></div><div class="col-sm-6 col-md-6 col-xl-6"><button class="btn btn-primary w-100" id="checkOut"><i class="bi bi-box-arrow-right"></i> Absen Pulang</button></div></div></div></section></div></div>
-                <section class="row g-3 mb-3" id="teacherLeaveCard" hidden><div class="col-sm-12"><article class="card"><div class="card-body"><h2 class="card-heading"><span class="heading-icon"><i class="bi bi-calendar2-check"></i></span><span>Pengajuan Izin, Cuti & Dinas Luar</span></h2><p class="card-description">Ajukan permohonan atau pantau keputusan admin.</p><div class="leave-actions"><button type="button" class="btn btn-outline-success" id="requestLeaveButton"><i class="bi bi-file-earmark-plus"></i> Buat Pengajuan</button><button type="button" class="btn btn-outline-primary" id="viewLeaveStatusButton"><i class="bi bi-list-check"></i> Lihat Status Pengajuan</button></div><p class="form-text mt-2 mb-0">Pengajuan dinas luar berstatus menunggu sampai disetujui. Pengajuan izin, cuti, dan sakit juga tidak dapat diajukan dua kali pada tanggal yang bertumpang tindih.</p></div></article></div></section>
+                <section class="row g-3 mb-3" id="teacherLeaveCard" hidden><div class="col-sm-12"><article class="card"><div class="card-body"><h2 class="card-heading"><span class="heading-icon"><i class="bi bi-calendar2-check"></i></span><span>Pengajuan Izin, Cuti & Dinas Luar</span></h2><p class="card-description">Ajukan permohonan atau pantau keputusan admin.</p><div class="leave-actions"><button type="button" class="btn btn-outline-success" id="openLeavePageButton"><i class="bi bi-box-arrow-up-right"></i> Buka halaman perizinan</button></div><p class="form-text mt-2 mb-0">Pengajuan dinas luar berstatus menunggu sampai disetujui. Pengajuan izin, cuti, dan sakit juga tidak dapat diajukan dua kali pada tanggal yang bertumpang tindih.</p></div></article></div></section>
                 <section class="row g-3" id="homeScheduleCard" hidden><div class="col-sm-12"><article class="card"><div class="card-body"><h2 class="card-heading"><span class="heading-icon"><i class="bi bi-calendar-week"></i></span>Jadwal Mengajar Hari Ini<button class="btn btn-sm btn-outline-success ms-auto" id="refreshSchedule">Muat ulang</button></h2><p class="card-description" id="scheduleCaption">Per kelas sesuai jadwal aktif</p><div class="schedule" id="homeScheduleList"></div></div></article></div></section>
                 <section class="row g-3"><div class="col-sm-12"><article class="card"><div class="card-body"><h2 class="card-heading"><span class="heading-icon"><i class="bi bi-megaphone"></i></span><span>Pengumuman</span><button class="btn btn-sm btn-outline-success ms-auto" id="refreshAnnouncements">Muat ulang</button></h2><div id="homeAnnouncements" class="notice-list"><div class="text-secondary small">Memuat pengumuman...</div></div></div></article></div></section>
                 <section class="row g-3" id="adminDashboardEntry" hidden><div class="col-sm-12"><button type="button" class="announcement text-start" id="openAdminDashboard"><span class="left"><i class="bi bi-speedometer2"></i><span>Dashboard Admin<small class="d-block fw-normal">Kelola sistem, data akademik, dan laporan</small></span></span><i class="bi bi-chevron-right"></i></button></div></section>
                 <section class="card role-intro" id="roleIntro"><div class="card-heading"><span class="heading-icon" id="roleIcon"><i class="bi bi-grid"></i></span><span id="roleDashboardTitle">Dashboard</span></div><p class="card-description" id="roleDashboardSubtitle">Menu sesuai akses akun Anda</p></section>
                 <div class="row g-3 module-grid" id="roleModules" hidden></div>
+            </section>
+            <section class="page" id="page-leave">
+                <button type="button" class="btn btn-outline-secondary btn-sm mb-3" id="leaveBackButton"><i class="bi bi-arrow-left"></i> Kembali ke Beranda</button>
+                <h1 class="page-title card-heading"><span class="heading-icon"><i class="bi bi-calendar2-check"></i></span>Perizinan</h1>
+                <p class="card-description">Ajukan izin, cuti, atau dinas luar dan pantau status pengajuan.</p>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <button type="button" class="btn btn-outline-success" id="leavePageRequestButton"><i class="bi bi-file-earmark-plus"></i> Buat Pengajuan</button>
+                    <button type="button" class="btn btn-outline-primary" id="leavePageHistoryButton"><i class="bi bi-list-check"></i> Riwayat Pengajuan</button>
+                </div>
+                <div id="leavePageContent" aria-live="polite"></div>
             </section>
             <section class="page" id="page-notifications">
                 <h1 class="page-title card-heading"><span class="heading-icon"><i class="bi bi-bell"></i></span>Notifikasi</h1>
@@ -81,14 +91,14 @@
 <script src="js/laporan.js?v=20261011-attendance-duration" defer></script>
 <script src="js/dashboard_admin.js?v=20261011-sunday-off" defer></script>
 <script src="js/admin_reports.js?v=20261011-report-print-pdf" defer></script>
-<script src="js/kelola_user_akses.js?v=20261011-user-import-datatables-all-pages" defer></script>
+<script src="js/kelola_user_akses.js?v=20261011-multi-role" defer></script>
 <script src="js/moderasi_presensi.js?v=20261010-attendance-schedule" defer></script>
 <script src="js/presensi_kamera.js?v=20261011-checkout-proof" defer></script>
 <script src="js/presensi_guru.js?v=20261011-checkout-proof" defer></script>
 <script src="js/data_akademik.js?v=20261011-datatables-all-pages" defer></script>
 <script src="js/kalender_hari_libur.js?v=20261011-holiday-calendar" defer></script>
 <script src="js/tahun_ajaran.js" defer></script>
-    <script src="js/push-notifications.js?v=20261011-push-registration-retry" defer></script>
-    <script src="js/dashboard.js?v=20261011-kepsek-readable" defer></script>
+    <script src="js/push-notifications.js?v=20261011-multi-role" defer></script>
+    <script src="js/dashboard.js?v=20261011-multi-role-leave" defer></script>
 </body>
 </html>

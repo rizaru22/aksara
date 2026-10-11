@@ -32,7 +32,7 @@
 
     async function setup(user) {
         const roles = (user.roles || []).map((role) => typeof role === 'string' ? role : role.name);
-        const supportedRoles = ['guru', 'admin', 'kepsek', 'kurikulum'];
+        const supportedRoles = ['guru', 'tendik', 'admin', 'kepsek', 'kurikulum'];
         if (!roles.some((role) => supportedRoles.includes(role))) return;
 
         const insertionPoint = document.querySelector('#page-notifications .page-title');

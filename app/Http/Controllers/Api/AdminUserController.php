@@ -16,13 +16,14 @@ use Throwable;
 class AdminUserController extends Controller
 {
     private const USER_TEMPLATE = ['Pengguna', ['nama', 'email', 'nip', 'jenis_kelamin', 'sandi']];
+    private const ROLES = ['guru', 'tendik', 'admin', 'kurikulum', 'kepsek'];
 
     public function roles(Request $request)
     {
         abort_unless($request->user()->hasRole('admin'), 403);
 
         return response()->json([
-            'roles' => \Spatie\Permission\Models\Role::query()->orderBy('name')->pluck('name'),
+            'roles' => self::ROLES,
             'permissions' => \Spatie\Permission\Models\Permission::query()->orderBy('name')->pluck('name'),
         ]);
     }
@@ -53,10 +54,16 @@ class AdminUserController extends Controller
     public function import(Request $request, SimpleXlsx $xlsx)
     {
         abort_unless($request->user()->hasRole('admin'), 403);
+        // Terima parameter lama `role` untuk kompatibilitas dengan halaman yang belum diperbarui.
+        if (! $request->has('roles') && $request->filled('role')) {
+            $request->merge(['roles' => [$request->input('role')]]);
+        }
         $data = $request->validate([
             'file' => ['required', 'file', 'mimes:xlsx', 'max:10240'],
-            'role' => ['required', 'string', Rule::exists('roles', 'name')],
+            'roles' => ['required', 'array', 'min:1'],
+            'roles.*' => ['required', 'string', 'distinct', Rule::in(self::ROLES), Rule::exists('roles', 'name')],
         ]);
+        $this->validateRoleCombination($data['roles']);
         if (! class_exists(\ZipArchive::class)) {
             return response()->json(['message' => 'Aktifkan ekstensi PHP zip untuk mengimpor file Excel.'], 503);
         }
@@ -75,12 +82,12 @@ class AdminUserController extends Controller
             DB::transaction(function () use ($users, $data): void {
                 foreach ($users as $attributes) {
                     $user = User::query()->create($attributes);
-                    $user->syncRoles([$data['role']]);
+                    $user->syncRoles($data['roles']);
                 }
             });
 
             return response()->json([
-                'message' => count($users).' pengguna berhasil diimpor dengan role '. $data['role'].'.',
+                'message' => count($users).' pengguna berhasil diimpor dengan role '.implode(', ', $data['roles']).'.',
                 'data' => ['imported' => count($users), 'failed' => 0],
             ]);
         } catch (ValidationException $exception) {
@@ -155,11 +162,12 @@ class AdminUserController extends Controller
             'jenis_kelamin' => ['nullable', 'in:L,P'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
             'password' => ['required', 'string', 'min:12', 'confirmed'],
-            'roles' => ['required', 'array', 'size:1'],
-            'roles.*' => ['required', 'distinct', 'exists:roles,name'],
+            'roles' => ['required', 'array', 'min:1'],
+            'roles.*' => ['required', 'string', 'distinct', Rule::in(self::ROLES), Rule::exists('roles', 'name')],
             'permissions' => ['sometimes', 'array'],
             'permissions.*' => ['required', 'distinct', 'exists:permissions,name'],
         ]);
+        $this->validateRoleCombination($data['roles']);
 
         $user = User::query()->create([
             'nip' => $data['nip'] ?? null,
@@ -182,11 +190,13 @@ class AdminUserController extends Controller
             'nama' => ['sometimes', 'required', 'string', 'max:255'],
             'jenis_kelamin' => ['sometimes', 'nullable', 'in:L,P'],
             'email' => ['sometimes', 'required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'roles' => ['sometimes', 'required', 'array', 'size:1'],
-            'roles.*' => ['required', 'distinct', 'exists:roles,name'],
+            'roles' => ['sometimes', 'required', 'array', 'min:1'],
+            'roles.*' => ['required', 'string', 'distinct', Rule::in(self::ROLES), Rule::exists('roles', 'name')],
             'permissions' => ['sometimes', 'array'],
             'permissions.*' => ['required', 'distinct', 'exists:permissions,name'],
         ]);
+
+        if (isset($data['roles'])) $this->validateRoleCombination($data['roles']);
 
         if (isset($data['roles']) && $user->hasRole('admin') && ! in_array('admin', $data['roles'], true)
             && User::role('admin')->count() <= 1) {
@@ -225,5 +235,16 @@ class AdminUserController extends Controller
         });
 
         return response()->json(['message' => 'Akun tanpa riwayat berhasil dihapus.']);
+    }
+
+    private function validateRoleCombination(array $roles): void
+    {
+        $roles = array_values(array_unique($roles));
+        if (in_array('kepsek', $roles, true) && count($roles) > 1) {
+            throw ValidationException::withMessages(['roles' => 'Role kepsek tidak dapat digabung dengan role lain.']);
+        }
+        if (in_array('guru', $roles, true) && in_array('tendik', $roles, true)) {
+            throw ValidationException::withMessages(['roles' => 'Role guru tidak dapat digabung dengan role tendik.']);
+        }
     }
 }
