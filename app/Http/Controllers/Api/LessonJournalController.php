@@ -10,6 +10,7 @@ use App\Models\PresensiSiswa;
 use App\Models\Setting;
 use App\Models\TahunAjaran;
 use App\Services\CycleScheduleService;
+use App\Services\HaversineService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +26,17 @@ class LessonJournalController extends Controller
         $now = now(config('app.timezone'));
         $this->authorizeSchedule($request, $jadwalPelajaran, $now, $cycles);
 
-        return response()->json(['data' => DB::table('siswas')->where('kelas_id', $jadwalPelajaran->kelas_id)->orderBy('nama')->get(['id', 'nisn', 'nama'])]);
+        $draft = JurnalMengajar::query()->with('presensiSiswas')
+            ->where('user_id', $request->user()->id)
+            ->where('jadwal_pelajaran_id', $jadwalPelajaran->id)
+            ->whereDate('tanggal', $now->toDateString())
+            ->where('status_sesi', 'berlangsung')
+            ->first();
+
+        return response()->json([
+            'data' => DB::table('siswas')->where('kelas_id', $jadwalPelajaran->kelas_id)->orderBy('nama')->get(['id', 'nisn', 'nama']),
+            'draft' => $draft,
+        ]);
     }
 
     public function store(Request $request, CycleScheduleService $cycles)
@@ -36,7 +47,6 @@ class LessonJournalController extends Controller
             'materi_pelajaran_id' => ['nullable', 'integer', 'exists:materi_pelajarans,id'],
             'materi_pembahasan' => ['required', 'string', 'min:3', 'max:10000'],
             'catatan_kejadian_kelas' => ['nullable', 'string', 'max:10000'],
-            'foto_kegiatan' => ['nullable', 'image', 'max:5120'],
             'presensi' => ['required', 'array', 'min:1'],
             'presensi.*.siswa_id' => ['required', 'integer', 'distinct', 'exists:siswas,id'],
             'presensi.*.status' => ['required', 'in:HADIR,SAKIT,IZIN,ALPHA,CABUT'],
@@ -46,6 +56,9 @@ class LessonJournalController extends Controller
         $now = now(config('app.timezone'));
         $schedule = JadwalPelajaran::query()->with('kelas')->findOrFail($data['jadwal_pelajaran_id']);
         $this->authorizeSchedule($request, $schedule, $now, $cycles);
+        if ($request->hasFile('foto_kegiatan')) {
+            throw ValidationException::withMessages(['foto_kegiatan' => 'Foto diambil saat finalisasi jurnal pada 30 menit terakhir pelajaran.']);
+        }
         if ($data['materi_pelajaran_id'] ?? null) {
             $belongsToSubject = DB::table('materi_pelajarans')
                 ->where('id', $data['materi_pelajaran_id'])
@@ -62,54 +75,56 @@ class LessonJournalController extends Controller
             throw ValidationException::withMessages(['presensi' => 'Daftar presensi harus mencakup seluruh siswa kelas dan tidak boleh memuat siswa dari kelas lain.']);
         }
 
-        $photoPath = $request->file('foto_kegiatan')?->store('lesson-journals', 'local');
-        try {
-            $journal = DB::transaction(function () use ($request, $data, $schedule, $now, $photoPath): JurnalMengajar {
-                $lockedSchedule = JadwalPelajaran::query()->lockForUpdate()->findOrFail($schedule->id);
-                $existing = JurnalMengajar::query()
-                    ->where('jadwal_pelajaran_id', $lockedSchedule->id)
-                    ->whereDate('tanggal', $now->toDateString())
-                    ->exists();
-                if ($existing) {
-                    throw new ConflictHttpException('Jurnal untuk sesi jadwal ini sudah pernah dikirim.');
-                }
+        [$journal, $created] = DB::transaction(function () use ($request, $data, $schedule, $now): array {
+            $lockedSchedule = JadwalPelajaran::query()->lockForUpdate()->findOrFail($schedule->id);
+            if (AgendaSekolah::query()
+                ->whereDate('tanggal', $now->toDateString())
+                ->where('scope', 'SEKOLAH')
+                ->where('override_kbm', true)
+                ->where('jam_mulai', '<', $lockedSchedule->jam_selesai)
+                ->where('jam_selesai', '>', $lockedSchedule->jam_mulai)
+                ->exists()) {
+                throw new ConflictHttpException('KBM pada waktu sesi ini ditangguhkan oleh agenda sekolah.');
+            }
 
-                if (AgendaSekolah::query()
-                    ->whereDate('tanggal', $now->toDateString())
-                    ->where('scope', 'SEKOLAH')
-                    ->where('override_kbm', true)
-                    ->where('jam_mulai', '<', $lockedSchedule->jam_selesai)
-                    ->where('jam_selesai', '>', $lockedSchedule->jam_mulai)
-                    ->exists()) {
-                    throw new ConflictHttpException('KBM pada waktu sesi ini ditangguhkan oleh agenda sekolah.');
-                }
+            $journal = JurnalMengajar::query()
+                ->where('jadwal_pelajaran_id', $lockedSchedule->id)
+                ->whereDate('tanggal', $now->toDateString())
+                ->lockForUpdate()
+                ->first();
+            if ($journal && $journal->status_sesi !== 'berlangsung') {
+                throw new ConflictHttpException('Jurnal sesi ini sudah selesai dan tidak dapat diubah.');
+            }
+            $created = ! $journal;
+            $journal ??= new JurnalMengajar;
+            $journal->fill([
+                'user_id' => $request->user()->id,
+                'jadwal_pelajaran_id' => $lockedSchedule->id,
+                'materi_pelajaran_id' => $data['materi_pelajaran_id'] ?? null,
+                'tanggal' => $now->toDateString(),
+                'materi_pembahasan' => $data['materi_pembahasan'],
+                'catatan_kejadian_kelas' => $data['catatan_kejadian_kelas'] ?? null,
+                'jam_mulai_realisasi' => $journal->jam_mulai_realisasi ?? $now,
+                'jam_selesai_realisasi' => null,
+                'status_sesi' => 'berlangsung',
+            ])->save();
 
-                $journal = JurnalMengajar::query()->create([
-                    'user_id' => $request->user()->id,
-                    'jadwal_pelajaran_id' => $lockedSchedule->id,
-                    'materi_pelajaran_id' => $data['materi_pelajaran_id'] ?? null,
-                    'tanggal' => $now->toDateString(),
-                    'materi_pembahasan' => $data['materi_pembahasan'],
-                    'catatan_kejadian_kelas' => $data['catatan_kejadian_kelas'] ?? null,
-                    'foto_kegiatan' => $photoPath,
-                    'jam_selesai_realisasi' => $now,
-                    'status_sesi' => 'selesai',
-                ]);
+            $studentIds = collect($data['presensi'])->pluck('siswa_id')->map(fn ($id) => (int) $id)->all();
+            $journal->presensiSiswas()->whereNotIn('siswa_id', $studentIds)->delete();
+            foreach ($data['presensi'] as $attendance) {
+                $journal->presensiSiswas()->updateOrCreate(
+                    ['siswa_id' => $attendance['siswa_id']],
+                    ['status' => $attendance['status'], 'keterangan' => $attendance['keterangan'] ?? null],
+                );
+            }
 
-                $journal->presensiSiswas()->createMany(collect($data['presensi'])->map(fn (array $attendance) => [
-                    'siswa_id' => $attendance['siswa_id'],
-                    'status' => $attendance['status'],
-                    'keterangan' => $attendance['keterangan'] ?? null,
-                ])->all());
+            return [$journal->load(['jadwalPelajaran.kelas', 'jadwalPelajaran.mataPelajaran', 'presensiSiswas.siswa']), $created];
+        });
 
-                return $journal->load(['jadwalPelajaran.kelas', 'jadwalPelajaran.mataPelajaran', 'presensiSiswas.siswa']);
-            });
-        } catch (\Throwable $exception) {
-            if ($photoPath) Storage::disk('local')->delete($photoPath);
-            throw $exception;
-        }
-
-        return response()->json(['message' => 'E-Jurnal dan presensi siswa berhasil disimpan.', 'data' => $journal], 201);
+        return response()->json([
+            'message' => $created ? 'Draf jurnal dan presensi siswa tersimpan.' : 'Draf jurnal dan presensi siswa diperbarui.',
+            'data' => $journal,
+        ], $created ? 201 : 200);
     }
 
     public function show(Request $request, JurnalMengajar $jurnalMengajar)
@@ -121,24 +136,56 @@ class LessonJournalController extends Controller
         return response()->json(['data' => $jurnalMengajar->load(['jadwalPelajaran.kelas', 'jadwalPelajaran.mataPelajaran', 'presensiSiswas.siswa'])]);
     }
 
-    public function uploadPhoto(Request $request, JurnalMengajar $jurnalMengajar)
+    public function finalize(Request $request, JurnalMengajar $jurnalMengajar, CycleScheduleService $cycles, HaversineService $distance)
     {
         abort_unless($request->user()->can('isi-ejurnal'), 403);
-        abort_unless($jurnalMengajar->user_id === $request->user()->id, 403, 'Anda hanya dapat mengunggah foto untuk jurnal sendiri.');
-
+        abort_unless($jurnalMengajar->user_id === $request->user()->id, 403, 'Anda hanya dapat memfinalisasi draf jurnal sendiri.');
         $data = $request->validate([
             'foto_kegiatan' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'accuracy' => ['required', 'numeric', 'min:0', 'max:3'],
         ]);
+        if ($jurnalMengajar->status_sesi !== 'berlangsung') {
+            throw new ConflictHttpException('Hanya draf jurnal yang dapat difinalisasi.');
+        }
+        $now = now(config('app.timezone'));
+        $schedule = $jurnalMengajar->jadwalPelajaran()->firstOrFail();
+        $this->authorizeSchedule($request, $schedule, $now, $cycles);
+        $this->authorizeFinalizationWindow($schedule, $now);
+        $distanceMeters = $this->verifyFinalizationLocation($data, $distance);
 
-        $previousPhoto = $jurnalMengajar->foto_kegiatan;
-        $jurnalMengajar->foto_kegiatan = $data['foto_kegiatan']->store('lesson-journals', 'local');
-        $jurnalMengajar->save();
-
-        if ($previousPhoto) {
-            Storage::disk('local')->delete($previousPhoto);
+        $expectedIds = DB::table('siswas')->where('kelas_id', $schedule->kelas_id)->pluck('id')->map(fn ($id) => (int) $id)->sort()->values();
+        $draftIds = $jurnalMengajar->presensiSiswas()->pluck('siswa_id')->map(fn ($id) => (int) $id)->sort()->values();
+        if ($expectedIds->isEmpty() || $expectedIds->all() !== $draftIds->all()) {
+            throw ValidationException::withMessages(['presensi' => 'Perbarui draf agar mencakup seluruh siswa kelas sebelum finalisasi.']);
         }
 
-        return response()->json(['message' => 'Foto kegiatan berhasil diunggah.', 'data' => $jurnalMengajar->refresh()]);
+        $photoPath = $data['foto_kegiatan']->store('lesson-journals', 'local');
+        try {
+            $journal = DB::transaction(function () use ($jurnalMengajar, $data, $now, $distanceMeters, $photoPath): JurnalMengajar {
+                $journal = JurnalMengajar::query()->lockForUpdate()->findOrFail($jurnalMengajar->id);
+                if ($journal->status_sesi !== 'berlangsung') {
+                    throw new ConflictHttpException('Draf jurnal sudah difinalisasi.');
+                }
+                $journal->fill([
+                    'foto_kegiatan' => $photoPath,
+                    'lat_finalisasi' => $data['latitude'],
+                    'long_finalisasi' => $data['longitude'],
+                    'gps_accuracy_finalisasi' => $data['accuracy'],
+                    'jarak_geofence_finalisasi' => $distanceMeters,
+                    'jam_selesai_realisasi' => $now,
+                    'status_sesi' => 'selesai',
+                ])->save();
+
+                return $journal->load(['jadwalPelajaran.kelas', 'jadwalPelajaran.mataPelajaran', 'presensiSiswas.siswa']);
+            });
+        } catch (\Throwable $exception) {
+            Storage::disk('local')->delete($photoPath);
+            throw $exception;
+        }
+
+        return response()->json(['message' => 'Jurnal dan presensi siswa berhasil difinalisasi.', 'data' => $journal]);
     }
 
     public function updateStudentAttendance(Request $request, PresensiSiswa $presensiSiswa)
@@ -192,8 +239,43 @@ class LessonJournalController extends Controller
         }
         $start = Carbon::parse($now->toDateString().' '.$schedule->jam_mulai, config('app.timezone'));
         $end = Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
-        if ($now->lt($start) || $now->gt($end->copy()->addMinutes(30))) {
-            throw new ConflictHttpException('E-Jurnal hanya dapat dikirim selama sesi hari ini atau hingga 30 menit sesudahnya.');
+        if ($now->lt($start) || $now->gt($end)) {
+            throw new ConflictHttpException('Draf jurnal hanya dapat diisi selama waktu pembelajaran.');
         }
+    }
+
+    private function authorizeFinalizationWindow(JadwalPelajaran $schedule, Carbon $now): void
+    {
+        $sessionStart = Carbon::parse($now->toDateString().' '.$schedule->jam_mulai, config('app.timezone'));
+        $sessionEnd = Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
+        $windowStart = $sessionEnd->copy()->subMinutes(30);
+        if ($windowStart->lt($sessionStart)) $windowStart = $sessionStart;
+
+        if ($now->lt($windowStart) || $now->gt($sessionEnd)) {
+            throw new ConflictHttpException('Finalisasi jurnal dibuka pukul '.$windowStart->format('H:i').' dan ditutup pukul '.$sessionEnd->format('H:i').'.');
+        }
+    }
+
+    private function verifyFinalizationLocation(array $data, HaversineService $distance): float
+    {
+        $verified = filter_var(Setting::value('geofence_location_verified', false), FILTER_VALIDATE_BOOLEAN);
+        $schoolLatitude = Setting::value('geofence_latitude', config('aksara.geofence.latitude'));
+        $schoolLongitude = Setting::value('geofence_longitude', config('aksara.geofence.longitude'));
+        if (! $verified || $schoolLatitude === null || $schoolLongitude === null) {
+            throw ValidationException::withMessages(['location' => 'Lokasi sekolah belum diverifikasi oleh Admin.']);
+        }
+
+        $distanceMeters = $distance->calculateDistance(
+            (float) $data['latitude'],
+            (float) $data['longitude'],
+            (float) $schoolLatitude,
+            (float) $schoolLongitude,
+        );
+        $radius = (int) Setting::value('geofence_radius_meters', config('aksara.geofence.radius_meters'));
+        if ($distanceMeters > $radius) {
+            throw ValidationException::withMessages(['location' => 'Finalisasi harus dilakukan di area sekolah. Jarak terdeteksi '.$distanceMeters.' m, sedangkan batas geofence '.$radius.' m.']);
+        }
+
+        return $distanceMeters;
     }
 }

@@ -108,9 +108,24 @@
     }
 
     const teacherAttendance = window.createAksaraTeacherAttendance({ $, api, showToast, setFeature, setFeatureError, featureModal });
+    const journalProof = window.createAksaraJournalProof();
 
     const academicData = window.createAksaraAcademicData({ $, api, htmlSafe, setFeature, setFeatureError, showToast, token });
     const academicYears = window.createAksaraAcademicYears({ openMaster: academicData.openMaster });
+
+    function renderJournalAction(schedule, visible = true) {
+        if (!visible) return '';
+        if (schedule.kbm_ditangguhkan) return `<span class="badge text-bg-warning">KBM ditangguhkan</span>`;
+        const journal = schedule.jurnal_hari_ini;
+        if (journal?.status_sesi === 'selesai') return `<span class="badge text-bg-success">Jurnal selesai</span>`;
+        if (journal?.status_sesi === 'berlangsung') {
+            if (schedule.can_finalize_journal) return `<button class="btn btn-sm btn-success" data-journal="${schedule.id}">Selesaikan jurnal</button>`;
+            if (schedule.can_fill_journal) return `<span class="text-end"><button class="btn btn-sm btn-outline-primary" data-journal="${schedule.id}">Lanjutkan draf</button><small class="d-block text-secondary mt-1">${htmlSafe(schedule.journal_finalization_message)}</small></span>`;
+            return `<span class="text-end"><button class="btn btn-sm btn-outline-secondary" disabled>Draf belum selesai</button><small class="d-block text-secondary mt-1">${htmlSafe(schedule.journal_finalization_message || 'Draf belum difinalisasi.')}</small></span>`;
+        }
+        if (schedule.can_fill_journal) return `<button class="btn btn-sm btn-success" data-journal="${schedule.id}">Isi jurnal</button>`;
+        return `<span class="text-end"><button class="btn btn-sm btn-outline-secondary" disabled>${schedule.journal_availability_message?.startsWith('Waktu') ? 'Waktu berakhir' : 'Belum waktunya'}</button><small class="d-block text-secondary mt-1">${htmlSafe(schedule.journal_availability_message || '')}</small></span>`;
+    }
 
     async function openSchedules() {
         const result = await api('/api/v1/teacher/schedules/today');
@@ -122,13 +137,12 @@
         }
         const holidayLabel = meta.hari_libur?.jenis === 'MINGGU' ? 'Hari Minggu' : meta.hari_libur?.jenis.replaceAll('_', ' ');
         const holidayNote = meta.hari_libur ? `<div class="alert alert-info mb-0">${htmlSafe(meta.hari_libur.nama)} · ${htmlSafe(holidayLabel)}. Tidak ada sesi mengajar hari ini.</div>` : '';
-        const list = rows.length ? `<div class="list-group">${rows.map((schedule) => {
-            const journal = schedule.jurnal_hari_ini;
-            const disabled = schedule.kbm_ditangguhkan || journal;
-            return `<article class="list-group-item"><div class="d-flex justify-content-between gap-2"><strong>${htmlSafe(schedule.kelas?.nama_kelas)} · ${htmlSafe(schedule.mata_pelajaran?.nama_mapel)}</strong><span class="small">${htmlSafe(schedule.jam_mulai)}–${htmlSafe(schedule.jam_selesai)}</span></div><div class="small text-secondary">${htmlSafe(schedule.hari)} · Siklus ${htmlSafe(schedule.siklus_minggu || 'Mingguan')}</div>${schedule.kbm_ditangguhkan ? `<div class="alert alert-warning mt-2 mb-0 small">KBM ditangguhkan: ${htmlSafe(schedule.agenda_pengganti)}</div>` : journal ? `<div class="alert alert-success mt-2 mb-0 small">Jurnal sudah dikirim · ${htmlSafe(journal.status_sesi)}</div>` : `<button class="btn btn-success btn-sm mt-2" data-journal="${schedule.id}">Isi E-Jurnal & Presensi Siswa</button>`}</article>`;
-        }).join('')}</div>` : '<div class="card"><div class="card-body text-center text-secondary">Tidak ada jadwal untuk tanggal dan siklus ini.</div></div>';
+        const list = rows.length ? `<div class="list-group">${rows.map((schedule) => `<article class="list-group-item"><div class="d-flex justify-content-between gap-2"><strong>${htmlSafe(schedule.kelas?.nama_kelas)} · ${htmlSafe(schedule.mata_pelajaran?.nama_mapel)}</strong><span class="small">${htmlSafe(schedule.jam_mulai)}–${htmlSafe(schedule.jam_selesai)}</span></div><div class="small text-secondary">${htmlSafe(schedule.hari)} · Siklus ${htmlSafe(schedule.siklus_minggu || 'Mingguan')}</div>${schedule.kbm_ditangguhkan ? `<div class="alert alert-warning mt-2 mb-0 small">KBM ditangguhkan: ${htmlSafe(schedule.agenda_pengganti)}</div>` : `<div class="mt-2">${renderJournalAction(schedule)}</div>`}</article>`).join('')}</div>` : '<div class="card"><div class="card-body text-center text-secondary">Tidak ada jadwal untuk tanggal dan siklus ini.</div></div>';
         setFeature('Jadwal & E-Jurnal Hari Ini', `<div class="alert alert-info small">${htmlSafe(meta.hari)} · ${htmlSafe(meta.tanggal)} · ${htmlSafe(meta.tahun_ajaran)} / ${htmlSafe(meta.semester)} · Siklus ${htmlSafe(meta.siklus_minggu)}</div>${holidayNote || list}`);
-        document.querySelectorAll('[data-journal]').forEach((button) => button.addEventListener('click', () => openJournalForm(button.dataset.journal)));
+        document.querySelectorAll('[data-journal]').forEach((button) => button.addEventListener('click', () => {
+            const schedule = rows.find((item) => String(item.id) === button.dataset.journal);
+            openJournalForm(button.dataset.journal, schedule).catch(setFeatureError);
+        }));
     }
 
     async function loadHomeSchedules() {
@@ -155,15 +169,14 @@
             card.hidden = false;
             list.innerHTML = rows.map((schedule) => {
                 const journal = schedule.jurnal_hari_ini;
-                const isGuru = activeRoleNames.includes('guru');
-                const action = schedule.kbm_ditangguhkan
-                    ? `<span class="badge text-bg-warning">KBM ditangguhkan</span>`
-                    : journal ? (journal.foto_kegiatan ? `<span class="badge text-bg-success">Jurnal & foto tercatat</span>` : `<button class="btn btn-sm btn-outline-success" data-home-journal-photo="${journal.id}">Unggah foto</button>`)
-                        : isGuru ? `<button class="btn btn-sm btn-success" data-home-journal="${schedule.id}">Isi Jurnal</button>` : '';
+                const canUseJournal = dashboardModules.some((module) => module.key === 'journal');
+                const action = renderJournalAction(schedule, canUseJournal);
                 return `<article class="schedule-item ${schedule.kbm_ditangguhkan ? '' : 'current'}"><span><strong>${htmlSafe(schedule.kelas?.nama_kelas || 'Kelas')} · ${htmlSafe(schedule.mata_pelajaran?.nama_mapel || 'Mata pelajaran')}</strong><br><span>${htmlSafe(schedule.jam_mulai)}–${htmlSafe(schedule.jam_selesai)} · Siklus ${htmlSafe(schedule.siklus_minggu || 'Mingguan')}</span>${schedule.agenda_pengganti ? `<br><small>${htmlSafe(schedule.agenda_pengganti)}</small>` : ''}</span>${action}</article>`;
             }).join('');
-            list.querySelectorAll('[data-home-journal]').forEach((button) => button.addEventListener('click', () => openJournalForm(button.dataset.homeJournal)));
-            list.querySelectorAll('[data-home-journal-photo]').forEach((button) => button.addEventListener('click', () => openJournalPhotoUpload(button.dataset.homeJournalPhoto)));
+            list.querySelectorAll('[data-journal]').forEach((button) => button.addEventListener('click', () => {
+                const schedule = rows.find((item) => String(item.id) === button.dataset.journal);
+                openJournalForm(button.dataset.journal, schedule).catch((error) => showToast(error.message));
+            }));
         } catch (error) {
             card.hidden = false;
             list.innerHTML = `<div class="alert alert-warning mb-0 small">Jadwal hari ini belum dapat dimuat: ${htmlSafe(error.message)}</div>`;
@@ -219,14 +232,82 @@
         if (module) return openModule(module);
     }
 
-    async function openJournalForm(scheduleId) {
+    async function openJournalForm(scheduleId, schedule = null) {
         const rosterResult = await api(`/api/v1/teacher/schedules/${scheduleId}/students`);
         const students = rosterResult.data || [];
         if (!students.length) return showToast('Kelas ini belum memiliki data siswa.');
-        setFeature('Isi E-Jurnal & Presensi Siswa', `<form id="journalForm"><input type="hidden" name="jadwal_pelajaran_id" value="${htmlSafe(scheduleId)}"><div class="mb-3"><label class="form-label" for="journalMaterial">ID materi pelajaran (opsional)</label><input class="form-control" id="journalMaterial" name="materi_pelajaran_id" type="number" min="1"><div class="form-text">Materi harus berasal dari mata pelajaran pada jadwal.</div></div><div class="mb-3"><label class="form-label" for="journalSummary">Materi pembahasan</label><textarea class="form-control" id="journalSummary" name="materi_pembahasan" rows="3" required></textarea></div><div class="mb-3"><label class="form-label" for="journalNotes">Catatan kejadian kelas (opsional)</label><textarea class="form-control" id="journalNotes" name="catatan_kejadian_kelas" rows="2"></textarea></div><div class="mb-3"><label class="form-label" for="journalPhoto">Foto kegiatan (opsional)</label><input class="form-control" id="journalPhoto" name="foto_kegiatan" type="file" accept="image/*" capture="environment"></div><h3 class="h6">Presensi siswa (${students.length})</h3><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Siswa</th><th>Status</th></tr></thead><tbody>${students.map((student, index) => `<tr><td>${htmlSafe(student.nama)}<input type="hidden" name="sid-${index}" value="${student.id}"></td><td><select class="form-select form-select-sm" name="status-${index}">${['HADIR', 'SAKIT', 'IZIN', 'ALPHA', 'CABUT'].map((status) => `<option value="${status}" ${status === 'HADIR' ? 'selected' : ''}>${status}</option>`).join('')}</select><input class="form-control form-control-sm mt-1" name="note-${index}" placeholder="Keterangan (opsional)"></td></tr>`).join('')}</tbody></table></div><button class="btn btn-success w-100" type="submit">Simpan Jurnal & Presensi</button></form>`);
-        $('journalForm').addEventListener('submit', async (event) => {
+        const draft = rosterResult.draft;
+        let draftSaved = Boolean(draft);
+        const draftAttendance = new Map((draft?.presensi_siswas || []).map((row) => [Number(row.siswa_id), row]));
+        const canFinalize = Boolean(schedule?.can_finalize_journal);
+        setFeature('Isi E-Jurnal & Presensi Siswa', `<form id="journalForm">
+            <input type="hidden" name="jadwal_pelajaran_id" value="${htmlSafe(scheduleId)}">
+            <div class="alert alert-info small">Tahap 1: isi jurnal dan presensi siswa sebagai draf selama pelajaran. Tahap 2: pada 30 menit terakhir, ambil foto langsung dan verifikasi lokasi sekolah untuk menyelesaikan jurnal.</div>
+            <div class="mb-3"><label class="form-label" for="journalMaterial">ID materi pelajaran (opsional)</label><input class="form-control" id="journalMaterial" name="materi_pelajaran_id" type="number" min="1" value="${htmlSafe(draft?.materi_pelajaran_id || '')}"><div class="form-text">Materi harus berasal dari mata pelajaran pada jadwal.</div></div>
+            <div class="mb-3"><label class="form-label" for="journalSummary">Materi pembahasan</label><textarea class="form-control" id="journalSummary" name="materi_pembahasan" rows="3" required>${htmlSafe(draft?.materi_pembahasan || '')}</textarea></div>
+            <div class="mb-3"><label class="form-label" for="journalNotes">Catatan kejadian kelas (opsional)</label><textarea class="form-control" id="journalNotes" name="catatan_kejadian_kelas" rows="2">${htmlSafe(draft?.catatan_kejadian_kelas || '')}</textarea></div>
+            <h3 class="h6">Presensi siswa (${students.length})</h3>
+            <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Siswa</th><th>Status</th></tr></thead><tbody>${students.map((student, index) => { const existing = draftAttendance.get(Number(student.id)); return `<tr><td>${htmlSafe(student.nama)}<input type="hidden" name="sid-${index}" value="${student.id}"></td><td><select class="form-select form-select-sm" name="status-${index}">${['HADIR', 'SAKIT', 'IZIN', 'ALPHA', 'CABUT'].map((status) => `<option value="${status}" ${status === (existing?.status || 'HADIR') ? 'selected' : ''}>${status}</option>`).join('')}</select><input class="form-control form-control-sm mt-1" name="note-${index}" value="${htmlSafe(existing?.keterangan || '')}" placeholder="Keterangan (opsional)"></td></tr>`; }).join('')}</tbody></table></div>
+            <button class="btn btn-outline-primary w-100" type="submit" name="journalAction" value="draft">Simpan draf jurnal & presensi</button>
+            <div class="border rounded p-3 mt-3 ${canFinalize ? '' : 'd-none'}" id="journalFinalizePanel">
+                <h3 class="h6">Tahap 2 · Finalisasi jurnal</h3>
+                <p class="small text-secondary mb-2">Foto harus diambil langsung dari kamera. Pastikan GPS aktif dan perangkat berada di area sekolah.</p>
+                <video id="journalCamera" class="w-100 rounded mb-2" autoplay playsinline muted hidden></video>
+                <div class="d-flex flex-wrap gap-2"><button class="btn btn-outline-secondary btn-sm" id="journalStartCamera" type="button">Buka kamera</button><button class="btn btn-outline-primary btn-sm" id="journalCapturePhoto" type="button" disabled>Ambil foto</button><button class="btn btn-outline-secondary btn-sm" id="journalVerifyLocation" type="button">Verifikasi lokasi</button></div>
+                <img id="journalPhotoPreview" class="img-fluid rounded mt-2" alt="Pratinjau foto kegiatan" hidden>
+                <div id="journalProofStatus" class="small text-secondary mt-2" aria-live="polite">Foto dan lokasi sekolah wajib diverifikasi untuk finalisasi.</div>
+                <button class="btn btn-success w-100 mt-3" id="journalFinalizeButton" type="submit" name="journalAction" value="finalize" disabled>Finalisasi jurnal</button>
+            </div>
+            ${canFinalize ? '' : `<div class="alert alert-secondary small mt-3 mb-0">${htmlSafe(schedule?.journal_finalization_message || 'Finalisasi tersedia pada 30 menit terakhir sebelum jadwal berakhir.')}</div>`}
+        </form>`);
+        const journalForm = $('journalForm');
+        const camera = $('journalCamera');
+        let photoBlob = null;
+        let photoUrl = null;
+        let verifiedLocation = null;
+        const proofStatus = $('journalProofStatus');
+        const updateFinalizeState = () => { if ($('journalFinalizeButton')) $('journalFinalizeButton').disabled = !(photoBlob && verifiedLocation); };
+        $('journalStartCamera')?.addEventListener('click', async (event) => {
+            const button = event.currentTarget;
+            button.disabled = true;
+            try {
+                await journalProof.startCamera(camera);
+                camera.hidden = false;
+                $('journalCapturePhoto').disabled = false;
+                proofStatus.textContent = 'Kamera aktif. Ambil foto kegiatan saat siap.';
+            } catch (error) { setFeatureError(error); }
+            finally { button.disabled = false; }
+        });
+        $('journalCapturePhoto')?.addEventListener('click', async (event) => {
+            event.currentTarget.disabled = true;
+            try {
+                photoBlob = await journalProof.capture(camera);
+                if (photoUrl) URL.revokeObjectURL(photoUrl);
+                photoUrl = URL.createObjectURL(photoBlob);
+                $('journalPhotoPreview').src = photoUrl;
+                $('journalPhotoPreview').hidden = false;
+                journalProof.stopCamera(camera);
+                camera.hidden = true;
+                proofStatus.textContent = 'Foto siap. Lanjutkan verifikasi lokasi.';
+            } catch (error) { setFeatureError(error); }
+            finally { event.currentTarget.disabled = false; updateFinalizeState(); }
+        });
+        $('journalVerifyLocation')?.addEventListener('click', async (event) => {
+            const button = event.currentTarget;
+            button.disabled = true;
+            verifiedLocation = null;
+            updateFinalizeState();
+            try {
+                verifiedLocation = await journalProof.findPreciseLocation(proofStatus);
+                proofStatus.textContent = `Lokasi akurat ±${Math.ceil(verifiedLocation.accuracy)} m ditemukan. Sistem akan memeriksa jarak ke sekolah saat finalisasi.`;
+            } catch (error) { setFeatureError(error); proofStatus.textContent = error.message; }
+            finally { button.disabled = false; updateFinalizeState(); }
+        });
+        journalForm.addEventListener('submit', async (event) => {
             event.preventDefault();
-            const form = new FormData(event.currentTarget);
+            const submitter = event.submitter;
+            const action = submitter?.value || 'draft';
+            const form = new FormData(journalForm);
             const data = new FormData();
             for (const [key, value] of form.entries()) if (!key.startsWith('sid-') && !key.startsWith('status-') && !key.startsWith('note-')) data.append(key, value);
             students.forEach((student, index) => {
@@ -235,28 +316,42 @@
                 data.append(`presensi[${index}][keterangan]`, form.get(`note-${index}`) || '');
             });
             if (!data.get('materi_pelajaran_id')) data.delete('materi_pelajaran_id');
-            try { await api('/api/v1/lesson-journals', { method: 'POST', body: data }); showToast('Jurnal dan presensi siswa tersimpan.'); openSchedules(); }
-            catch (error) { setFeatureError(error); }
-        });
-    }
-
-    async function openJournalPhotoUpload(journalId) {
-        setFeature('Unggah Foto Kegiatan', `<form id="journalPhotoForm"><p class="text-secondary small">Unggah foto kegiatan untuk melengkapi jurnal pelajaran.</p><div class="mb-3"><label class="form-label" for="journalPhotoUpload">Foto kegiatan</label><input class="form-control" id="journalPhotoUpload" name="foto_kegiatan" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" required></div><button class="btn btn-success w-100" type="submit">Simpan foto</button></form>`);
-        $('journalPhotoForm').addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const submit = event.currentTarget.querySelector('button[type="submit"]');
-            submit.disabled = true;
+            journalForm.querySelectorAll('button[type="submit"]').forEach((button) => { button.disabled = true; });
             try {
-                await api(`/api/v1/lesson-journals/${journalId}/photo`, { method: 'POST', body: new FormData(event.currentTarget) });
+                const saved = await api('/api/v1/lesson-journals', { method: 'POST', body: data });
+                if (action === 'draft') {
+                    draftSaved = true;
+                    showToast('Draf jurnal dan presensi siswa tersimpan.');
+                    await loadHomeSchedules();
+                    return;
+                }
+                if (!draftSaved) {
+                    draftSaved = true;
+                    showToast('Draf jurnal dan presensi tersimpan. Periksa kembali, lalu tekan Finalisasi jurnal untuk menyelesaikan tahap kedua.');
+                    await loadHomeSchedules();
+                    return;
+                }
+                const journalId = saved.data?.id;
+                if (!journalId || !photoBlob || !verifiedLocation) throw new Error('Simpan draf, ambil foto langsung, dan verifikasi lokasi sebelum finalisasi.');
+                const finalData = new FormData();
+                finalData.append('foto_kegiatan', photoBlob, 'foto-kegiatan.jpg');
+                finalData.append('latitude', String(verifiedLocation.latitude));
+                finalData.append('longitude', String(verifiedLocation.longitude));
+                finalData.append('accuracy', String(verifiedLocation.accuracy));
+                await api(`/api/v1/lesson-journals/${journalId}/finalize`, { method: 'POST', body: finalData });
+                journalProof.stopCamera(camera);
+                if (photoUrl) URL.revokeObjectURL(photoUrl);
                 featureModal.hide();
-                showToast('Foto kegiatan berhasil diunggah.');
-                loadHomeSchedules();
-            } catch (error) {
-                setFeatureError(error);
-            } finally {
-                submit.disabled = false;
-            }
+                showToast('Jurnal dan presensi berhasil difinalisasi.');
+                await loadHomeSchedules();
+                openSchedules();
+            } catch (error) { setFeatureError(error); }
+            finally { journalForm.querySelectorAll('button[type="submit"]').forEach((button) => { button.disabled = button.value === 'finalize' ? !(photoBlob && verifiedLocation) : false; }); }
         });
+        featureModal._element?.addEventListener('hidden.bs.modal', () => {
+            journalProof.stopCamera(camera);
+            if (photoUrl) URL.revokeObjectURL(photoUrl);
+        }, { once: true });
     }
 
     async function openWaliSessions() {
@@ -386,9 +481,22 @@
         ];
         const attendanceSchedule = result.attendance_schedule || [];
         const scheduleRows = attendanceSchedule.map((schedule) => `<tr><th scope="row" class="align-middle">${htmlSafe(schedule.hari)}</th><td><input class="form-control" type="time" name="attendance_jam_masuk_mulai[${htmlSafe(schedule.hari)}]" value="${htmlSafe(schedule.jam_masuk_mulai || '')}" aria-label="Awal absen masuk ${htmlSafe(schedule.hari)}"></td><td><input class="form-control" type="time" name="attendance_jam_masuk_akhir[${htmlSafe(schedule.hari)}]" value="${htmlSafe(schedule.jam_masuk_akhir)}" required aria-label="Batas terlambat masuk ${htmlSafe(schedule.hari)}"></td><td><input class="form-control" type="time" name="attendance_jam_pulang_mulai[${htmlSafe(schedule.hari)}]" value="${htmlSafe(schedule.jam_pulang_mulai || '')}" aria-label="Awal absen pulang ${htmlSafe(schedule.hari)}"></td><td><input class="form-control" type="time" name="attendance_jam_pulang_akhir[${htmlSafe(schedule.hari)}]" value="${htmlSafe(schedule.jam_pulang_akhir || '')}" aria-label="Batas akhir absen pulang ${htmlSafe(schedule.hari)}"></td></tr>`).join('');
-        setFeature('Pengaturan Sekolah', `<form class="admin-form" id="settingsForm"><div class="row g-3 admin-form-grid">${fields.map(([key, label, type]) => `<div class="col-sm-12"><label class="form-label">${label}</label>${type === 'select' ? `<select class="form-select" name="${key}">${(key === 'active_semester' ? [['Ganjil', 'Ganjil'], ['Genap', 'Genap']] : [['0', 'Tidak strict'], ['1', 'Strict']]).map(([v, l]) => `<option value="${v}" ${String(settings[key]) === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : `<input class="form-control" name="${key}" type="${type}" value="${htmlSafe(settings[key])}" required>`}</div>`).join('')}<div class="col-sm-12 form-span-all"><section class="border rounded p-3"><h2 class="h6 mb-1">Jadwal presensi harian</h2><p class="small text-secondary mb-3">Sebelum jam awal masuk, tombol absen belum bisa digunakan. Setelah batas masuk dihitung terlambat. Pulang sebelum awal atau setelah akhir jadwal tetap tercatat dengan status khusus dan wajib disertai alasan.</p><div class="table-responsive"><table class="table table-sm align-middle mb-0" style="min-width: 780px"><thead><tr><th>Hari</th><th>Awal masuk</th><th>Batas terlambat</th><th>Awal pulang</th><th>Akhir pulang</th></tr></thead><tbody>${scheduleRows}</tbody></table></div></section></div><div class="col-sm-12 form-span-all"><div class="alert alert-warning small">Status koordinat: <strong>${String(settings.geofence_location_verified) === '1' ? 'terverifikasi' : 'belum terverifikasi'}. </strong>Jika Anda telah memeriksa lokasi sekolah secara langsung, centang konfirmasi berikut.</div><label class="form-check"><input class="form-check-input" name="confirm_geofence_location" type="checkbox"><span class="form-check-label">Saya sudah memverifikasi koordinat lokasi sekolah</span></label></div><div class="col-sm-12 form-actions"><button class="btn btn-primary">Simpan pengaturan</button></div></div></form>`);
+        setFeature('Pengaturan Sekolah', `<form class="admin-form" id="settingsForm" novalidate><div id="settingsFeedback" class="alert d-none" role="alert" aria-live="polite"></div><div class="row g-3 admin-form-grid">${fields.map(([key, label, type]) => `<div class="col-sm-12"><label class="form-label">${label}</label>${type === 'select' ? `<select class="form-select" name="${key}">${(key === 'active_semester' ? [['Ganjil', 'Ganjil'], ['Genap', 'Genap']] : [['0', 'Tidak strict'], ['1', 'Strict']]).map(([v, l]) => `<option value="${v}" ${String(settings[key]) === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : `<input class="form-control" name="${key}" type="${type}" value="${htmlSafe(settings[key])}" ${['geofence_latitude', 'geofence_longitude'].includes(key) ? 'step="any" inputmode="decimal"' : ''} ${['geofence_latitude', 'geofence_longitude'].includes(key) ? '' : 'required'}>`}</div>`).join('')}<div class="col-sm-12 form-span-all"><p class="form-text">Koordinat boleh dikosongkan jika belum diatur. Jika mengubah lokasi, isi latitude dan longitude bersama-sama.</p></div><div class="col-sm-12 form-span-all"><section class="border rounded p-3"><h2 class="h6 mb-1">Jadwal presensi harian</h2><p class="small text-secondary mb-3">Sebelum jam awal masuk, tombol absen belum bisa digunakan. Setelah batas masuk dihitung terlambat. Pulang sebelum awal atau setelah akhir jadwal tetap tercatat dengan status khusus dan wajib disertai alasan.</p><div class="table-responsive"><table class="table table-sm align-middle mb-0" style="min-width: 780px"><thead><tr><th>Hari</th><th>Awal masuk</th><th>Batas terlambat</th><th>Awal pulang</th><th>Akhir pulang</th></tr></thead><tbody>${scheduleRows}</tbody></table></div></section></div><div class="col-sm-12 form-span-all"><div class="alert alert-warning small">Status koordinat: <strong>${String(settings.geofence_location_verified) === '1' ? 'terverifikasi' : 'belum terverifikasi'}. </strong>Jika Anda telah memeriksa lokasi sekolah secara langsung, centang konfirmasi berikut.</div><label class="form-check"><input class="form-check-input" name="confirm_geofence_location" type="checkbox"><span class="form-check-label">Saya sudah memverifikasi koordinat lokasi sekolah</span></label></div><div class="col-sm-12 form-actions"><button class="btn btn-primary" type="submit">Simpan pengaturan</button></div></div></form>`);
+        const settingsFeedback = $('settingsFeedback');
+        const showSettingsError = (message) => {
+            settingsFeedback.textContent = message || 'Pengaturan gagal disimpan. Periksa data dan coba lagi.';
+            settingsFeedback.className = 'alert alert-danger';
+            settingsFeedback.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        };
         $('settingsForm').addEventListener('submit', async (event) => {
             event.preventDefault();
+            settingsFeedback.className = 'alert d-none';
+            if (!event.currentTarget.checkValidity()) {
+                const invalidField = event.currentTarget.querySelector(':invalid');
+                showSettingsError('Periksa kembali kolom wajib dan format angka atau tanggal.');
+                invalidField?.focus();
+                return;
+            }
             const formData = new FormData(event.currentTarget);
             const form = Object.fromEntries([...formData.entries()].filter(([key]) => !key.startsWith('attendance_')));
             form.attendance_schedule = attendanceSchedule.map((schedule) => ({
@@ -398,11 +506,29 @@
                 jam_pulang_mulai: formData.get(`attendance_jam_pulang_mulai[${schedule.hari}]`) || null,
                 jam_pulang_akhir: formData.get(`attendance_jam_pulang_akhir[${schedule.hari}]`) || null,
             }));
-            for (const key of ['geofence_latitude', 'geofence_longitude', 'geofence_radius_meters']) form[key] = Number(form[key]);
+            const hasLatitude = String(form.geofence_latitude || '').trim() !== '';
+            const hasLongitude = String(form.geofence_longitude || '').trim() !== '';
+            if (hasLatitude !== hasLongitude) {
+                showSettingsError('Isi latitude dan longitude sekolah bersama-sama.');
+                return;
+            }
+            if (hasLatitude) {
+                form.geofence_latitude = Number(form.geofence_latitude);
+                form.geofence_longitude = Number(form.geofence_longitude);
+            } else {
+                delete form.geofence_latitude;
+                delete form.geofence_longitude;
+            }
+            form.geofence_radius_meters = Number(form.geofence_radius_meters);
             form.is_geofence_strict = form.is_geofence_strict === '1';
             form.confirm_geofence_location = form.confirm_geofence_location === 'on';
-            try { await api('/api/v1/admin/settings', { method: 'PUT', body: { settings: form } }); showToast('Pengaturan diperbarui.'); openSettings(); }
-            catch (error) { setFeatureError(error); }
+            try {
+                await api('/api/v1/admin/settings', { method: 'PUT', body: { settings: form } });
+                showToast('Pengaturan diperbarui.');
+                openSettings().catch((error) => showSettingsError(`Pengaturan tersimpan, tetapi gagal memuat ulang data: ${error.message}`));
+            } catch (error) {
+                showSettingsError(error.message);
+            }
         });
     }
 

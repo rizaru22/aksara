@@ -115,6 +115,10 @@ return new class extends Migration
             $table->text('materi_pembahasan');
             $table->text('catatan_kejadian_kelas')->nullable();
             $table->string('foto_kegiatan')->nullable();
+            $table->decimal('lat_finalisasi', 10, 8)->nullable();
+            $table->decimal('long_finalisasi', 11, 8)->nullable();
+            $table->double('gps_accuracy_finalisasi')->nullable();
+            $table->double('jarak_geofence_finalisasi')->nullable();
             $table->timestamp('jam_mulai_realisasi')->nullable();
             $table->timestamp('jam_selesai_realisasi')->nullable();
             $table->enum('status_sesi', ['berlangsung', 'selesai', 'flagged'])->default('berlangsung');

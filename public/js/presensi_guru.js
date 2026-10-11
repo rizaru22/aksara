@@ -1,6 +1,7 @@
 window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature, setFeatureError, featureModal }) {
     const MAX_GPS_ACCURACY = 3;
     const captureModule = window.createAksaraAttendanceCapture();
+    let checkInWindowTimer;
 
     async function refreshAttendance() {
         try {
@@ -8,6 +9,11 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
             const item = result.data;
             const holiday = result.holiday;
             const leave = result.approved_leave;
+            clearTimeout(checkInWindowTimer);
+            const secondsUntilCheckIn = Number(result.check_in_seconds_until) || 0;
+            if (secondsUntilCheckIn > 0 && secondsUntilCheckIn < 2147483) {
+                checkInWindowTimer = setTimeout(refreshAttendance, secondsUntilCheckIn * 1000 + 500);
+            }
             if (holiday) {
                 const holidayType = { NASIONAL: 'Libur nasional', CUTI_BERSAMA: 'Cuti bersama', SEKOLAH: 'Libur sekolah', MINGGU: 'Hari Minggu' }[holiday.jenis] || 'Hari libur';
                 $('checkIn').disabled = true;
@@ -25,9 +31,13 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
                 $('checkOut').disabled = !existingCheckIn || Boolean(item?.jam_pulang);
                 return;
             }
-            if (!item) {
-                $('attendanceState').textContent = 'Belum melakukan absen masuk hari ini';
-                $('checkIn').disabled = false;
+            if (!item || !item.jam_masuk) {
+                const opensAt = result.check_in_opens_at || '07:00';
+                const tooEarly = result.check_in_available === false;
+                $('attendanceState').textContent = tooEarly
+                    ? `Absen masuk dibuka pukul ${opensAt}. Tombol akan aktif setelah waktu tersebut.`
+                    : `Belum melakukan absen masuk hari ini. Absen dibuka pukul ${opensAt}.`;
+                $('checkIn').disabled = tooEarly;
                 $('checkOut').disabled = true;
                 return;
             }

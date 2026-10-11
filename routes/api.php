@@ -55,7 +55,7 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
     Route::get('/reports/my-attendance', [AttendanceReportController::class, 'mine']);
     Route::get('/teacher/schedules/{jadwalPelajaran}/students', [LessonJournalController::class, 'students'])->middleware('permission:isi-ejurnal');
     Route::post('/lesson-journals', [LessonJournalController::class, 'store'])->middleware(['permission:isi-ejurnal', 'throttle:10,1']);
-    Route::post('/lesson-journals/{jurnalMengajar}/photo', [LessonJournalController::class, 'uploadPhoto'])->middleware(['permission:isi-ejurnal', 'throttle:6,1']);
+    Route::post('/lesson-journals/{jurnalMengajar}/finalize', [LessonJournalController::class, 'finalize'])->middleware(['permission:isi-ejurnal', 'throttle:6,1']);
     Route::get('/lesson-journals/{jurnalMengajar}', [LessonJournalController::class, 'show']);
     Route::patch('/student-attendances/{presensiSiswa}', [LessonJournalController::class, 'updateStudentAttendance'])->middleware('permission:kelola-presensi-siswa');
     Route::get('/student-attendances/wali-sessions', [LessonJournalController::class, 'waliSessions'])->middleware('permission:kelola-presensi-siswa');

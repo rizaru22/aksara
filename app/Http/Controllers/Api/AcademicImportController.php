@@ -22,7 +22,7 @@ class AcademicImportController extends Controller
 {
     private const TEMPLATES = [
         'classes' => ['Kelas', ['nama_kelas', 'tingkat', 'jurusan', 'wali_kelas_nip']],
-        'students' => ['Siswa', ['nisn', 'nama', 'nama_kelas', 'jenis_kelamin']],
+        'students' => ['Siswa', ['nisn', 'nama', 'jenis_kelamin']],
         'subjects' => ['Mata_Pelajaran', ['kode_mapel', 'nama_mapel']],
         'materials' => ['Materi_Pelajaran', ['kode_mapel', 'urutan_bab', 'judul_bab', 'target_jjp']],
         'schedules' => ['Jadwal_Pelajaran', ['tahun_ajaran', 'semester', 'nip_guru', 'nama_kelas', 'kode_mapel', 'siklus_minggu', 'hari', 'jam_mulai', 'jam_selesai']],
@@ -45,6 +45,9 @@ class AcademicImportController extends Controller
     {
         abort_unless(isset(self::TEMPLATES[$resource]), 404);
         $request->validate(['file' => 'required|file|mimes:xlsx|max:10240']);
+        $classId = $resource === 'students'
+            ? $request->validate(['class_id' => 'required|integer|exists:kelas,id'])['class_id']
+            : null;
         if (! class_exists(\ZipArchive::class)) return response()->json(['message' => 'Aktifkan ekstensi PHP zip untuk mengimpor file Excel.'], 503);
 
         try {
@@ -54,7 +57,7 @@ class AcademicImportController extends Controller
             $missing = array_values(array_diff($expected, $headers));
             if ($missing) throw ValidationException::withMessages(['file' => 'Kolom template tidak lengkap: '.implode(', ', $missing).'. Unduh template terbaru.']);
             if (count($rows) > 2000) throw ValidationException::withMessages(['file' => 'Maksimum 2.000 baris data per impor.']);
-            $records = $this->mapRows($resource, $rows);
+            $records = $this->mapRows($resource, $rows, $classId);
             DB::transaction(function () use ($resource, $records): void {
                 foreach ($records as $record) {
                     match ($resource) {
@@ -77,7 +80,7 @@ class AcademicImportController extends Controller
         }
     }
 
-    private function mapRows(string $resource, array $rows): array
+    private function mapRows(string $resource, array $rows, ?int $classId = null): array
     {
         $mapped = [];
         $errors = [];
@@ -86,7 +89,7 @@ class AcademicImportController extends Controller
             try {
                 $record = match ($resource) {
                     'classes' => $this->classRow($row),
-                    'students' => $this->studentRow($row),
+                    'students' => $this->studentRow($row, $classId),
                     'subjects' => $this->subjectRow($row),
                     'materials' => $this->materialRow($row),
                     'schedules' => $this->scheduleRow($row),
@@ -112,11 +115,9 @@ class AcademicImportController extends Controller
         return ['nama_kelas' => $row['nama_kelas'] ?? '', 'tingkat' => $row['tingkat'] ?? '', 'jurusan' => $row['jurusan'] ?? '', 'wali_kelas_id' => $wali?->id];
     }
 
-    private function studentRow(array $row): array
+    private function studentRow(array $row, ?int $classId): array
     {
-        $class = Kelas::query()->where('nama_kelas', trim($row['nama_kelas'] ?? ''))->first();
-        if (! $class) throw new RuntimeException('Kelas "'.($row['nama_kelas'] ?? '').'" tidak ditemukan; impor kelas lebih dahulu.');
-        return ['nisn' => $row['nisn'] ?? '', 'nama' => $row['nama'] ?? '', 'kelas_id' => $class->id, 'jenis_kelamin' => strtoupper($row['jenis_kelamin'] ?? '')];
+        return ['nisn' => trim($row['nisn'] ?? ''), 'nama' => trim($row['nama'] ?? ''), 'kelas_id' => $classId, 'jenis_kelamin' => strtoupper(trim($row['jenis_kelamin'] ?? ''))];
     }
 
     private function subjectRow(array $row): array

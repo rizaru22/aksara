@@ -32,6 +32,11 @@ class TeacherAttendanceController extends Controller
         if (! $holiday && $now->isSunday()) {
             $holiday = (object) ['nama' => 'Hari Minggu', 'jenis' => 'MINGGU'];
         }
+        $checkInStart = $this->checkInStartAt($now);
+        $checkInAvailable = ! $holiday
+            && ! $approvedLeave
+            && ! $attendance?->jam_masuk
+            && $now->greaterThanOrEqualTo($checkInStart);
 
         return response()->json([
             'data' => $attendance,
@@ -40,6 +45,9 @@ class TeacherAttendanceController extends Controller
                 'tanggal_selesai' => $approvedLeave->tanggal_selesai,
             ] : null,
             'holiday' => $holiday,
+            'check_in_available' => $checkInAvailable,
+            'check_in_opens_at' => $checkInStart->format('H:i'),
+            'check_in_seconds_until' => max(0, $checkInStart->getTimestamp() - $now->getTimestamp()),
         ]);
     }
 
@@ -65,6 +73,11 @@ class TeacherAttendanceController extends Controller
         if ($this->approvedLeaveForDate($request->user(), $now)
             && ($action === 'check-in' || ! $attendance?->jam_masuk)) {
             throw ValidationException::withMessages(['location' => 'Presensi dinonaktifkan karena izin/cuti Anda disetujui hari ini.']);
+        }
+        if ($action === 'check-in' && $now->lessThan($this->checkInStartAt($now))) {
+            throw ValidationException::withMessages([
+                'attendance' => 'Absen masuk baru dapat dilakukan mulai pukul '.$this->checkInStartAt($now)->format('H:i').'.',
+            ]);
         }
 
         $geo = $this->geofence($distance, (float) $validated['latitude'], (float) $validated['longitude']);
@@ -119,13 +132,11 @@ class TeacherAttendanceController extends Controller
                 }
 
                 $schedule = JadwalPresensiHarian::query()->where('hari', $this->hariPresensi($now))->first();
-                if ($schedule?->jam_masuk_mulai) {
-                    $checkInStart = Carbon::parse($now->toDateString().' '.$schedule->jam_masuk_mulai, config('app.timezone'));
-                    if ($now->lessThan($checkInStart)) {
-                        throw ValidationException::withMessages([
-                            'attendance' => 'Absen masuk untuk hari ini baru dibuka pukul '.$checkInStart->format('H:i').'.',
-                        ]);
-                    }
+                $checkInStart = $this->checkInStartAt($now, $schedule);
+                if ($now->lessThan($checkInStart)) {
+                    throw ValidationException::withMessages([
+                        'attendance' => 'Absen masuk untuk hari ini baru dibuka pukul '.$checkInStart->format('H:i').'.',
+                    ]);
                 }
                 $deadline = $schedule?->jam_masuk_akhir ?? Setting::value('jam_masuk_batas', '07:15:00');
                 $deadlineAt = Carbon::parse($now->toDateString().' '.$deadline, config('app.timezone'));
@@ -301,6 +312,14 @@ class TeacherAttendanceController extends Controller
             1 => 'Senin', 2 => 'Selasa', 3 => 'Rabu', 4 => 'Kamis',
             5 => 'Jumat', 6 => 'Sabtu', 7 => 'Minggu',
         ][$date->dayOfWeekIso];
+    }
+
+    private function checkInStartAt(Carbon $date, ?JadwalPresensiHarian $schedule = null): Carbon
+    {
+        $schedule ??= JadwalPresensiHarian::query()->where('hari', $this->hariPresensi($date))->first();
+        $startTime = $schedule?->jam_masuk_mulai ?: '07:00';
+
+        return Carbon::parse($date->toDateString().' '.$startTime, config('app.timezone'));
     }
 
     private function approvedLeaveForDate(User $user, Carbon $date): ?PengajuanIzin

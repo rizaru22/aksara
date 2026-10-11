@@ -10,6 +10,7 @@ use App\Models\Setting;
 use App\Models\TahunAjaran;
 use App\Services\ActiveAcademicYearService;
 use App\Services\CycleScheduleService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
@@ -50,11 +51,27 @@ class TeacherScheduleController extends Controller
             ->where('override_kbm', true)
             ->get();
 
-        $data = $schedules->map(function (JadwalPelajaran $schedule) use ($agendas) {
+        $data = $schedules->map(function (JadwalPelajaran $schedule) use ($agendas, $now) {
             $schedule->setAttribute('jurnal_hari_ini', $schedule->jurnalMengajars->first());
             $agenda = $agendas->first(fn (AgendaSekolah $item) => $item->jam_mulai < $schedule->jam_selesai && $item->jam_selesai > $schedule->jam_mulai);
             $schedule->setAttribute('kbm_ditangguhkan', (bool) $agenda);
             $schedule->setAttribute('agenda_pengganti', $agenda?->nama_agenda);
+            $journalStartsAt = Carbon::parse($now->toDateString().' '.$schedule->jam_mulai, config('app.timezone'));
+            $scheduleEndsAt = Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
+            $finalizationStartsAt = $scheduleEndsAt->copy()->subMinutes(30);
+            if ($finalizationStartsAt->lt($journalStartsAt)) $finalizationStartsAt = $journalStartsAt;
+            $canFillJournal = ! $now->lt($journalStartsAt) && ! $now->gt($scheduleEndsAt);
+            $availabilityMessage = $now->lt($journalStartsAt)
+                ? 'Draf jurnal dapat diisi mulai pukul '.$journalStartsAt->format('H:i').'.'
+                : ($now->gt($scheduleEndsAt) ? 'Waktu pengisian draf berakhir pukul '.$scheduleEndsAt->format('H:i').'.' : null);
+            $canFinalizeJournal = ! $now->lt($finalizationStartsAt) && ! $now->gt($scheduleEndsAt);
+            $finalizationMessage = $now->lt($finalizationStartsAt)
+                ? 'Finalisasi dibuka pukul '.$finalizationStartsAt->format('H:i').'.'
+                : ($now->gt($scheduleEndsAt) ? 'Finalisasi ditutup pukul '.$scheduleEndsAt->format('H:i').'.' : 'Finalisasi harus dilakukan sebelum jadwal berakhir pukul '.$scheduleEndsAt->format('H:i').'.');
+            $schedule->setAttribute('can_fill_journal', $canFillJournal);
+            $schedule->setAttribute('journal_availability_message', $availabilityMessage);
+            $schedule->setAttribute('can_finalize_journal', $canFinalizeJournal);
+            $schedule->setAttribute('journal_finalization_message', $finalizationMessage);
             unset($schedule->jurnalMengajars);
 
             return $schedule;

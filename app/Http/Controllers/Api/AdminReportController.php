@@ -122,7 +122,12 @@ class AdminReportController extends Controller
             'attendance' => $attendanceRows,
             'attendance_hours_note' => 'Dinas luar yang disetujui dihitung sebagai hari hadir. Jika tidak ada jam presensi aktual, jam kerja dikreditkan sesuai rentang jadwal presensi sekolah pada hari tersebut.',
             'classes' => $classRows,
-            'class_summary' => ['total' => $classRows->count(), 'filled' => $classRows->where('journal_filled', true)->count(), 'missing' => $classRows->where('journal_filled', false)->count()],
+            'class_summary' => [
+                'total' => $classRows->count(),
+                'filled' => $classRows->where('journal_filled', true)->count(),
+                'draft' => $classRows->where('journal_status', 'berlangsung')->count(),
+                'missing' => $classRows->where('journal_status', 'Belum diisi')->count(),
+            ],
             'teachers_missing_journal' => $missingByTeacher,
         ];
     }
@@ -219,7 +224,8 @@ class AdminReportController extends Controller
                     'nip' => $schedule->guru?->nip, 'class_name' => $schedule->kelas?->nama_kelas ?? 'Kelas tidak ditemukan',
                     'subject_name' => $schedule->mataPelajaran?->nama_mapel ?? 'Mata pelajaran',
                     'start' => substr((string) $schedule->jam_mulai, 0, 5), 'end' => substr((string) $schedule->jam_selesai, 0, 5),
-                    'journal_filled' => (bool) $journal, 'journal_status' => $journal ? $journal->status_sesi : 'Belum diisi',
+                    'journal_filled' => $journal?->status_sesi === 'selesai',
+                    'journal_status' => $journal?->status_sesi ?? 'Belum diisi',
                     'materi' => $journal?->materi_pembahasan, 'catatan' => $journal?->catatan_kejadian_kelas,
                     'has_photo' => (bool) $journal?->foto_kegiatan,
                 ]);
