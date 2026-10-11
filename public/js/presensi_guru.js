@@ -1,0 +1,202 @@
+window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature, setFeatureError, featureModal }) {
+    const MAX_GPS_ACCURACY = 3;
+    const captureModule = window.createAksaraAttendanceCapture();
+
+    async function refreshAttendance() {
+        try {
+            const result = await api('/api/v1/teacher/attendance/today');
+            const item = result.data;
+            const holiday = result.holiday;
+            const leave = result.approved_leave;
+            if (holiday) {
+                const holidayType = { NASIONAL: 'Libur nasional', CUTI_BERSAMA: 'Cuti bersama', SEKOLAH: 'Libur sekolah', MINGGU: 'Hari Minggu' }[holiday.jenis] || 'Hari libur';
+                $('checkIn').disabled = true;
+                $('checkOut').disabled = true;
+                $('attendanceState').textContent = `${holidayType}: ${holiday.nama}. Tombol absen masuk dan pulang dinonaktifkan hari ini.`;
+                return;
+            }
+            if (leave) {
+                const start = leave.tanggal_mulai;
+                const end = leave.tanggal_selesai;
+                const dateRange = start === end ? start : `${start}–${end}`;
+                const existingCheckIn = Boolean(item?.jam_masuk);
+                $('attendanceState').textContent = `Izin/cuti disetujui (${dateRange}). Absen masuk dinonaktifkan.${existingCheckIn && !item.jam_pulang ? ' Absen pulang tersedia untuk melengkapi presensi yang sudah tercatat.' : ''}`;
+                $('checkIn').disabled = true;
+                $('checkOut').disabled = !existingCheckIn || Boolean(item?.jam_pulang);
+                return;
+            }
+            if (!item) {
+                $('attendanceState').textContent = 'Belum melakukan absen masuk hari ini';
+                $('checkIn').disabled = false;
+                $('checkOut').disabled = true;
+                return;
+            }
+            const checkoutStatus = item.status_waktu_pulang ? ` · ${item.status_waktu_pulang.replaceAll('_', ' ')}` : '';
+            $('attendanceState').textContent = `Masuk ${item.jam_masuk || '—'} · Pulang ${item.jam_pulang || 'belum tercatat'}${checkoutStatus} · ${item.status_verifikasi_masuk}`;
+            $('checkIn').disabled = Boolean(item.jam_masuk);
+            $('checkOut').disabled = !item.jam_masuk || Boolean(item.jam_pulang);
+        } catch (error) {
+            $('attendanceState').textContent = error.message;
+            $('checkIn').disabled = true;
+            $('checkOut').disabled = true;
+        }
+    }
+
+    function findPreciseLocation(status, preflight, signal, action = 'check-in') {
+        if (!navigator.geolocation) return Promise.reject(new Error('Browser ini tidak menyediakan GPS.'));
+        if (signal?.aborted) return Promise.reject(new DOMException('Pencarian lokasi dibatalkan.', 'AbortError'));
+        return new Promise((resolve, reject) => {
+            let watchId;
+            let timer;
+            let checking = false;
+            let settled = false;
+            let abortHandler;
+            const finish = (callback, value) => {
+                if (settled) return;
+                settled = true;
+                if (watchId !== undefined) navigator.geolocation.clearWatch(watchId);
+                clearTimeout(timer);
+                if (abortHandler) signal?.removeEventListener('abort', abortHandler);
+                callback(value);
+            };
+            abortHandler = () => finish(reject, new DOMException('Pencarian lokasi dibatalkan.', 'AbortError'));
+            signal?.addEventListener('abort', abortHandler, { once: true });
+            status.textContent = 'Mencari GPS akurasi tinggi. Tetap di area terbuka…';
+            watchId = navigator.geolocation.watchPosition(async (position) => {
+                const accuracy = Number(position.coords.accuracy);
+                status.textContent = `Akurasi GPS saat ini ±${Math.ceil(accuracy)} m. Menargetkan ≤${MAX_GPS_ACCURACY} m…`;
+                if (accuracy > MAX_GPS_ACCURACY || checking) return;
+                checking = true;
+                const location = {
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy,
+                    action,
+                };
+                try {
+                    if (preflight) {
+                        status.textContent = 'Akurasi GPS tercapai. Memeriksa jarak ke area sekolah…';
+                        const check = await api('/api/v1/teacher/attendance/location-check', { method: 'POST', body: location });
+                        if (!check.within) {
+                            const distance = Math.round(check.distance_meters);
+                            finish(reject, new Error(`Lokasi berada di luar area sekolah (${distance} m dari titik sekolah, batas ${check.radius_meters} m).`));
+                            return;
+                        }
+                    }
+                    finish(resolve, location);
+                } catch (error) {
+                    finish(reject, error);
+                } finally {
+                    checking = false;
+                }
+            }, (error) => {
+                if (error.code === error.TIMEOUT) {
+                    status.textContent = 'GPS belum mendapat posisi akurat. Tetap di area terbuka, sedang mencoba lagi…';
+                    return;
+                }
+                const message = error.code === error.PERMISSION_DENIED
+                    ? 'Izin lokasi ditolak. Aktifkan GPS dan izinkan lokasi untuk situs ini.'
+                    : error.code === error.POSITION_UNAVAILABLE
+                        ? 'Lokasi GPS belum tersedia. Periksa pengaturan lokasi perangkat dan coba lagi.'
+                        : 'Pencarian GPS melewati batas waktu. Coba lagi di area terbuka.';
+                finish(reject, new Error(message));
+            }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
+            if (settled) navigator.geolocation.clearWatch(watchId);
+            timer = setTimeout(() => finish(reject, new Error('Akurasi GPS belum mencapai 3 meter setelah 60 detik. Pastikan GPS aktif dan coba lagi di area terbuka.')), 60000);
+        });
+    }
+
+    async function submitAttendance(action, location, photo, livenessType) {
+        const form = new FormData();
+        form.append('latitude', location.latitude);
+        form.append('longitude', location.longitude);
+        form.append('accuracy', location.accuracy);
+        if (photo) form.append('photo', photo, `presensi-${action}.jpg`);
+        if (livenessType) form.append('liveness_type', livenessType);
+        const reason = $('earlyReason')?.value?.trim();
+        if (reason) form.append('reason', reason);
+        await api(`/api/v1/teacher/attendance/${action}`, { method: 'POST', body: form });
+        featureModal.hide();
+        showToast(action === 'check-in' ? 'Absen masuk berhasil dicatat.' : 'Absen pulang berhasil dicatat.');
+        refreshAttendance();
+    }
+
+    async function startCheckIn() {
+        setFeature('Absen Masuk · Verifikasi Lokasi dan Wajah', `
+            <div class="alert alert-info small">Aplikasi akan menunggu GPS berakurasi maksimal 3 meter dan memeriksa geofence sekolah. Setelah lolos, kamera depan melakukan deteksi wajah dan tantangan liveness. Video diproses di perangkat; hanya satu foto hasil tangkapan yang dikirim untuk presensi.</div>
+            <div class="attendance-capture-status alert alert-secondary mb-3" id="attendanceCaptureStatus" role="status" aria-live="polite">Menyiapkan pencarian lokasi…</div>
+            <div class="attendance-camera" id="attendanceCamera" hidden><div class="attendance-camera-frame"><video id="attendanceCameraVideo" autoplay muted playsinline></video><div class="attendance-face-guide" id="attendanceFaceGuide" aria-hidden="true"><span></span></div></div><p class="small text-secondary mt-2 mb-0">Pastikan wajah terang, tidak membelakangi jendela/cahaya, dan berada di dalam lingkaran.</p></div>
+            <button type="button" class="btn btn-outline-secondary w-100 mt-3" id="cancelAttendanceCapture">Batal</button>`);
+
+        const status = $('attendanceCaptureStatus');
+        const camera = $('attendanceCamera');
+        const cancel = $('cancelAttendanceCapture');
+        const controller = new AbortController();
+        const cancelCapture = () => controller.abort();
+        $('featureModal').addEventListener('hidden.bs.modal', cancelCapture, { once: true });
+        cancel.addEventListener('click', () => featureModal.hide());
+        try {
+            const location = await findPreciseLocation(status, true, controller.signal);
+            if (controller.signal.aborted) return;
+            camera.hidden = false;
+            status.className = 'attendance-capture-status alert alert-primary mb-3';
+            status.textContent = 'Lokasi sesuai geofence. Membuka kamera depan…';
+            const result = await captureModule.capture($('attendanceCameraVideo'), $('attendanceFaceGuide'), status, controller.signal);
+            if (controller.signal.aborted) return;
+            status.textContent = 'Foto berhasil diambil. Memeriksa kembali posisi GPS…';
+            const finalLocation = await findPreciseLocation(status, true, controller.signal);
+            cancel.disabled = true;
+            status.textContent = 'Lokasi terverifikasi. Mengirim presensi…';
+            await submitAttendance('check-in', finalLocation, result.photo, result.livenessType);
+        } catch (error) {
+            if (error.name !== 'AbortError') setFeatureError(error);
+        } finally {
+            $('featureModal').removeEventListener('hidden.bs.modal', cancelCapture);
+        }
+    }
+
+    async function startCheckOut() {
+        setFeature('Absen Pulang · Verifikasi Lokasi dan Wajah', `
+            <div class="alert alert-info small">Absen pulang memerlukan GPS akurasi maksimal 3 meter di area sekolah serta verifikasi wajah dan liveness. Jika dilakukan di luar rentang jam pulang, isi alasan yang diminta.</div>
+            <div class="mb-3"><label class="form-label" for="earlyReason">Alasan di luar jadwal (isi bila diminta)</label><textarea class="form-control" id="earlyReason" rows="2" maxlength="2000" placeholder="Contoh: tugas sekolah / keperluan mendesak"></textarea></div>
+            <div class="attendance-capture-status alert alert-secondary mb-3" id="attendanceCaptureStatus" role="status" aria-live="polite">Menyiapkan pencarian lokasi…</div>
+            <div class="attendance-camera" id="attendanceCamera" hidden><div class="attendance-camera-frame"><video id="attendanceCameraVideo" autoplay muted playsinline></video><div class="attendance-face-guide" id="attendanceFaceGuide" aria-hidden="true"><span></span></div></div><p class="small text-secondary mt-2 mb-0">Pastikan wajah terang, tidak membelakangi jendela/cahaya, dan berada di dalam lingkaran.</p></div>
+            <button type="button" class="btn btn-outline-secondary w-100 mt-3" id="cancelAttendanceCapture">Batal</button>`);
+
+        const status = $('attendanceCaptureStatus');
+        const camera = $('attendanceCamera');
+        const cancel = $('cancelAttendanceCapture');
+        const controller = new AbortController();
+        const cancelCapture = () => controller.abort();
+        $('featureModal').addEventListener('hidden.bs.modal', cancelCapture, { once: true });
+        cancel.addEventListener('click', () => featureModal.hide());
+        try {
+            await findPreciseLocation(status, true, controller.signal, 'check-out');
+            if (controller.signal.aborted) return;
+            camera.hidden = false;
+            status.className = 'attendance-capture-status alert alert-primary mb-3';
+            status.textContent = 'Lokasi sesuai geofence. Membuka kamera depan…';
+            const result = await captureModule.capture($('attendanceCameraVideo'), $('attendanceFaceGuide'), status, controller.signal);
+            if (controller.signal.aborted) return;
+            status.textContent = 'Foto berhasil diambil. Memeriksa kembali posisi GPS…';
+            const finalLocation = await findPreciseLocation(status, true, controller.signal, 'check-out');
+            cancel.disabled = true;
+            status.textContent = 'Lokasi terverifikasi. Mengirim absen pulang…';
+            await submitAttendance('check-out', finalLocation, result.photo, result.livenessType);
+        } catch (error) {
+            if (error.name !== 'AbortError') setFeatureError(error);
+        } finally {
+            $('featureModal').removeEventListener('hidden.bs.modal', cancelCapture);
+        }
+    }
+
+    function attendanceDialog(action) {
+        if (action === 'check-in') {
+            startCheckIn();
+            return;
+        }
+        startCheckOut();
+    }
+
+    return { refreshAttendance, attendanceDialog };
+};

@@ -35,23 +35,24 @@ class RoleAndPermissionSeeder extends Seeder
             // Master Data & Event
             'kelola-master-data',
             'kelola-pengajuan-izin',
+            'ajukan-pengajuan-izin',
             'kelola-agenda-sekolah',
             'kelola-tahun-ajaran',
         ];
 
         foreach ($permissions as $permission) {
-            Permission::firstOrCreate(['name' => $permission]);
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
 
         // 2. Buat Roles & Hubungkan Izin
 
         // Role Admin / TU
-        $roleAdmin = Role::firstOrCreate(['name' => 'admin']);
-        $roleAdmin->givePermissionTo(Permission::all());
+        $roleAdmin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
+        $roleAdmin->syncPermissions(Permission::all());
 
         // Role Guru
-        $roleGuru = Role::firstOrCreate(['name' => 'guru']);
-        $roleGuru->givePermissionTo([
+        $roleGuru = Role::firstOrCreate(['name' => 'guru', 'guard_name' => 'web']);
+        $roleGuru->syncPermissions([
             'absen-masuk',
             'absen-pulang',
             'isi-ejurnal',
@@ -59,8 +60,12 @@ class RoleAndPermissionSeeder extends Seeder
         ]);
 
         // Role Waka Kurikulum
-        $roleKurikulum = Role::firstOrCreate(['name' => 'kurikulum']);
-        $roleKurikulum->givePermissionTo([
+        $roleKurikulum = Role::firstOrCreate(['name' => 'kurikulum', 'guard_name' => 'web']);
+        $roleKurikulum->syncPermissions([
+            'absen-masuk',
+            'absen-pulang',
+            'isi-ejurnal',
+            'kelola-presensi-siswa',
             'kelola-atp',
             'view-dashboard-kurikulum',
             'view-audit-discrepancy',
@@ -70,29 +75,34 @@ class RoleAndPermissionSeeder extends Seeder
         ]);
 
         // Role Kepala Sekolah
-        $roleKepsek = Role::firstOrCreate(['name' => 'kepsek']);
-        $roleKepsek->givePermissionTo([
+        $roleKepsek = Role::firstOrCreate(['name' => 'kepsek', 'guard_name' => 'web']);
+        $roleKepsek->syncPermissions([
+            'absen-masuk',
+            'absen-pulang',
+            'isi-ejurnal',
+            'kelola-presensi-siswa',
             'view-dashboard-kurikulum',
             'view-audit-discrepancy',
             'kelola-pengajuan-izin',
         ]);
 
-        // 3. Buat Akun Super Admin Pertama
-        $admin = User::firstOrCreate([
-            'nip' => '198705302010031001',
-            'nama' => 'Safrizal, S.ST',
-            'email' => 'safrizal05@guru.smk.belajar.id',
-            'password' => Hash::make('password123'),
-        ]);
-        $admin->assignRole('admin');
+        // Demo accounts use a known password, so they are opt-in for local development only.
+        if (app()->environment('local', 'testing') && filter_var(env('AKSARA_SEED_DEMO_USERS', false), FILTER_VALIDATE_BOOLEAN)) {
+            $admin = User::firstOrCreate([
+                'nip' => '198705302010031001',
+                'nama' => 'Safrizal, S.ST',
+                'email' => 'safrizal05@guru.smk.belajar.id',
+                'password' => Hash::make('password123'),
+            ]);
+            $admin->assignRole('admin');
 
-        // 4. Buat Akun Sample Guru (Non-NIP / Honorer)
-        $guru = User::firstOrCreate([
-            'nip' => null, // Contoh guru non-NIP
-            'nama' => 'Budi Santoso, S.Kom',
-            'email' => 'budi@aksara.sch.id',
-            'password' => Hash::make('password123'),
-        ]);
-        $guru->assignRole('guru');
+            $guru = User::firstOrCreate([
+                'nip' => null,
+                'nama' => 'Budi Santoso, S.Kom',
+                'email' => 'budi@aksara.sch.id',
+                'password' => Hash::make('password123'),
+            ]);
+            $guru->assignRole('guru');
+        }
     }
 }

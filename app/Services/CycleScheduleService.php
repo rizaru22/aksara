@@ -26,10 +26,10 @@ class CycleScheduleService
         $startOfWeekCurrent = $date->copy()->startOfWeek();
 
         // Hitung selisih minggu penuh
-        $weeksDifference = $startOfWeekSemester->diffInWeeks($startOfWeekCurrent);
+        $weeksDifference = (int) $startOfWeekSemester->diffInWeeks($startOfWeekCurrent, false);
 
         // Modulo 3 untuk memetakan ke Siklus 1, 2, atau 3
-        return ($weeksDifference % 3) + 1;
+        return (($weeksDifference % 3) + 3) % 3 + 1;
     }
 
     /**

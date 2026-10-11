@@ -8,9 +8,14 @@ class TahunAjaran extends Model
 {
     //
     
-    protected $fillable = ['tahun_ajaran','is_active'];
+    protected $fillable = ['tahun_ajaran', 'is_active'];
 
-    public function JadwalPelajaran()
+    protected function casts(): array
+    {
+        return ['is_active' => 'boolean'];
+    }
+
+    public function jadwalPelajarans()
     {
         return $this->hasMany(JadwalPelajaran::class);
     }

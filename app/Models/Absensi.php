@@ -10,8 +10,9 @@ class Absensi extends Model
 {
     protected $fillable = [
         'user_id', 'tanggal', 'jam_masuk', 'foto_masuk', 'lat_masuk', 'long_masuk',
-        'distance_masuk', 'liveness_type_masuk', 'similarity_masuk', 'status_verifikasi_masuk',
-        'keterlambatan_menit', 'jam_pulang', 'foto_pulang', 'status_verifikasi_pulang',
+        'distance_masuk', 'gps_accuracy_masuk', 'liveness_type_masuk', 'similarity_masuk', 'status_verifikasi_masuk',
+        'keterlambatan_menit', 'jam_pulang', 'foto_pulang', 'lat_pulang', 'long_pulang', 'distance_pulang',
+        'gps_accuracy_pulang', 'liveness_type_pulang', 'status_verifikasi_pulang', 'status_waktu_pulang',
         'alasan_pulang_awal', 'catatan_admin', 'approved_by'
     ];
 

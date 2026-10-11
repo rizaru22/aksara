@@ -10,7 +10,8 @@ class JurnalMengajar extends Model
 {
     protected $fillable = [
         'user_id', 'guru_pengganti_id', 'jadwal_pelajaran_id', 'materi_pelajaran_id',
-        'tanggal', 'materi_pembahasan', 'catatan_kejadian_kelas', 'foto_kegiatan'
+        'tanggal', 'materi_pembahasan', 'catatan_kejadian_kelas', 'foto_kegiatan',
+        'jam_mulai_realisasi', 'jam_selesai_realisasi', 'status_sesi', 'catatan_penutupan',
     ];
 
     public function guru(): BelongsTo

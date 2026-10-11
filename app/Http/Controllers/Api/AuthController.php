@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Kelas;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -80,8 +81,12 @@ class AuthController extends Controller
             'id'             => $user->id,
             'nip'            => $user->nip,
             'nama'           => $user->nama,
+            'jenis_kelamin'  => $user->jenis_kelamin,
             'email'          => $user->email,
-            'foto_master'    => $user->foto_master ? asset('storage/' . $user->foto_master) : null,
+            'school_name'    => Setting::value('school_name', 'Nama Sekolah'),
+            'foto_master'    => $user->getAttribute('foto-master')
+                ? '/storage/' . ltrim($user->getAttribute('foto-master'), '/')
+                : null,
             'roles'          => $user->getRoleNames(),
             'permissions'    => $user->getAllPermissions()->pluck('name'),
             'is_wali_kelas'  => Kelas::where('wali_kelas_id', $user->id)->exists(),

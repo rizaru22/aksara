@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\Setting;
+use App\Models\TahunAjaran;
+use App\Services\ActiveAcademicYearService;
 use Illuminate\Database\Seeder;
 
 class SettingSeeder extends Seeder
@@ -13,7 +15,7 @@ class SettingSeeder extends Seeder
             // --- GEOFENCE & KEAMANAN ---
             [
                 'key'         => 'geofence_latitude',
-                'value'       => '-6.200000',
+                'value'       => null,
                 'group'       => 'geofence',
                 'type'        => 'number',
                 'label'       => 'Latitude Sekolah',
@@ -21,11 +23,19 @@ class SettingSeeder extends Seeder
             ],
             [
                 'key'         => 'geofence_longitude',
-                'value'       => '106.816666',
+                'value'       => null,
                 'group'       => 'geofence',
                 'type'        => 'number',
                 'label'       => 'Longitude Sekolah',
                 'description' => 'Titik koordinat bujur lokasi sekolah',
+            ],
+            [
+                'key'         => 'geofence_location_verified',
+                'value'       => '0',
+                'group'       => 'geofence',
+                'type'        => 'boolean',
+                'label'       => 'Lokasi Geofence Terverifikasi',
+                'description' => 'Aktifkan hanya setelah koordinat sekolah dikonfirmasi.',
             ],
             [
                 'key'         => 'geofence_radius_meters',
@@ -84,7 +94,24 @@ class SettingSeeder extends Seeder
         ];
 
         foreach ($settings as $setting) {
-            Setting::updateOrCreate(['key' => $setting['key']], $setting);
+            if ($setting['key'] === 'active_tahun_ajaran') {
+                continue;
+            }
+            Setting::firstOrCreate(['key' => $setting['key']], array_diff_key($setting, ['key' => true]));
+        }
+
+        if (! TahunAjaran::query()->where('is_active', true)->exists()) {
+            $yearLabel = Setting::value('active_tahun_ajaran', '2026/2027');
+            $year = TahunAjaran::query()->firstOrCreate(['tahun_ajaran' => $yearLabel]);
+            app(ActiveAcademicYearService::class)->activate($year->id);
+        } else {
+            $active = TahunAjaran::query()->where('is_active', true)->first();
+            if (TahunAjaran::query()->where('is_active', true)->count() === 1) {
+                Setting::put('active_tahun_ajaran', $active->tahun_ajaran, [
+                    'group' => 'academic', 'type' => 'string', 'label' => 'Tahun Ajaran Aktif',
+                    'description' => 'Disinkronkan dengan tahun_ajarans.is_active.',
+                ]);
+            }
         }
     }
 }

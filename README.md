@@ -1,58 +1,64 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# AKSARA
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+AKSARA is a Laravel application for school attendance, lesson journals, student attendance, academic master data, announcements/agendas, leave requests, and role-based operational dashboards. The interface uses Bootstrap 5 and is designed mobile-first; dashboard modules are presented in full-width cards on small screens.
 
-## About Laravel
+## Requirements and setup
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- PHP and Composer versions supported by this Laravel project.
+- MySQL 8 (the schema is defined by the repository migrations).
+- PHP extensions `zip` and `simplexml` for Excel template generation and `.xlsx` imports.
+- Node/npm only if you need to build or change the Vite assets. The login and dashboard pages are static files in `public/` and load Bootstrap 5.3.3 from CDN.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+Typical local setup:
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+cp .env.example .env
+php artisan key:generate
+# Configure DB_* and mail settings in .env
+php artisan migrate
+php artisan db:seed
+php artisan aksara:create-admin
+php artisan serve
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Open the application root to sign in. The first admin is created interactively; the password is not included in source code or seeded demo accounts. `AKSARA_SEED_DEMO_USERS` is disabled by default and should remain disabled outside local development.
 
-## Contributing
+## Roles and dashboards
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+- **Admin**: user/role/direct-permission administration, attendance review, academic masters and school agendas, settings, discrepancy review, and leave decisions.
+- **Guru**: daily check-in/out, today’s teaching schedule, lesson journal submission, and student attendance for the journal session.
+- **Wali kelas**: teacher features plus corrections to student attendance for classes they lead.
+- **Kurikulum**: attendance controls, academic monitoring, discrepancy review, and authorized academic master management.
+- **Kepala sekolah**: attendance controls, monitoring, discrepancy review, and leave decisions.
 
-## Code of Conduct
+Attendance check-in and check-out are available to all four seeded roles (admin, guru, kurikulum, kepala sekolah). Authorization is enforced by API permissions as well as by dashboard visibility. Additional capabilities can be assigned to a user by an admin where appropriate.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Guru sees daily attendance, today's per-class teaching schedule when available, and school announcements. Admin and Kurikulum see the same home sections plus an Admin Dashboard with a desktop sidebar and responsive mobile navigation. Academic imports are available from that area for classes, students, subjects, materials, and schedules. Download the matching `.xlsx` template for the required column names before importing. Student rows reference an existing class name; material rows reference an existing subject code; schedule rows reference an academic-year label, teacher NIP, class name, and subject code. Imports are validated and committed as one batch, with a maximum of 2,000 rows per file.
 
-## Security Vulnerabilities
+## Important configuration
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- Set school geofence coordinates in Admin Settings and explicitly confirm the location before location-based attendance is accepted. Unverified coordinates are intentionally rejected. Strict mode rejects out-of-range attendance; non-strict mode records it for review.
+- The active academic year is managed in the app and synchronized with `settings.active_tahun_ajaran`. Check consistency with `php artisan aksara:check-academic-year`. The command reports inconsistencies without changing data; repair only with an explicit source, for example `php artisan aksara:check-academic-year --repair-from=table` or `--repair-from=settings`.
+- Configure mail delivery before using password reset links and leave-related email workflows.
+- Configure push notification keys through your deployment secrets if push notifications are enabled. Never commit private keys or `.env` values.
 
-## License
+## Teacher push reminders
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Guru can enable browser push reminders from the home dashboard. Push needs a secure HTTPS site (localhost is allowed for local development), a generated VAPID key pair, and the `push_subscriptions` / `push_reminder_dispatches` tables. Generate keys with `php artisan webpush:vapid`; keep the same private key across deployments and do not commit it. Set `VAPID_SUBJECT` to the production site URL or a valid contact `mailto:` address.
+
+The scheduler sends reminders every minute in `Asia/Jakarta`: 10 minutes before the attendance check-in deadline, at the check-out deadline, 15 minutes into a scheduled lesson if no journal exists, and 5 minutes before a lesson ends if its activity photo is missing. For local development, run `php artisan schedule:work`. On a server, configure the host cron to run `php artisan schedule:run` every minute. Photo reminders link back to the dashboard, where a teacher can upload the missing photo to an existing journal.
+
+## Scope notes from PRD v1.2
+
+- Student attendance is stored per lesson-journal session; this project does not add a separate daily student attendance register.
+- Full ATP CRUD is deferred by the PRD.
+- Agenda scope is currently school-wide. Grade/class targeting requires an approved scope and audience rule.
+- Dashboard monitoring returns raw counts. Percentage KPIs are withheld until their formulas are approved.
+- Discrepancy case storage and review are available, but automatic case generation waits for approved actionable discrepancy rules.
+- Substitute-teacher journal authorization is denied by default until an approved assignment workflow exists.
+- Journal edit policy, leave-submission roles, discrepancy/KPI rules, and full audit-history requirements need product decisions before expanding those behaviors.
+
+## Verification
+
+Run the project test suite with `php artisan test`. Database feature tests use the test environment and do not require a production database. Avoid `migrate:fresh` on databases containing data.

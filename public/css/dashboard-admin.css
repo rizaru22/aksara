@@ -1,0 +1,20 @@
+/* Admin live report cards: stronger labels and distinct status colors. */
+.admin-kpi{border-left-width:6px!important;overflow:hidden}
+.admin-kpi .card-body{padding:1.25rem}
+.admin-kpi-caption{font-size:18px;font-weight:750;line-height:1.35;color:#18384d;margin-bottom:8px}
+.admin-kpi-number{font-size:34px!important;margin-top:0!important}
+.admin-kpi-present{border-left-color:#16864b!important;background:linear-gradient(110deg,#f1fbf4 0,#fff 46%)}
+.admin-kpi-present .admin-kpi-caption{color:#146c3a}
+.admin-kpi-classroom{border-left-color:#087f8c!important;background:linear-gradient(110deg,#edfafd 0,#fff 46%)}
+.admin-kpi-classroom .admin-kpi-caption{color:#086674}
+.admin-kpi-missing{border-left-color:#c33c45!important;background:linear-gradient(110deg,#fff2f2 0,#fff 46%)}
+.admin-kpi-missing .admin-kpi-caption{color:#a52e37}
+.admin-kpi-leave{border-left-color:#b77908!important;background:linear-gradient(110deg,#fff9e9 0,#fff 46%)}
+.admin-kpi-leave .admin-kpi-caption{color:#875800}
+.admin-kpi-sick{border-left-color:#7047a3!important;background:linear-gradient(110deg,#f7f2ff 0,#fff 46%)}
+.admin-kpi-sick .admin-kpi-caption{color:#5c378b}
+.admin-kpi-duty{border-left-color:#1767b1!important;background:linear-gradient(110deg,#eff6ff 0,#fff 46%)}
+.admin-kpi-duty .admin-kpi-caption{color:#155391}
+@media(max-width:575.98px){.admin-kpi-caption{font-size:17px}.admin-kpi-number{font-size:32px!important}}
+
+.leave-approval-table{min-width:1050px}.leave-approval-table th{white-space:nowrap;font-size:12px;color:#455b70}.leave-approval-table td{font-size:13px}.leave-reason-cell{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

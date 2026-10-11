@@ -1,6 +1,7 @@
 <?php
 namespace App\Services;
 
+use App\Models\Setting;
 use Carbon\Carbon;
 
 class HaversineService
@@ -20,7 +21,7 @@ class HaversineService
              cos(deg2rad($lat1)) * cos(deg2rad($lat2)) *
              sin($dLon / 2) * sin($dLon / 2);
 
-        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+        $c = 2 * atan2(sqrt($a), sqrt(max(0, 1 - $a)));
 
         return round($earthRadius * $c, 2); // Jarak dalam meter
     }
@@ -30,9 +31,14 @@ class HaversineService
      */
     public function isWithinSchoolGeofence(float $userLat, float $userLon): array
     {
-        $schoolLat = config('aksara.geofence.latitude');
-        $schoolLon = config('aksara.geofence.longitude');
-        $maxRadius = config('aksara.geofence.radius_meters');
+        $latitude = Setting::value('geofence_latitude', config('aksara.geofence.latitude'));
+        $longitude = Setting::value('geofence_longitude', config('aksara.geofence.longitude'));
+        if ($latitude === null || $longitude === null || ! filter_var(Setting::value('geofence_location_verified', false), FILTER_VALIDATE_BOOLEAN)) {
+            throw new \RuntimeException('Lokasi sekolah belum diverifikasi.');
+        }
+        $schoolLat = (float) $latitude;
+        $schoolLon = (float) $longitude;
+        $maxRadius = (int) Setting::value('geofence_radius_meters', config('aksara.geofence.radius_meters'));
 
         $distance = $this->calculateDistance($userLat, $userLon, $schoolLat, $schoolLon);
 
@@ -53,12 +59,16 @@ class HaversineService
 
         $timePrevious = Carbon::parse($prevTime);
         $timeCurrent = Carbon::parse($currTime);
-        $hoursDifference = $timePrevious->diffInMinutes($timeCurrent) / 60;
+        $minutesDifference = $timePrevious->diffInMinutes($timeCurrent, false);
 
-        if ($hoursDifference <= 0) {
-            return $distanceMeters > 100; // Anomali jika waktu sama tapi beda >100m
+        if ($minutesDifference < 0) {
+            return true;
+        }
+        if ($minutesDifference <= 0) {
+            return $distanceMeters > 100;
         }
 
+        $hoursDifference = $minutesDifference / 60;
         $speed = $distanceKm / $hoursDifference;
 
         return $speed > $maxSpeedKmPerHour;

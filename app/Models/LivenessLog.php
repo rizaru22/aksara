@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class LivenessLog extends Model
 {
-    protected $fillable = ['absensi_id', 'gesture_type', 'is_passed'];
+    protected $fillable = ['absensi_id', 'session', 'gesture_type', 'is_passed'];
 
     protected $casts = ['is_passed' => 'boolean'];
 
