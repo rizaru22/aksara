@@ -29,6 +29,7 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
     Route::prefix('auth')->group(function (): void {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
+        Route::post('/change-password', [AuthController::class, 'changePassword'])->middleware('throttle:5,1');
         Route::post('/profile/photo', [ProfilePhotoController::class, 'update'])->middleware('throttle:6,1');
     });
 

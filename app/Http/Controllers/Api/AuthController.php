@@ -61,6 +61,33 @@ class AuthController extends Controller
         ], 200);
     }
 
+    /** Ganti kata sandi dengan verifikasi kata sandi saat ini. */
+    public function changePassword(Request $request)
+    {
+        $data = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:12', 'confirmed', 'different:current_password'],
+        ], [
+            'password.min' => 'Kata sandi baru minimal 12 karakter.',
+            'password.confirmed' => 'Konfirmasi kata sandi baru tidak cocok.',
+            'password.different' => 'Kata sandi baru harus berbeda dari kata sandi saat ini.',
+        ]);
+
+        $user = $request->user();
+        if (! Hash::check($data['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => 'Kata sandi saat ini tidak sesuai.',
+            ]);
+        }
+
+        $user->forceFill(['password' => $data['password']])->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Kata sandi berhasil diubah.',
+        ]);
+    }
+
     /**
      * Logout & menghapus token Sanctum aktif
      */

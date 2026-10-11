@@ -31,7 +31,7 @@
         <div id="loadError" class="error" hidden></div>
         <div id="dashboard" hidden>
             <section class="page active" id="page-home">
-                <div class="welcome"><div class="welcome-copy"><div class="eyebrow" id="greeting">Selamat pagi,</div><h1 id="userName">Pengguna</h1></div><div class="avatar-wrap"><div class="avatar" id="welcomeAvatar"><i class="bi bi-person-fill" aria-hidden="true"></i><img id="welcomePhotoImage" alt="Foto profil guru" hidden></div><div class="avatar-label">Foto</div></div></div>
+                <div class="welcome"><div class="welcome-copy"><div class="eyebrow" id="greeting">Selamat pagi,</div><h1 id="userName">Pengguna</h1></div><div class="avatar-wrap"><div class="avatar" id="welcomeAvatar"><i class="bi bi-person-fill" aria-hidden="true"></i><img id="welcomePhotoImage" alt="Foto profil guru" hidden></div></div></div>
                 <div class="row g-3 mb-3"><div class="col-sm-12"><section class="card"><div class="card-body"><h2 class="card-heading"><span class="heading-icon"><i class="bi bi-clock-history"></i></span><span class="card-heading-copy"><span>Presensi Harian</span></span></h2><p class="attendance-state" id="attendanceState">Memuat status hari ini</p><div class="row g-3 action-card"><div class="col-sm-6 col-md-6 col-xl-6"><button class="btn btn-success w-100" id="checkIn"><i class="bi bi-box-arrow-in-right"></i> Absen Masuk</button></div><div class="col-sm-6 col-md-6 col-xl-6"><button class="btn btn-primary w-100" id="checkOut"><i class="bi bi-box-arrow-right"></i> Absen Pulang</button></div></div></div></section></div></div>
                 <section class="row g-3 mb-3" id="teacherLeaveCard" hidden><div class="col-sm-12"><article class="card"><div class="card-body"><h2 class="card-heading"><span class="heading-icon"><i class="bi bi-calendar2-check"></i></span><span>Pengajuan Izin, Cuti & Dinas Luar</span></h2><p class="card-description">Ajukan permohonan atau pantau keputusan admin.</p><div class="leave-actions"><button type="button" class="btn btn-outline-success" id="openLeavePageButton"><i class="bi bi-box-arrow-up-right"></i> Buka halaman perizinan</button></div><p class="form-text mt-2 mb-0">Pengajuan dinas luar berstatus menunggu sampai disetujui. Pengajuan izin, cuti, dan sakit juga tidak dapat diajukan dua kali pada tanggal yang bertumpang tindih.</p></div></article></div></section>
                 <section class="row g-3" id="homeScheduleCard" hidden><div class="col-sm-12"><article class="card"><div class="card-body"><h2 class="card-heading"><span class="heading-icon"><i class="bi bi-calendar-week"></i></span>Jadwal Mengajar Hari Ini<button class="btn btn-sm btn-outline-success ms-auto" id="refreshSchedule">Muat ulang</button></h2><p class="card-description" id="scheduleCaption">Per kelas sesuai jadwal aktif</p><div class="schedule" id="homeScheduleList"></div></div></article></div></section>
@@ -65,6 +65,11 @@
             </section>
             <section class="page" id="page-profile">
                 <article class="card profile-card"><div class="avatar" id="profileAvatar"><i class="bi bi-person-fill"></i><img id="profilePhotoImage" alt="Foto profil" hidden></div><h2 id="profileName">Pengguna</h2><p id="profileRole">Pengguna AKSARA</p><input class="visually-hidden" id="profilePhotoInput" type="file" accept="image/jpeg,image/png,image/webp"><button class="btn btn-outline-success mt-3" type="button" id="changeProfilePhoto"><i class="bi bi-camera"></i> Unggah / Ganti Foto</button><div class="small text-secondary mt-2" id="profilePhotoStatus">JPG, PNG, atau WebP · Maksimal 5 MB</div><div class="profile-meta"><div class="profile-row"><span>Email</span><strong id="profileEmail">—</strong></div><div class="profile-row"><span>NIP</span><strong id="profileNip">—</strong></div></div><button class="logout" id="btnLogout"><i class="bi bi-box-arrow-right"></i> Keluar</button></article>
+                <article class="card profile-password-card text-center">
+                    <h2 class="card-heading justify-content-center"><span class="heading-icon"><i class="bi bi-shield-lock"></i></span>Keamanan akun</h2>
+                    <p class="text-secondary small">Perbarui kata sandi untuk menjaga keamanan akun Anda.</p>
+                    <button class="btn btn-outline-success" type="button" data-bs-toggle="modal" data-bs-target="#changePasswordModal"><i class="bi bi-key"></i> Ubah kata sandi</button>
+                </article>
             </section>
         </div>
     </main>
@@ -80,13 +85,33 @@
     <button class="nav-item" data-page="profile"><i class="bi bi-person"></i><span>Profil</span></button>
 </nav>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="changePasswordTitle"><i class="bi bi-shield-lock me-2"></i>Ubah kata sandi</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-secondary small">Kata sandi baru minimal 12 karakter dan harus berbeda dari kata sandi saat ini.</p>
+                <div id="passwordChangeStatus" class="alert d-none" role="status" aria-live="polite"></div>
+                <form id="changePasswordForm" class="text-start">
+                    <div class="mb-3"><label class="form-label" for="currentPassword">Kata sandi saat ini</label><div class="input-group"><input class="form-control" type="password" id="currentPassword" name="current_password" autocomplete="current-password" required><button class="btn btn-outline-secondary" type="button" data-toggle-password="currentPassword" aria-label="Lihat kata sandi saat ini" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></div></div>
+                    <div class="mb-3"><label class="form-label" for="newPassword">Kata sandi baru</label><div class="input-group"><input class="form-control" type="password" id="newPassword" name="password" minlength="12" autocomplete="new-password" required><button class="btn btn-outline-secondary" type="button" data-toggle-password="newPassword" aria-label="Lihat kata sandi baru" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></div><div class="form-text">Minimal 12 karakter dan harus berbeda dari kata sandi saat ini.</div></div>
+                    <div class="mb-3"><label class="form-label" for="newPasswordConfirmation">Ulangi kata sandi baru</label><div class="input-group"><input class="form-control" type="password" id="newPasswordConfirmation" name="password_confirmation" minlength="12" autocomplete="new-password" required><button class="btn btn-outline-secondary" type="button" data-toggle-password="newPasswordConfirmation" aria-label="Lihat konfirmasi kata sandi baru" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button></div></div>
+                    <button class="btn btn-success w-100" id="changePasswordSubmit" type="submit"><i class="bi bi-key"></i> Simpan kata sandi baru</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 <div class="modal fade" id="featureModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable modal-lg modal-fullscreen-sm-down"><div class="modal-content"><div class="modal-header"><h2 class="modal-title fs-5" id="featureTitle">Modul</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div><div class="modal-body feature-content" id="featureContent"></div></div></div></div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
 <script src="https://cdn.datatables.net/2.3.5/js/dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/2.3.5/js/dataTables.bootstrap5.min.js"></script>
 <script src="js/table-search.js?v=20261011-datatables-pagination" defer></script>
-<script src="js/profil_guru.js" defer></script>
+<script src="js/profil_guru.js?v=20261012-change-password" defer></script>
 <script src="js/notifikasi.js" defer></script>
 <script src="js/laporan.js?v=20261011-attendance-duration" defer></script>
 <script src="js/dashboard_admin.js?v=20261011-sunday-off" defer></script>

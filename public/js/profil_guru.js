@@ -1,14 +1,104 @@
 (() => {
     const byId = (id) => document.getElementById(id);
+    const passwordForm = byId('changePasswordForm');
+    const passwordStatus = byId('passwordChangeStatus');
+    const passwordSubmit = byId('changePasswordSubmit');
+    const passwordModal = byId('changePasswordModal');
+
+    document.querySelectorAll('[data-toggle-password]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const input = byId(button.dataset.togglePassword);
+            if (!input) return;
+            const visible = input.type === 'password';
+            input.type = visible ? 'text' : 'password';
+            button.setAttribute('aria-pressed', String(visible));
+            button.setAttribute('aria-label', `${visible ? 'Sembunyikan' : 'Lihat'} ${button.dataset.togglePassword === 'currentPassword' ? 'kata sandi saat ini' : button.dataset.togglePassword === 'newPassword' ? 'kata sandi baru' : 'konfirmasi kata sandi baru'}`);
+            button.innerHTML = `<i class="bi bi-eye${visible ? '-slash' : ''}" aria-hidden="true"></i>`;
+        });
+    });
+
+    function token() {
+        return localStorage.getItem('token') || sessionStorage.getItem('token') || '';
+    }
+
+    if (passwordForm && passwordStatus && passwordSubmit) {
+        passwordModal?.addEventListener('hidden.bs.modal', () => {
+            passwordForm.reset();
+            passwordStatus.className = 'alert d-none';
+            passwordStatus.textContent = '';
+            passwordForm.querySelectorAll('[data-toggle-password]').forEach((button) => {
+                const input = byId(button.dataset.togglePassword);
+                if (input) input.type = 'password';
+                button.setAttribute('aria-pressed', 'false');
+                button.setAttribute('aria-label', `Lihat ${button.dataset.togglePassword === 'currentPassword' ? 'kata sandi saat ini' : button.dataset.togglePassword === 'newPassword' ? 'kata sandi baru' : 'konfirmasi kata sandi baru'}`);
+                button.innerHTML = '<i class="bi bi-eye" aria-hidden="true"></i>';
+            });
+        });
+
+        passwordForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            passwordStatus.className = 'alert d-none';
+
+            const form = new FormData(passwordForm);
+            const currentPassword = String(form.get('current_password') || '');
+            const newPassword = String(form.get('password') || '');
+            const confirmation = String(form.get('password_confirmation') || '');
+            let validationMessage = '';
+            if (!currentPassword) {
+                validationMessage = 'Masukkan kata sandi saat ini.';
+            } else if (newPassword.length < 12) {
+                validationMessage = 'Kata sandi baru minimal 12 karakter.';
+            } else if (newPassword === currentPassword) {
+                validationMessage = 'Kata sandi baru harus berbeda dari kata sandi saat ini.';
+            } else if (newPassword !== confirmation) {
+                validationMessage = 'Konfirmasi kata sandi baru tidak cocok.';
+            }
+            if (validationMessage) {
+                passwordStatus.className = 'alert alert-danger';
+                passwordStatus.textContent = validationMessage;
+                return;
+            }
+
+            passwordSubmit.disabled = true;
+            passwordSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Menyimpan…';
+            try {
+                const response = await fetch(window.aksaraApiUrl('/api/v1/auth/change-password'), {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token()}`,
+                    },
+                    body: JSON.stringify({
+                        current_password: currentPassword,
+                        password: newPassword,
+                        password_confirmation: confirmation,
+                    }),
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    const errors = result.errors ? Object.values(result.errors).flat().join(' ') : '';
+                    throw new Error(errors || result.message || `Kata sandi gagal diubah (${response.status}).`);
+                }
+
+                passwordForm.reset();
+                passwordStatus.className = 'alert alert-success';
+                passwordStatus.textContent = result.message || 'Kata sandi berhasil diubah.';
+            } catch (error) {
+                passwordStatus.className = 'alert alert-danger';
+                passwordStatus.textContent = error.message || 'Kata sandi gagal diubah.';
+            } finally {
+                passwordSubmit.disabled = false;
+                passwordSubmit.innerHTML = '<i class="bi bi-key"></i> Simpan kata sandi baru';
+            }
+        });
+    }
+
     const input = byId('profilePhotoInput');
     const button = byId('changeProfilePhoto');
     const status = byId('profilePhotoStatus');
 
     if (!input || !button || !status) return;
-
-    function token() {
-        return localStorage.getItem('token') || sessionStorage.getItem('token') || '';
-    }
 
     function setPhoto(url) {
         const imageUrl = url ? `${url}${url.includes('?') ? '&' : '?'}v=${Date.now()}` : '';

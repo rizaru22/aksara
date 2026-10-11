@@ -553,7 +553,7 @@
             add('settings', 'kelola-master-data', 'bi-sliders', 'Pengaturan Sekolah', 'Atur geofence, semester aktif, dan batas presensi.');
         }
 
-        if (canSubmitLeave && !modules.some((module) => module.key === 'leave-submit')) {
+        if (canSubmitLeave && !is('tendik') && !modules.some((module) => module.key === 'leave-submit')) {
             modules.push({ key: 'leave-submit', icon: 'bi-file-earmark-plus', title: 'Pengajuan Izin', description: 'Ajukan cuti atau dinas dan pantau status permohonan.' });
         }
 
@@ -562,16 +562,17 @@
         document.body.classList.toggle('kepsek-dashboard', is('kepsek') && !canAdminDashboard);
         $('adminDashboardEntry').hidden = !canAdminDashboard;
         $('teacherLeaveCard').hidden = !canSubmitLeave;
-        $('roleIntro').hidden = canAdminDashboard || is('guru') && !is('tendik');
-        $('roleModules').hidden = canAdminDashboard || is('guru') && !is('tendik');
+        const hideRoleDashboard = canAdminDashboard || is('guru');
+        $('roleIntro').hidden = hideRoleDashboard;
+        $('roleModules').hidden = hideRoleDashboard;
         $('adminSideModules').innerHTML = modules.filter((module) => module.key !== 'academic-master').map((module) => `<button class="admin-side-link" data-admin-action="${htmlSafe(module.key)}"><i class="bi ${htmlSafe(module.icon)}"></i> ${htmlSafe(module.title)}</button>`).join('');
         $('adminSideModules').querySelectorAll('[data-admin-action]').forEach((button) => button.addEventListener('click', () => {
             document.body.classList.remove('sidebar-open');
             adminAction(button.dataset.adminAction);
         }));
 
-        const labels = { guru: 'Dashboard Guru', tendik: 'Dashboard Tenaga Kependidikan', kurikulum: 'Dashboard Kurikulum', kepsek: 'Dashboard Kepala Sekolah', admin: 'Dashboard Admin / TU' };
-        const dashboardLabel = ['admin', 'kurikulum', 'kepsek', 'guru', 'tendik'].filter((role) => is(role)).map((role) => labels[role]);
+        const labels = { guru: 'Dashboard Guru', kurikulum: 'Dashboard Kurikulum', kepsek: 'Dashboard Kepala Sekolah', admin: 'Dashboard Admin / TU' };
+        const dashboardLabel = ['admin', 'kurikulum', 'kepsek', 'guru'].filter((role) => is(role)).map((role) => labels[role]);
         $('roleDashboardTitle').textContent = dashboardLabel[0] || 'Dashboard Pengguna';
         $('roleDashboardSubtitle').textContent = modules.length ? `${modules.length} menu tersedia untuk akses akun Anda` : 'Belum ada menu yang diberikan untuk akun ini';
 
@@ -609,6 +610,11 @@
             column.append(card);
             container.append(column);
         });
+
+        if (is('tendik')) {
+            $('roleIntro').remove();
+            $('roleModules').remove();
+        }
     }
 
     async function loadProfile() {
