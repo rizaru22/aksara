@@ -4,10 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\PengajuanIzin;
+use App\Models\User;
+use App\Notifications\LeaveRequestSubmittedNotification;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class LeaveRequestController extends Controller
 {
@@ -103,7 +108,53 @@ class LeaveRequestController extends Controller
             throw $exception;
         }
 
+        try {
+            $this->notifyApprovers($requestRecord->load('user:id,nama'), $request->user());
+        } catch (Throwable $exception) {
+            Log::warning('Could not prepare web push notifications for leave request.', [
+                'pengajuan_izin_id' => $requestRecord->id,
+                'exception' => $exception->getMessage(),
+            ]);
+        }
+
         return response()->json(['message' => 'Pengajuan berhasil dikirim.', 'data' => $requestRecord], 201);
+    }
+
+    private function notifyApprovers(PengajuanIzin $leaveRequest, User $submitter): void
+    {
+        if (! $submitter->hasRole('guru')
+            || ! config('webpush.vapid.public_key')
+            || ! config('webpush.vapid.private_key')) {
+            return;
+        }
+
+        $recipients = User::query()
+            ->role(['admin', 'kepsek', 'kurikulum'])
+            ->whereKeyNot($submitter->id)
+            ->whereHas('pushSubscriptions')
+            ->with('pushSubscriptions')
+            ->get();
+
+        $type = $leaveRequest->jenis_pengajuan === 'DINAS' ? 'Dinas luar' : 'Izin/cuti';
+        $startDate = Carbon::parse($leaveRequest->tanggal_mulai)->format('d/m/Y');
+        $endDate = Carbon::parse($leaveRequest->tanggal_selesai)->format('d/m/Y');
+        $dates = $startDate === $endDate ? $startDate : $startDate.' - '.$endDate;
+
+        foreach ($recipients as $recipient) {
+            try {
+                $recipient->notify(new LeaveRequestSubmittedNotification(
+                    'Pengajuan perizinan baru',
+                    sprintf('%s mengajukan %s untuk %s.', $leaveRequest->user?->nama ?? 'Guru', $type, $dates),
+                    "leave-request-{$leaveRequest->id}",
+                ));
+            } catch (Throwable $exception) {
+                Log::warning('Web push leave request notification failed.', [
+                    'pengajuan_izin_id' => $leaveRequest->id,
+                    'recipient_id' => $recipient->id,
+                    'exception' => $exception->getMessage(),
+                ]);
+            }
+        }
     }
 
     public function decide(Request $request, PengajuanIzin $pengajuanIzin)
