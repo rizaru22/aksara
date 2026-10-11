@@ -528,6 +528,7 @@
 
         dashboardModules = modules;
         const canAdminDashboard = is('admin') || is('kurikulum');
+        document.body.classList.toggle('kepsek-dashboard', is('kepsek') && !canAdminDashboard);
         $('adminDashboardEntry').hidden = !canAdminDashboard;
         $('teacherLeaveCard').hidden = !has('ajukan-pengajuan-izin');
         $('roleIntro').hidden = canAdminDashboard || is('guru');
