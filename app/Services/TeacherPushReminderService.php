@@ -31,18 +31,18 @@ class TeacherPushReminderService
             return ['sent' => 0, 'skipped' => 'School holiday.'];
         }
 
-        $teachers = User::query()
-            ->role('guru')
+        $recipients = User::query()
+            ->role(['guru', 'admin', 'kepsek', 'kurikulum'])
             ->whereHas('pushSubscriptions')
             ->with('pushSubscriptions')
             ->get();
 
-        if ($teachers->isEmpty()) {
-            return ['sent' => 0, 'skipped' => 'No subscribed teachers.'];
+        if ($recipients->isEmpty()) {
+            return ['sent' => 0, 'skipped' => 'No subscribed recipients.'];
         }
 
         $onLeave = PengajuanIzin::query()
-            ->whereIn('user_id', $teachers->modelKeys())
+            ->whereIn('user_id', $recipients->modelKeys())
             ->where('jenis_pengajuan', 'CUTI')
             ->where('status_approval', 'APPROVED')
             ->whereDate('tanggal_mulai', '<=', $now->toDateString())
@@ -54,8 +54,12 @@ class TeacherPushReminderService
         $sent = 0;
         $weekday = app(CycleScheduleService::class)->getHariIndo($now);
         $attendanceSchedule = JadwalPresensiHarian::query()->where('hari', $weekday)->first();
-        $this->sendAttendanceReminders($teachers, $onLeave, $attendanceSchedule, $now, $sent);
-        $this->sendLessonReminders($teachers, $onLeave, $weekday, $now, $sent);
+        $this->sendAttendanceReminders($recipients, $onLeave, $attendanceSchedule, $now, $sent);
+
+        $teachingStaff = $recipients
+            ->filter(fn (User $user) => $user->hasAnyRole(['guru', 'admin', 'kurikulum']))
+            ->values();
+        $this->sendLessonReminders($teachingStaff, $onLeave, $weekday, $now, $sent);
 
         return ['sent' => $sent];
     }
@@ -117,7 +121,9 @@ class TeacherPushReminderService
         );
 
         $schedules = JadwalPelajaran::query()
-            ->with(['jurnalMengajars' => fn ($query) => $query->whereDate('tanggal', $now->toDateString())])
+            ->with(['jurnalMengajars' => fn ($query) => $query
+                ->with('presensiSiswas')
+                ->whereDate('tanggal', $now->toDateString())])
             ->whereIn('user_id', $teachers->modelKeys())
             ->where('tahun_ajaran_id', $year->id)
             ->where('semester', $semester)
@@ -153,9 +159,21 @@ class TeacherPushReminderService
                 $sent += $this->sendOnce(
                     $teacher,
                     "journal:{$now->toDateString()}:{$schedule->id}",
-                    'Pengingat pengisian jurnal',
-                    'Pelajaran sudah berjalan 15 menit. Silakan isi jurnal dan presensi kelas.',
+                    'Pengingat jurnal dan presensi siswa',
+                    'Pelajaran sudah berjalan 15 menit. Silakan isi jurnal mengajar dan presensi siswa.',
                     "journal-{$now->toDateString()}-{$schedule->id}",
+                    $now,
+                );
+            }
+
+            if ($journal && $journal->presensiSiswas->isEmpty()
+                && $this->within($now, $start->addMinutes(15), $end)) {
+                $sent += $this->sendOnce(
+                    $teacher,
+                    "student-attendance:{$now->toDateString()}:{$schedule->id}",
+                    'Pengingat presensi siswa',
+                    'Pelajaran sudah berjalan 15 menit. Presensi siswa pada sesi ini belum diisi.',
+                    "student-attendance-{$now->toDateString()}-{$schedule->id}",
                     $now,
                 );
             }
