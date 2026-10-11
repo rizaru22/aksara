@@ -14,7 +14,7 @@
 
 
 
-    <link rel="stylesheet" href="css/dashboard.css?v=20261011-action-columns-fix">
+    <link rel="stylesheet" href="css/dashboard.css?v=20261011-admin-report-print-pdf">
     <link rel="stylesheet" href="css/dashboard-admin.css?v=20261010-kpi-contrast">
 </head>
 <body>
@@ -59,7 +59,7 @@
     </main>
     <section id="adminWorkspace" hidden aria-label="Dashboard Admin">
         <nav class="admin-navbar navbar navbar-dark px-3 px-lg-4"><button class="btn btn-outline-light d-lg-none me-2" id="adminSidebarToggle" aria-label="Buka navigasi"><i class="bi bi-list"></i></button><a class="navbar-brand fw-bold" href="#admin-home" id="adminBrand">AKSARA <span class="fw-normal">· Dashboard Admin</span></a><div class="ms-auto d-flex align-items-center gap-2"><span class="text-white small d-none d-sm-inline" id="adminUserLabel"></span><button class="btn btn-light btn-sm" id="returnHome"><i class="bi bi-house"></i> Beranda</button></div></nav>
-        <div class="admin-layout"><aside class="admin-sidebar" id="adminSidebar"><div class="admin-sidebar-label">MENU UTAMA</div><button class="admin-side-link active" data-admin-action="home"><i class="bi bi-speedometer2"></i> Dashboard</button><div id="adminSideModules"></div><div class="admin-sidebar-label mt-3">DATA AKADEMIK</div><button class="admin-side-link" data-admin-action="classes"><i class="bi bi-building"></i> Kelas</button><button class="admin-side-link" data-admin-action="students"><i class="bi bi-people"></i> Siswa</button><button class="admin-side-link" data-admin-action="subjects"><i class="bi bi-book"></i> Mata Pelajaran</button><button class="admin-side-link" data-admin-action="materials"><i class="bi bi-journal-text"></i> Materi Pelajaran</button><button class="admin-side-link" data-admin-action="schedules"><i class="bi bi-calendar-week"></i> Jadwal Pelajaran</button></aside><div class="admin-sidebar-backdrop" id="adminSidebarBackdrop"></div><main class="admin-content"><div id="adminPanelContent"></div></main></div>
+        <div class="admin-layout"><aside class="admin-sidebar" id="adminSidebar"><div class="admin-sidebar-label">MENU UTAMA</div><button class="admin-side-link active" data-admin-action="home"><i class="bi bi-speedometer2"></i> Dashboard</button><button class="admin-side-link" data-admin-action="reports"><i class="bi bi-clipboard-data"></i> Laporan</button><div id="adminSideModules"></div><div class="admin-sidebar-label mt-3">DATA AKADEMIK</div><button class="admin-side-link" data-admin-action="classes"><i class="bi bi-building"></i> Kelas</button><button class="admin-side-link" data-admin-action="students"><i class="bi bi-people"></i> Siswa</button><button class="admin-side-link" data-admin-action="subjects"><i class="bi bi-book"></i> Mata Pelajaran</button><button class="admin-side-link" data-admin-action="materials"><i class="bi bi-journal-text"></i> Materi Pelajaran</button><button class="admin-side-link" data-admin-action="schedules"><i class="bi bi-calendar-week"></i> Jadwal Pelajaran</button></aside><div class="admin-sidebar-backdrop" id="adminSidebarBackdrop"></div><main class="admin-content"><div id="adminPanelContent"></div></main></div>
     </section>
 </div>
 <nav class="bottom-nav" aria-label="Navigasi utama">
@@ -75,6 +75,7 @@
 <script src="js/notifikasi.js" defer></script>
 <script src="js/laporan.js?v=20261011-attendance-duration" defer></script>
 <script src="js/dashboard_admin.js?v=20261011-sunday-off" defer></script>
+<script src="js/admin_reports.js?v=20261011-report-print-pdf" defer></script>
 <script src="js/kelola_user_akses.js?v=20261010-form-layout" defer></script>
 <script src="js/moderasi_presensi.js?v=20261010-attendance-schedule" defer></script>
 <script src="js/presensi_kamera.js?v=20261011-checkout-proof" defer></script>
@@ -83,6 +84,6 @@
 <script src="js/kalender_hari_libur.js?v=20261011-holiday-calendar" defer></script>
 <script src="js/tahun_ajaran.js" defer></script>
     <script src="js/push-notifications.js?v=20261011-push" defer></script>
-    <script src="js/dashboard.js?v=20261011-unread-count" defer></script>
+    <script src="js/dashboard.js?v=20261011-admin-reports-sidebar" defer></script>
 </body>
 </html>

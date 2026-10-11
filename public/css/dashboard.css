@@ -116,6 +116,29 @@
     .today time { font-size: 17px; }
     .today strong { font-size: 27px; }
 }
+
+@media print {
+    @page { margin: 14mm; }
+    html, body, body.admin-mode { width: 100%; min-height: 0; margin: 0; padding: 0; overflow: visible; background: #fff !important; }
+    body.admin-mode .app { width: 100%; min-height: 0; margin: 0; padding: 0; overflow: visible; box-shadow: none; }
+    body.admin-mode .admin-navbar,
+    body.admin-mode .admin-sidebar,
+    body.admin-mode .admin-sidebar-backdrop,
+    body.admin-mode .admin-report-controls,
+    body.admin-mode .admin-report-actions,
+    body.admin-mode #adminPanelBack { display: none !important; }
+    body.admin-mode .admin-layout { display: block; min-height: 0; background: #fff; }
+    body.admin-mode .admin-content { padding: 0; overflow: visible; }
+    body.admin-mode #adminPanelContent { color: #111; }
+    .admin-report-heading { margin: 0 0 12px !important; }
+    .admin-report-results .card { border: 1px solid #bbb; box-shadow: none; break-inside: auto; }
+    .admin-report-results .table-responsive { overflow: visible !important; }
+    .admin-report-results table { width: 100% !important; font-size: 8pt; }
+    .admin-report-results thead { display: table-header-group; }
+    .admin-report-results tr { break-inside: avoid; }
+    .admin-report-results th { color: #111 !important; background: #eee !important; }
+    .admin-report-results td { color: #111 !important; }
+}
 .action-card .btn, .leave-actions .btn { min-height: 58px; padding: 12px 16px; font-size: clamp(1rem, 1.4vw, 1.15rem); }
 
 @media (min-width: 700px) {

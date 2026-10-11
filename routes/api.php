@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Api\AcademicImportController;
 use App\Http\Controllers\Api\AttendanceReportController;
 use App\Http\Controllers\Api\AdminSettingsController;
+use App\Http\Controllers\Api\AdminReportController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DiscrepancyController;
@@ -60,6 +61,7 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
 
     Route::get('/dashboard/curriculum', [DashboardController::class, 'curriculum'])->middleware('permission:view-dashboard-kurikulum');
     Route::get('/dashboard/admin', [DashboardController::class, 'adminLive']);
+    Route::get('/admin/reports', [AdminReportController::class, 'index']);
     Route::get('/discrepancy-cases', [DiscrepancyController::class, 'index'])->middleware('permission:view-audit-discrepancy');
     Route::patch('/discrepancy-cases/{discrepancyCase}', [DiscrepancyController::class, 'update'])->middleware('permission:view-audit-discrepancy');
 

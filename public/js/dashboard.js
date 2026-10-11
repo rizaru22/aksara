@@ -167,6 +167,7 @@
 
     function renderAdminHome() {
         const quickLinks = [
+            { key: 'reports', icon: 'bi-clipboard-data', label: 'Laporan Harian, Mingguan & Bulanan', text: 'Rekap kehadiran guru dan jurnal mengajar berdasarkan periode.' },
             { key: 'classes', icon: 'bi-building', label: 'Kelola Kelas', text: 'Data kelas, tingkat, jurusan, dan wali kelas.' },
             { key: 'students', icon: 'bi-people', label: 'Kelola Siswa', text: 'Data siswa dan penempatan kelas.' },
             { key: 'schedules', icon: 'bi-calendar-week', label: 'Jadwal Pelajaran', text: 'Jadwal guru, kelas, mata pelajaran, dan siklus.' },
@@ -179,12 +180,14 @@
     }
 
     const adminDashboard = window.createAksaraAdminDashboard({ $, api, htmlSafe });
+    const adminReports = window.createAksaraAdminReports({ api, htmlSafe, setAdminPanel });
     const holidayCalendar = window.createAksaraHolidayCalendar({ api, htmlSafe, setFeature, setFeatureError, showToast });
 
     function adminAction(action) {
         document.querySelectorAll('.admin-side-link').forEach((button) => button.classList.toggle('active', button.dataset.adminAction === action));
         const module = dashboardModules.find((item) => item.key === action);
         if (action === 'home') return renderAdminHome();
+        if (action === 'reports') return adminReports.open();
         if (['classes', 'students', 'subjects', 'materials', 'schedules'].includes(action)) return academicData.openMaster(action);
         if (module) return openModule(module);
     }
