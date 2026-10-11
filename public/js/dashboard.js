@@ -64,6 +64,33 @@
         return result;
     }
 
+    window.aksaraFetchAllPages = async (request, path, parameters = {}) => {
+        const query = new URLSearchParams(parameters);
+        query.set('page', '1');
+        const first = await request(`${path}?${query.toString()}`);
+        const unpack = (result) => {
+            const page = result?.data && !Array.isArray(result.data) && Array.isArray(result.data.data)
+                ? result.data
+                : result;
+            return {
+                rows: Array.isArray(page?.data) ? page.data : (Array.isArray(result?.data) ? result.data : []),
+                lastPage: Math.max(1, Number(page?.last_page || 1)),
+            };
+        };
+        const firstPage = unpack(first);
+        if (firstPage.lastPage === 1) return firstPage.rows;
+        const pages = [];
+        for (let start = 2; start <= firstPage.lastPage; start += 5) {
+            const batch = await Promise.all(Array.from({ length: Math.min(5, firstPage.lastPage - start + 1) }, (_, index) => {
+                const pageQuery = new URLSearchParams(query);
+                pageQuery.set('page', String(start + index));
+                return request(`${path}?${pageQuery.toString()}`).then(unpack);
+            }));
+            pages.push(...batch);
+        }
+        return firstPage.rows.concat(...pages.map((page) => page.rows));
+    };
+
     function setFeature(title, content) {
         if (document.body.classList.contains('admin-mode')) {
             setAdminPanel(title, content);
@@ -260,12 +287,11 @@
             });
             return;
         }
-        const searchValue = $('leaveSearch')?.value ?? search;
-        const pageValue = Number.isInteger(page) && page > 0 ? page : 1;
-        const query = new URLSearchParams({ page: String(pageValue), per_page: String(perPage), search: searchValue.trim() });
-        const result = await api(`/api/v1/leave-requests?${query.toString()}`);
-        const items = Array.isArray(result.data) ? result.data : (result.data?.data || []);
-        const pagination = Array.isArray(result.data) ? { current_page: 1, last_page: 1, total: items.length, per_page: perPage, from: items.length ? 1 : null, to: items.length } : result;
+        const searchValue = '';
+        const pageValue = 1;
+        const allItems = await window.aksaraFetchAllPages(api, '/api/v1/leave-requests', { per_page: '50' });
+        const items = allItems;
+        const pagination = { current_page: 1, last_page: 1, total: items.length, per_page: items.length || 50, from: items.length ? 1 : null, to: items.length };
         const statusBadge = { PENDING: 'text-bg-warning', APPROVED: 'text-bg-success', REJECTED: 'text-bg-danger' };
         const displayDate = (value) => value ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—';
         const rows = items.map((item) => `<tr><td class="text-nowrap">${htmlSafe(displayDate(item.created_at))}</td><td><strong>${htmlSafe(item.user?.nama || 'Pengguna')}</strong>${item.user?.nip ? `<div class="small text-secondary">${htmlSafe(item.user.nip)}</div>` : ''}</td><td class="text-nowrap">${item.jenis_pengajuan === 'DINAS' ? 'Dinas luar' : 'Izin / cuti'}</td><td class="text-nowrap">${htmlSafe(item.tanggal_mulai)}${item.tanggal_mulai !== item.tanggal_selesai ? ` – ${htmlSafe(item.tanggal_selesai)}` : ''}</td><td class="leave-reason-cell" title="${htmlSafe(item.alasan)}">${htmlSafe(item.alasan)}</td><td><span class="badge ${statusBadge[item.status_approval] || 'text-bg-secondary'}">${htmlSafe(item.status_approval)}</span></td><td class="text-nowrap">${item.berkas_lampiran ? `<button class="btn btn-outline-secondary btn-sm" data-attachment="${item.id}" title="Unduh lampiran" aria-label="Unduh lampiran"><i class="bi bi-paperclip"></i></button>` : '<span class="text-secondary">—</span>'}</td><td class="text-nowrap">${item.status_approval === 'PENDING' ? `<div class="d-flex gap-1"><button class="btn btn-success btn-sm" data-leave-decision="${item.id}" data-status="APPROVED">Setujui</button><button class="btn btn-outline-danger btn-sm" data-leave-decision="${item.id}" data-status="REJECTED">Tolak</button></div>` : '<span class="text-secondary">Selesai</span>'}</td></tr>`).join('');
@@ -275,6 +301,8 @@
         const endPage = Math.min(lastPage, startPage + 4);
         const pageButtons = Array.from({ length: endPage - startPage + 1 }, (_, index) => startPage + index).map((number) => `<button type="button" class="btn btn-sm ${number === currentPage ? 'btn-primary' : 'btn-outline-secondary'}" data-leave-page="${number}" aria-current="${number === currentPage ? 'page' : 'false'}">${number}</button>`).join('');
         setFeature('Persetujuan Perizinan Guru', `<section class="card"><div class="card-body"><form id="leaveSearchForm" class="row g-2 align-items-end mb-3"><div class="col-12 col-md"><label class="form-label" for="leaveSearch">Cari nama, NIP, jenis, status, atau alasan</label><input class="form-control" type="search" id="leaveSearch" value="${htmlSafe(searchValue)}" placeholder="Ketik kata pencarian"></div><div class="col-6 col-md-2"><label class="form-label" for="leavePerPage">Baris per halaman</label><select class="form-select" id="leavePerPage">${[10, 20, 50].map((count) => `<option value="${count}" ${Number(perPage) === count ? 'selected' : ''}>${count}</option>`).join('')}</select></div><div class="col-6 col-md-auto"><button class="btn btn-primary w-100"><i class="bi bi-search"></i> Cari</button></div></form><div class="table-responsive"><table class="table table-hover table-striped align-middle leave-approval-table"><thead><tr><th>Waktu pengajuan</th><th>Guru</th><th>Jenis</th><th>Tanggal izin</th><th>Alasan</th><th>Status</th><th>Lampiran</th><th>Aksi</th></tr></thead><tbody>${rows || `<tr><td colspan="8" class="text-center text-secondary py-4">${searchValue ? 'Tidak ditemukan pengajuan yang cocok.' : 'Belum ada pengajuan izin.'}</td></tr>`}</tbody></table></div><div class="d-flex flex-wrap justify-content-between align-items-center gap-2"><small class="text-secondary">Menampilkan ${pagination.from || 0}–${pagination.to || 0} dari ${pagination.total || 0} pengajuan terbaru</small><nav class="d-flex gap-1" aria-label="Halaman pengajuan"><button type="button" class="btn btn-sm btn-outline-secondary" data-leave-page="${Math.max(1, currentPage - 1)}" ${currentPage <= 1 ? 'disabled' : ''} aria-label="Halaman sebelumnya"><i class="bi bi-chevron-left"></i></button>${pageButtons}<button type="button" class="btn btn-sm btn-outline-secondary" data-leave-page="${Math.min(lastPage, currentPage + 1)}" ${currentPage >= lastPage ? 'disabled' : ''} aria-label="Halaman berikutnya"><i class="bi bi-chevron-right"></i></button></nav></div></div></section>`);
+        $('leaveSearchForm')?.remove();
+        document.querySelector('nav[aria-label="Halaman pengajuan"]')?.parentElement.remove();
         $('leaveSearchForm')?.addEventListener('submit', (event) => {
             event.preventDefault();
             openLeave(false, 1, $('leaveSearch').value, Number($('leavePerPage').value)).catch((error) => setFeatureError(error));
@@ -325,7 +353,7 @@
         }));
     }
 
-    const userAccess = window.createAksaraUserAccess({ $, api, htmlSafe, setFeature, setFeatureError, showToast });
+    const userAccess = window.createAksaraUserAccess({ $, api, htmlSafe, setFeature, setFeatureError, showToast, token });
 
     async function openSettings() {
         const result = await api('/api/v1/admin/settings');

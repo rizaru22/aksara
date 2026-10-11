@@ -41,6 +41,7 @@ Untuk MySQL, isi `DB_CONNECTION=mysql`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB
 - Login dan logout berbasis token API Sanctum.
 - Pengaturan role dan permission; menu pada dashboard mengikuti role/permission akun.
 - Admin dapat membuat, mengubah, menghapus, dan mengelola akun, role, serta permission tambahan.
+- Admin dapat mengimpor akun secara batch dari Excel `.xlsx` dengan kolom `nama`, `email`, `nip`, `jenis_kelamin`, dan `sandi`; role dipilih sekali untuk seluruh file. Impor maksimal 2.000 baris dan dibatalkan seluruhnya jika ada kesalahan. Sandi harus minimal 12 karakter. File Excel memuat sandi teks biasa, jadi lindungi dan hapus setelah impor.
 - Lupa kata sandi dan reset melalui tautan email. Admin juga dapat meminta tautan reset untuk akun pengguna.
 - Pengguna dapat mengunggah atau mengganti foto profil.
 - Pembatasan laju permintaan diterapkan pada endpoint sensitif seperti login, reset kata sandi, presensi, dan impor.

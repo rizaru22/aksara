@@ -73,6 +73,8 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
 
     Route::prefix('admin/users')->middleware('permission:kelola-master-data')->group(function (): void {
         Route::get('/roles', [AdminUserController::class, 'roles']);
+        Route::get('/template', [AdminUserController::class, 'template']);
+        Route::post('/import', [AdminUserController::class, 'import'])->middleware('throttle:10,1');
         Route::get('/', [AdminUserController::class, 'index']);
         Route::post('/', [AdminUserController::class, 'store']);
         Route::patch('/{user}', [AdminUserController::class, 'update']);

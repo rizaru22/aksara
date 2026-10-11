@@ -1,13 +1,66 @@
-window.createAksaraUserAccess = function ({ $, api, htmlSafe, setFeature, setFeatureError, showToast }) {
+window.createAksaraUserAccess = function ({ $, api, htmlSafe, setFeature, setFeatureError, showToast, token }) {
     const genderLabel = (value) => ({ L: 'Laki-laki', P: 'Perempuan' })[value] || '—';
-    async function openUsers(page = 1) {
-        const result = await api(`/api/v1/admin/users?page=${page}`);
-        const pageData = Array.isArray(result.data) ? result : (result.data?.data ? result.data : result);
-        const users = Array.isArray(pageData.data) ? pageData.data : [];
-        const pagination = `<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3"><span class="small text-secondary">${users.length ? `Menampilkan ${pageData.from || 1}–${pageData.to || users.length} dari ${pageData.total || users.length} pengguna` : 'Belum ada data pengguna.'}</span><div class="btn-group btn-group-sm"><button class="btn btn-outline-secondary" data-user-page="${Math.max(1, (pageData.current_page || page) - 1)}" ${(pageData.current_page || page) <= 1 ? 'disabled' : ''}>Sebelumnya</button><span class="btn btn-outline-secondary disabled">Halaman ${pageData.current_page || page} / ${pageData.last_page || 1}</span><button class="btn btn-outline-secondary" data-user-page="${Math.min(pageData.last_page || page, (pageData.current_page || page) + 1)}" ${(pageData.current_page || page) >= (pageData.last_page || page) ? 'disabled' : ''}>Berikutnya</button></div></div>`;
-        setFeature('Kelola User & Akses', `<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><p class="text-secondary mb-0">Daftar seluruh akun pengguna yang tersimpan.</p><button class="btn btn-success" id="newUser"><i class="bi bi-person-plus"></i> Tambah pengguna</button></div><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Nama</th><th>Email</th><th>NIP</th><th>Jenis kelamin</th><th>Role</th><th class="text-end">Aksi</th></tr></thead><tbody>${users.map((user) => `<tr><td class="fw-semibold">${htmlSafe(user.nama)}</td><td>${htmlSafe(user.email)}</td><td>${htmlSafe(user.nip || '—')}</td><td>${htmlSafe(genderLabel(user.jenis_kelamin))}</td><td>${htmlSafe((user.roles || []).map((role) => role.name).join(', ') || 'Belum ada role')}</td><td class="text-end"><div class="d-inline-flex flex-wrap gap-1"><button class="btn btn-outline-primary btn-sm" data-user-edit="${user.id}">Ubah</button><button class="btn btn-outline-secondary btn-sm" data-password-reset="${user.id}">Kirim reset</button><button class="btn btn-outline-danger btn-sm" data-user-delete="${user.id}">Hapus</button></div></td></tr>`).join('') || '<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada pengguna di database.</td></tr>'}</tbody></table></div>${pagination}`);
+    async function downloadTemplate() {
+        const response = await fetch(window.aksaraApiUrl('/api/v1/admin/users/template'), { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' } });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || `Template gagal diunduh (${response.status}).`);
+        }
+        const url = URL.createObjectURL(await response.blob());
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'template_pengguna.xlsx';
+        link.click();
+        URL.revokeObjectURL(url);
+    }
+
+    async function openUsers() {
+        const [users, roleResult] = await Promise.all([window.aksaraFetchAllPages(api, '/api/v1/admin/users'), api('/api/v1/admin/users/roles')]);
+        setFeature('Kelola User & Akses', `<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><p class="text-secondary mb-0">Daftar seluruh akun pengguna yang tersimpan.</p><button class="btn btn-success" id="newUser"><i class="bi bi-person-plus"></i> Tambah pengguna</button></div><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Nama</th><th>Email</th><th>NIP</th><th>Jenis kelamin</th><th>Role</th><th class="text-end">Aksi</th></tr></thead><tbody>${users.map((user) => `<tr><td class="fw-semibold">${htmlSafe(user.nama)}</td><td>${htmlSafe(user.email)}</td><td>${htmlSafe(user.nip || '—')}</td><td>${htmlSafe(genderLabel(user.jenis_kelamin))}</td><td>${htmlSafe((user.roles || []).map((role) => role.name).join(', ') || 'Belum ada role')}</td><td class="text-end"><div class="d-inline-flex flex-wrap gap-1"><button class="btn btn-outline-primary btn-sm" data-user-edit="${user.id}">Ubah</button><button class="btn btn-outline-secondary btn-sm" data-password-reset="${user.id}">Kirim reset</button><button class="btn btn-outline-danger btn-sm" data-user-delete="${user.id}">Hapus</button></div></td></tr>`).join('') || '<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada pengguna di database.</td></tr>'}</tbody></table></div>`);
+        const toolbar = $('newUser').parentElement;
+        const templateButton = document.createElement('button');
+        templateButton.className = 'btn btn-outline-primary';
+        templateButton.innerHTML = '<i class="bi bi-download"></i> Template Excel';
+        templateButton.addEventListener('click', async () => {
+            try { await downloadTemplate(); }
+            catch (error) { showToast(error.message); }
+        });
+        toolbar.insertBefore(templateButton, $('newUser'));
+        const importButton = document.createElement('button');
+        importButton.className = 'btn btn-outline-success';
+        importButton.innerHTML = '<i class="bi bi-upload"></i> Import Excel';
+        toolbar.insertBefore(importButton, $('newUser'));
+
+        const importPanel = document.createElement('section');
+        importPanel.className = 'border rounded p-3 mb-3';
+        importPanel.innerHTML = `<div class="row g-2 align-items-end"><div class="col-12 col-md-4"><label class="form-label" for="userImportRole">Role untuk semua akun di file</label><select class="form-select" id="userImportRole"><option value="">Pilih satu role</option>${(roleResult.roles || []).map((role) => `<option value="${htmlSafe(role)}">${htmlSafe(role)}</option>`).join('')}</select></div><div class="col-12 col-md-8"><p class="small text-secondary mb-0">Kolom Excel: <code>nama</code>, <code>email</code>, <code>nip</code>, <code>jenis_kelamin</code>, <code>sandi</code>. Sandi minimal 12 karakter; jenis kelamin L/P atau Laki-laki/Perempuan. Maksimal 2.000 akun per file; jika ada data tidak valid, seluruh impor dibatalkan.</p></div></div><div class="alert alert-warning small mt-3 mb-0">File Excel berisi sandi dalam teks biasa. Simpan dengan aman dan hapus file setelah impor selesai.</div><input class="d-none" type="file" id="userImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><div id="userImportResult" class="mt-3" aria-live="polite"></div>`;
+        toolbar.parentElement.insertBefore(importPanel, toolbar.nextSibling);
+        importButton.addEventListener('click', () => $('userImportFile').click());
+        $('userImportFile').addEventListener('change', async (event) => {
+            const file = event.currentTarget.files?.[0];
+            if (!file) return;
+            const resultBox = $('userImportResult');
+            const role = $('userImportRole').value;
+            if (!role) {
+                resultBox.innerHTML = '<div class="alert alert-danger mb-0">Pilih role untuk akun yang akan diimpor.</div>';
+                event.currentTarget.value = '';
+                return;
+            }
+            resultBox.innerHTML = '<div class="alert alert-info mb-0">Memvalidasi dan mengimpor akun...</div>';
+            const form = new FormData();
+            form.append('file', file);
+            form.append('role', role);
+            try {
+                const imported = await api('/api/v1/admin/users/import', { method: 'POST', body: form });
+                await openUsers(1);
+                showToast(imported.message);
+            } catch (error) {
+                resultBox.innerHTML = `<div class="alert alert-danger mb-0">${htmlSafe(error.message || 'Impor pengguna gagal.')}</div>`;
+            } finally {
+                event.currentTarget.value = '';
+            }
+        });
         $('newUser').addEventListener('click', () => openUserForm());
-        document.querySelectorAll('[data-user-page]').forEach((button) => button.addEventListener('click', () => openUsers(Number(button.dataset.userPage))));
         document.querySelectorAll('[data-user-edit]').forEach((button) => button.addEventListener('click', () => openUserForm(users.find((user) => String(user.id) === button.dataset.userEdit))));
         document.querySelectorAll('[data-password-reset]').forEach((button) => button.addEventListener('click', async () => {
             try { const result = await api(`/api/v1/admin/users/${button.dataset.passwordReset}/password-reset`, { method: 'POST', body: {} }); showToast(result.message); }

@@ -51,16 +51,15 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
         URL.revokeObjectURL(url);
     }
     async function loadOptions(optionKey) {
-        const result = optionKey === 'teachers'
-            ? await api('/api/v1/academic/teachers')
-            : await api(`/api/v1/academic/${optionKey}`);
-        return Array.isArray(result.data) ? result.data : (result.data?.data || []);
+        const path = optionKey === 'teachers'
+            ? '/api/v1/academic/teachers'
+            : `/api/v1/academic/${optionKey}`;
+        return window.aksaraFetchAllPages(api, path);
     }
 
     async function openMaster(resource, current = null) {
         const definition = masterDefinitions[resource];
-        const result = await api(`/api/v1/academic/${resource}`);
-        const items = Array.isArray(result.data) ? result.data : (result.data?.data || []);
+        const items = await window.aksaraFetchAllPages(api, `/api/v1/academic/${resource}`);
         const references = {};
         for (const field of definition.fields) if (field.options && typeof field.options === 'string') references[field.options] = await loadOptions(field.options);
         const fieldMarkup = definition.fields.map((field) => {

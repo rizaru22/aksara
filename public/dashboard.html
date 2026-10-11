@@ -11,11 +11,12 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.3.5/css/dataTables.bootstrap5.min.css">
 
 
 
     <link rel="stylesheet" href="css/dashboard.css?v=20261011-admin-report-print-pdf">
-    <link rel="stylesheet" href="css/dashboard-admin.css?v=20261010-kpi-contrast">
+    <link rel="stylesheet" href="css/dashboard-admin.css?v=20261011-datatables-pagination">
 </head>
 <body>
 <div class="app">
@@ -71,19 +72,23 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <div class="modal fade" id="featureModal" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable modal-lg modal-fullscreen-sm-down"><div class="modal-content"><div class="modal-header"><h2 class="modal-title fs-5" id="featureTitle">Modul</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div><div class="modal-body feature-content" id="featureContent"></div></div></div></div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.datatables.net/2.3.5/js/dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/2.3.5/js/dataTables.bootstrap5.min.js"></script>
+<script src="js/table-search.js?v=20261011-datatables-pagination" defer></script>
 <script src="js/profil_guru.js" defer></script>
 <script src="js/notifikasi.js" defer></script>
 <script src="js/laporan.js?v=20261011-attendance-duration" defer></script>
 <script src="js/dashboard_admin.js?v=20261011-sunday-off" defer></script>
 <script src="js/admin_reports.js?v=20261011-report-print-pdf" defer></script>
-<script src="js/kelola_user_akses.js?v=20261010-form-layout" defer></script>
+<script src="js/kelola_user_akses.js?v=20261011-user-import-datatables-all-pages" defer></script>
 <script src="js/moderasi_presensi.js?v=20261010-attendance-schedule" defer></script>
 <script src="js/presensi_kamera.js?v=20261011-checkout-proof" defer></script>
 <script src="js/presensi_guru.js?v=20261011-checkout-proof" defer></script>
-<script src="js/data_akademik.js?v=20261010-form-layout" defer></script>
+<script src="js/data_akademik.js?v=20261011-datatables-all-pages" defer></script>
 <script src="js/kalender_hari_libur.js?v=20261011-holiday-calendar" defer></script>
 <script src="js/tahun_ajaran.js" defer></script>
     <script src="js/push-notifications.js?v=20261011-push" defer></script>
-    <script src="js/dashboard.js?v=20261011-admin-reports-sidebar" defer></script>
+    <script src="js/dashboard.js?v=20261011-datatables-all-pages" defer></script>
 </body>
 </html>

@@ -18,3 +18,84 @@
 @media(max-width:575.98px){.admin-kpi-caption{font-size:17px}.admin-kpi-number{font-size:32px!important}}
 
 .leave-approval-table{min-width:1050px}.leave-approval-table th{white-space:nowrap;font-size:12px;color:#455b70}.leave-approval-table td{font-size:13px}.leave-reason-cell{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Consistent table contrast across dashboard features, including JS-rendered tables. */
+.app table thead th {
+    color: #fff !important;
+    background-color: #07545c !important;
+    border-color: #0b6870 !important;
+    font-weight: 700;
+}
+.app table tbody tr:nth-child(odd) > * {
+    background-color: #edf4f7 !important;
+}
+.app table tbody tr:nth-child(even) > * {
+    background-color: #fff !important;
+}
+.app table tbody tr:hover > * {
+    background-color: #dceef0 !important;
+}
+.app .dt-container .dt-layout-row { gap: .75rem; align-items: center; }
+.app .dt-container .dt-search { display: flex; align-items: center; gap: .5rem; }
+.app .dt-container .dt-search input,
+.app .dt-container .dt-length select {
+    min-height: 38px;
+    border: 1px solid #c8d7de;
+    border-radius: .5rem;
+    padding: .35rem .65rem;
+    background-color: #fff;
+}
+.app .dt-container .dt-length select,
+.app .dt-container .dt-length select.dt-input {
+    box-sizing: border-box;
+    width: 82px !important;
+    min-width: 82px !important;
+    max-width: 82px !important;
+    flex: 0 0 82px;
+    height: 40px;
+    padding: .35rem 1.7rem .35rem .65rem;
+    line-height: 1.25;
+}
+.app .dt-container .dt-search input:focus,
+.app .dt-container .dt-length select:focus {
+    border-color: #087b80;
+    box-shadow: 0 0 0 .2rem #087b8025;
+    outline: 0;
+}
+.app .dt-paging .pagination { margin-bottom: 0; }
+.app .dt-paging .page-link {
+    color: #08777b;
+    border-color: #c8d9df;
+    background-color: #fff;
+}
+.app .dt-paging .page-link:hover,
+.app .dt-paging .page-link:focus {
+    color: #06434b;
+    border-color: #6eb8b8;
+    background-color: #e5f4f3;
+    box-shadow: none;
+}
+.app .dt-paging .page-item.active .page-link {
+    color: #fff;
+    border-color: #087b7c;
+    background-color: #087b7c;
+}
+.app .dt-paging .page-item.disabled .page-link {
+    color: #8496a0;
+    border-color: #d8e1e5;
+    background-color: #f1f4f6;
+}
+.app:not(.admin-mode) .dt-paging .page-link {
+    min-width: 36px;
+    padding: .3rem .55rem;
+    text-align: center;
+}
+.app .aksara-table-search-fallback { display: grid; grid-template-columns: auto minmax(180px, 320px) auto; align-items: center; gap: .65rem; }
+.app .aksara-table-search-fallback label { margin: 0; font-weight: 600; color: #365267; }
+.app .aksara-table-search-fallback input { min-height: 38px; border-color: #c8d7de; }
+@media (max-width: 575.98px) {
+    .app .dt-container .dt-layout-row { justify-content: flex-start; }
+    .app .dt-container .dt-search { width: 100%; }
+    .app .dt-container .dt-search input { width: 100%; margin-left: 0; }
+    .app .aksara-table-search-fallback { grid-template-columns: 1fr; gap: .35rem; }
+}
