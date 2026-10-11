@@ -32,7 +32,7 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
         Route::post('/profile/photo', [ProfilePhotoController::class, 'update'])->middleware('throttle:6,1');
     });
 
-    Route::prefix('push')->middleware('role:guru')->group(function (): void {
+    Route::prefix('push')->middleware('role:guru|admin|kepsek|kurikulum')->group(function (): void {
         Route::get('/vapid-public-key', [PushSubscriptionController::class, 'publicKey']);
         Route::post('/subscriptions', [PushSubscriptionController::class, 'subscribe'])->middleware('throttle:10,1');
         Route::delete('/subscriptions', [PushSubscriptionController::class, 'unsubscribe'])->middleware('throttle:10,1');
