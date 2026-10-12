@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AgendaSekolah;
 use App\Models\HariLibur;
 use App\Models\JadwalPelajaran;
+use App\Models\PengajuanGuruPengganti;
 use App\Models\Setting;
 use App\Models\TahunAjaran;
 use App\Services\ActiveAcademicYearService;
@@ -39,10 +40,22 @@ class TeacherScheduleController extends Controller
             $holiday = (object) ['nama' => 'Hari Minggu', 'jenis' => 'MINGGU'];
         }
 
+        $userId = $request->user()->id;
+        $substituteScheduleIds = PengajuanGuruPengganti::query()
+            ->where('guru_pengganti_id', $userId)
+            ->where('status_approval', 'APPROVED')
+            ->whereDate('tanggal', $now->toDateString())
+            ->pluck('jadwal_pelajaran_id');
+
         $schedules = ($holiday || $isSunday) ? collect() : JadwalPelajaran::query()
-            ->with(['kelas:id,nama_kelas,tingkat,jurusan', 'mataPelajaran:id,kode_mapel,nama_mapel', 'tahunAjaran:id,tahun_ajaran'])
+            ->with(['kelas:id,nama_kelas,tingkat,jurusan', 'mataPelajaran:id,kode_mapel,nama_mapel', 'tahunAjaran:id,tahun_ajaran', 'guru:id,nama,nip'])
             ->with(['jurnalMengajars' => fn ($query) => $query->whereDate('tanggal', $now->toDateString())->with('presensiSiswas')])
-            ->where('user_id', $request->user()->id)
+            ->where(function ($query) use ($userId, $substituteScheduleIds) {
+                $query->where('user_id', $userId);
+                if ($substituteScheduleIds->isNotEmpty()) {
+                    $query->orWhereIn('id', $substituteScheduleIds);
+                }
+            })
             ->where('tahun_ajaran_id', $year->id)
             ->where('semester', $semester)
             ->where('hari', $weekday)
@@ -57,6 +70,22 @@ class TeacherScheduleController extends Controller
             ->get();
 
         $data = $schedules->map(function (JadwalPelajaran $schedule) use ($agendas, $now) {
+            $substituteRequest = PengajuanGuruPengganti::query()
+                ->where('jadwal_pelajaran_id', $schedule->id)
+                ->whereDate('tanggal', $now->toDateString())
+                ->with('guruPengganti:id,nama,nip')
+                ->latest('id')
+                ->first();
+
+            $isApproved = $substituteRequest?->status_approval === 'APPROVED';
+            $schedule->setAttribute('substitute_active', $isApproved);
+            $schedule->setAttribute('substitute_status', $substituteRequest?->status_approval);
+            $schedule->setAttribute('substitute_teacher', $substituteRequest?->guruPengganti ? [
+                'id' => $substituteRequest->guruPengganti->id,
+                'nama' => $substituteRequest->guruPengganti->nama,
+                'nip' => $substituteRequest->guruPengganti->nip,
+            ] : null);
+            $schedule->setAttribute('substitute_request_id', $substituteRequest?->id);
             $schedule->setAttribute('jurnal_hari_ini', $schedule->jurnalMengajars->first());
             $agenda = $agendas->first(fn (AgendaSekolah $item) => $item->jam_mulai < $schedule->jam_selesai && $item->jam_selesai > $schedule->jam_mulai);
             $schedule->setAttribute('kbm_ditangguhkan', (bool) $agenda);

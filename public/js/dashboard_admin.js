@@ -32,10 +32,16 @@ window.createAksaraAdminDashboard = function ({ $, api, htmlSafe }) {
             if (!$('adminLiveReport')) return;
             const data = response.data;
             const chart = data.attendance_chart || { labels: [], values: [] };
+            const substituteRequests = (data.substitute_requests || []).slice(0, 5);
+            const substituteList = (substituteRequests.length
+                ? `<div class="admin-report-list">${substituteRequests.map((request) => `<div class="admin-report-person"><i class="bi bi-person-plus text-secondary me-1"></i>${htmlSafe(request.guru_utama?.nama || 'Guru utama')} → ${htmlSafe(request.guru_pengganti?.nama || 'Pengganti')}<span class="text-secondary"> · ${htmlSafe(request.status_approval)}</span></div>`).join('')}</div>`
+                : '<div class="admin-report-list small text-secondary">Tidak ada pengajuan guru pengganti.</div>') +
+                '<button type="button" class="btn btn-outline-primary btn-sm mt-2 w-100" id="btnAdminOpenSubstitutes"><i class="bi bi-person-check"></i> Kelola Pengajuan Pengganti</button>';
             const cards = [
                 ['Guru hadir di sekolah', data.present_count, renderTeacherList(data.present_teachers || []), 'present'],
                 ['Guru sudah di dalam kelas', data.in_class_teacher_count, renderTeacherList(data.in_class_teachers || []), 'classroom'],
                 ['Belum absen masuk', data.not_checked_in_count, renderTeacherList(data.not_checked_in_teachers || []), 'missing'],
+                ['Permintaan pengganti', data.pending_substitute_requests_count || 0, substituteList, 'duty'],
                 ['Izin', data.leave_count, renderTeacherList(data.leave_teachers || []), 'leave'],
                 ['Sakit', data.sick_count, renderTeacherList(data.sick_teachers || []), 'sick'],
                 ['Dinas luar', data.outside_duty_count, renderTeacherList(data.outside_duty_teachers || []), 'duty'],
@@ -50,6 +56,9 @@ window.createAksaraAdminDashboard = function ({ $, api, htmlSafe }) {
             updateReportClock();
             if (!reportClockTimer) reportClockTimer = window.setInterval(updateReportClock, 1000);
             $('refreshAdminReport').addEventListener('click', loadAdminLiveReport);
+            $('btnAdminOpenSubstitutes')?.addEventListener('click', () => {
+                window.dispatchEvent(new CustomEvent('aksara:open-substitutes'));
+            });
         } catch (error) {
             const liveReport = $('adminLiveReport');
             if (liveReport) liveReport.innerHTML = `<div class="alert alert-danger d-flex flex-wrap justify-content-between gap-2"><span>${htmlSafe(error.message)}</span><button class="btn btn-sm btn-outline-danger" id="retryAdminReport">Coba lagi</button></div>`;

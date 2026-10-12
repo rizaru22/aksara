@@ -37,4 +37,9 @@ class JadwalPelajaran extends Model
     {
         return $this->hasMany(JurnalMengajar::class);
     }
+
+    public function pengajuanGuruPenggantins(): HasMany
+    {
+        return $this->hasMany(PengajuanGuruPengganti::class);
+    }
 }

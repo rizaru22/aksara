@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AgendaSekolah;
 use App\Models\JadwalPelajaran;
 use App\Models\JurnalMengajar;
+use App\Models\PengajuanGuruPengganti;
 use App\Models\PresensiSiswa;
 use App\Models\Setting;
 use App\Models\TahunAjaran;
@@ -44,9 +45,9 @@ class LessonJournalController extends Controller
         $this->authorizeSchedule($request, $jadwalPelajaran, $now, $cycles);
 
         $draft = JurnalMengajar::query()->with('presensiSiswas')
-            ->where('user_id', $request->user()->id)
             ->where('jadwal_pelajaran_id', $jadwalPelajaran->id)
             ->whereDate('tanggal', $now->toDateString())
+            ->where(fn ($query) => $query->where('user_id', $request->user()->id)->orWhere('guru_pengganti_id', $request->user()->id))
             ->where('status_sesi', 'berlangsung')
             ->first();
 
@@ -78,6 +79,7 @@ class LessonJournalController extends Controller
         $now = now(config('app.timezone'));
         $schedule = JadwalPelajaran::query()->with('kelas')->findOrFail($data['jadwal_pelajaran_id']);
         $this->authorizeSchedule($request, $schedule, $now, $cycles);
+        $activeSubstitute = $this->activeSubstituteForSchedule($schedule, $now);
         if ($request->hasFile('foto_kegiatan')) {
             throw ValidationException::withMessages(['foto_kegiatan' => 'Foto diambil saat finalisasi jurnal pada 30 menit terakhir pelajaran.']);
         }
@@ -97,7 +99,7 @@ class LessonJournalController extends Controller
             throw ValidationException::withMessages(['presensi' => 'Daftar presensi harus mencakup seluruh siswa kelas dan tidak boleh memuat siswa dari kelas lain.']);
         }
 
-        [$journal, $created] = DB::transaction(function () use ($request, $data, $schedule, $now): array {
+        [$journal, $created] = DB::transaction(function () use ($request, $data, $schedule, $now, $activeSubstitute): array {
             $lockedSchedule = JadwalPelajaran::query()->lockForUpdate()->findOrFail($schedule->id);
             if (AgendaSekolah::query()
                 ->whereDate('tanggal', $now->toDateString())
@@ -120,7 +122,8 @@ class LessonJournalController extends Controller
             $created = ! $journal;
             $journal ??= new JurnalMengajar;
             $journal->fill([
-                'user_id' => $request->user()->id,
+                'user_id' => $lockedSchedule->user_id,
+                'guru_pengganti_id' => $activeSubstitute?->guru_pengganti_id,
                 'jadwal_pelajaran_id' => $lockedSchedule->id,
                 'materi_pelajaran_id' => $data['materi_pelajaran_id'] ?? null,
                 'tanggal' => $now->toDateString(),
@@ -157,7 +160,7 @@ class LessonJournalController extends Controller
     {
         $user = $request->user();
         $canManage = $user->hasRole('admin') || $user->can('view-dashboard-kurikulum');
-        abort_unless($jurnalMengajar->user_id === $user->id || $canManage, 403);
+        abort_unless($jurnalMengajar->user_id === $user->id || $jurnalMengajar->guru_pengganti_id === $user->id || $canManage, 403);
 
         return response()->json(['data' => $jurnalMengajar->load(['jadwalPelajaran.kelas', 'jadwalPelajaran.mataPelajaran', 'presensiSiswas.siswa'])]);
     }
@@ -170,7 +173,11 @@ class LessonJournalController extends Controller
     public function finalize(Request $request, JurnalMengajar $jurnalMengajar, CycleScheduleService $cycles, HaversineService $distance)
     {
         abort_unless($request->user()->can('isi-ejurnal'), 403);
-        abort_unless($jurnalMengajar->user_id === $request->user()->id, 403, 'Anda hanya dapat memfinalisasi draf jurnal sendiri.');
+        abort_unless(
+            $jurnalMengajar->user_id === $request->user()->id || $jurnalMengajar->guru_pengganti_id === $request->user()->id,
+            403,
+            'Anda hanya dapat memfinalisasi draf jurnal yang relevan dengan jadwal Anda.'
+        );
         $data = $request->validate([
             'foto_kegiatan' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
@@ -269,13 +276,32 @@ class LessonJournalController extends Controller
     }
 
     /**
-     * Mengijinkan akses ke jadwal yang benar-benar milik guru, aktif pada hari/siklus/semester yang berlaku,
-     * dan masih dalam jendela pengisian jurnal. Jika draf sudah dibuka, akses lanjutan tetap diperbolehkan.
+     * Mengambalikan pengajuan pengganti yang aktif untuk sesi hari ini, bila ada persetujuan admin.
+     */
+    private function activeSubstituteForSchedule(JadwalPelajaran $schedule, Carbon $now): ?PengajuanGuruPengganti
+    {
+        return PengajuanGuruPengganti::query()
+            ->where('jadwal_pelajaran_id', $schedule->id)
+            ->whereDate('tanggal', $now->toDateString())
+            ->where('status_approval', 'APPROVED')
+            ->first();
+    }
+
+    /**
+     * Mengijinkan akses ke jadwal yang benar-benar milik guru atau pengganti yang telah disetujui pada hari itu,
+     * aktif pada hari/siklus/semester yang berlaku, dan masih dalam jendela pengisian jurnal.
+     * Jika draf sudah dibuka, akses lanjutan tetap diperbolehkan.
      */
     private function authorizeSchedule(Request $request, JadwalPelajaran $schedule, Carbon $now, CycleScheduleService $cycles): void
     {
-        if ($schedule->user_id !== $request->user()->id) {
-            abort(403, 'Guru hanya dapat mengisi jadwal yang ditugaskan kepadanya.');
+        $activeSubstitute = $this->activeSubstituteForSchedule($schedule, $now);
+        $allowedUserIds = [$schedule->user_id];
+        if ($activeSubstitute && $activeSubstitute->guru_pengganti_id) {
+            $allowedUserIds[] = $activeSubstitute->guru_pengganti_id;
+        }
+
+        if (! in_array($request->user()->id, $allowedUserIds, true)) {
+            abort(403, 'Guru hanya dapat mengisi jadwal yang ditugaskan kepadanya atau yang telah disetujui sebagai pengganti.');
         }
         if ($schedule->tahunAjaran?->is_active !== true || $schedule->hari !== $cycles->getHariIndo($now)) {
             throw new ConflictHttpException('Jadwal tidak aktif untuk tanggal hari ini.');
@@ -290,9 +316,9 @@ class LessonJournalController extends Controller
         }
 
         $hasOpenDraft = JurnalMengajar::query()
-            ->where('user_id', $request->user()->id)
             ->where('jadwal_pelajaran_id', $schedule->id)
             ->whereDate('tanggal', $now->toDateString())
+            ->where(fn ($query) => $query->where('user_id', $request->user()->id)->orWhere('guru_pengganti_id', $request->user()->id))
             ->where('status_sesi', 'berlangsung')
             ->exists();
         if ($hasOpenDraft) {

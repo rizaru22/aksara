@@ -49,4 +49,14 @@ class User extends Authenticatable
     {
         return $this->hasMany(PengajuanIzin::class);
     }
+
+    public function pengajuanGuruPenggantins(): HasMany
+    {
+        return $this->hasMany(PengajuanGuruPengganti::class, 'user_id');
+    }
+
+    public function pengajuanGuruPenggantiSebagaiSubstitusi(): HasMany
+    {
+        return $this->hasMany(PengajuanGuruPengganti::class, 'guru_pengganti_id');
+    }
 }

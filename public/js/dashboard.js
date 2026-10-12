@@ -145,11 +145,29 @@
         }
         const holidayLabel = meta.hari_libur?.jenis === 'MINGGU' ? 'Hari Minggu' : meta.hari_libur?.jenis.replaceAll('_', ' ');
         const holidayNote = meta.hari_libur ? `<div class="alert alert-info mb-0">${htmlSafe(meta.hari_libur.nama)} · ${htmlSafe(holidayLabel)}. Tidak ada sesi mengajar hari ini.</div>` : '';
-        const list = rows.length ? `<div class="list-group">${rows.map((schedule) => `<article class="list-group-item"><div class="d-flex justify-content-between gap-2"><strong>${htmlSafe(schedule.kelas?.nama_kelas)} · ${htmlSafe(schedule.mata_pelajaran?.nama_mapel)}</strong><span class="small">${htmlSafe(schedule.jam_mulai)}–${htmlSafe(schedule.jam_selesai)}</span></div><div class="small text-secondary">${htmlSafe(schedule.hari)} · Siklus ${htmlSafe(schedule.siklus_minggu || 'Mingguan')}</div>${schedule.kbm_ditangguhkan ? `<div class="alert alert-warning mt-2 mb-0 small">KBM ditangguhkan: ${htmlSafe(schedule.agenda_pengganti)}</div>` : `<div class="mt-2">${renderJournalAction(schedule)}</div>`}</article>`).join('')}</div>` : '<div class="card"><div class="card-body text-center text-secondary">Tidak ada jadwal untuk tanggal dan siklus ini.</div></div>';
-        setFeature('Jadwal & E-Jurnal Hari Ini', `<div class="alert alert-info small">${htmlSafe(meta.hari)} · ${htmlSafe(meta.tanggal)} · ${htmlSafe(meta.tahun_ajaran)} / ${htmlSafe(meta.semester)} · Siklus ${htmlSafe(meta.siklus_minggu)}</div>${holidayNote || list}`);
+        const list = rows.length ? `<div class="list-group">${rows.map((schedule) => {
+            const isOwner = Number(schedule.user_id) === Number(activeUser?.id);
+            const isFinished = schedule.jurnal_hari_ini?.status_sesi === 'selesai';
+            let substituteAction = '';
+            if (isOwner && !isFinished && !schedule.substitute_active) {
+                if (schedule.substitute_status === 'PENDING') {
+                    substituteAction = `<span class="badge text-bg-warning ms-1"><i class="bi bi-hourglass-split"></i> Pengganti diajukan</span>`;
+                } else {
+                    substituteAction = `<button class="btn btn-sm btn-outline-info ms-1" data-substitute="${schedule.id}"><i class="bi bi-person-plus"></i> Ajukan Pengganti</button>`;
+                }
+            }
+            return `<article class="list-group-item"><div class="d-flex justify-content-between gap-2"><strong>${htmlSafe(schedule.kelas?.nama_kelas)} · ${htmlSafe(schedule.mata_pelajaran?.nama_mapel)}</strong><span class="small">${htmlSafe(schedule.jam_mulai)}–${htmlSafe(schedule.jam_selesai)}</span></div><div class="small text-secondary">${htmlSafe(schedule.hari)} · Siklus ${htmlSafe(schedule.siklus_minggu || 'Mingguan')}</div>${schedule.substitute_active ? `<div class="alert alert-info mt-2 mb-0 small"><i class="bi bi-person-badge"></i> Mengajar pengganti: ${htmlSafe(schedule.substitute_teacher?.nama || 'Guru pengganti')}</div>` : ''}${schedule.kbm_ditangguhkan ? `<div class="alert alert-warning mt-2 mb-0 small">KBM ditangguhkan: ${htmlSafe(schedule.agenda_pengganti)}</div>` : `<div class="d-flex flex-wrap align-items-center justify-content-end gap-1 mt-2">${renderJournalAction(schedule)}${substituteAction}</div>`}</article>`;
+        }).join('')}</div>` : '<div class="card"><div class="card-body text-center text-secondary">Tidak ada jadwal untuk tanggal dan siklus ini.</div></div>';
+        const headerToolbar = `<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><div class="alert alert-info small mb-0 py-2 flex-grow-1">${htmlSafe(meta.hari)} · ${htmlSafe(meta.tanggal)} · ${htmlSafe(meta.tahun_ajaran)} / ${htmlSafe(meta.semester)} · Siklus ${htmlSafe(meta.siklus_minggu)}</div><button class="btn btn-outline-secondary btn-sm" id="btnMySubstitutes"><i class="bi bi-person-lines-fill"></i> Riwayat Pengganti</button></div>`;
+        setFeature('Jadwal & E-Jurnal Hari Ini', `${headerToolbar}${holidayNote || list}`);
+        $('btnMySubstitutes')?.addEventListener('click', openMySubstituteRequests);
         document.querySelectorAll('[data-journal]').forEach((button) => button.addEventListener('click', () => {
             const schedule = rows.find((item) => String(item.id) === button.dataset.journal);
             openJournalForm(button.dataset.journal, schedule).catch(setFeatureError);
+        }));
+        document.querySelectorAll('[data-substitute]').forEach((button) => button.addEventListener('click', () => {
+            const schedule = rows.find((item) => String(item.id) === button.dataset.substitute);
+            openSubstituteRequestForm(button.dataset.substitute, schedule);
         }));
     }
 
@@ -180,11 +198,26 @@
                 const journal = schedule.jurnal_hari_ini;
                 const canUseJournal = dashboardModules.some((module) => module.key === 'journal');
                 const action = renderJournalAction(schedule, canUseJournal);
-                return `<article class="schedule-item ${schedule.kbm_ditangguhkan ? '' : 'current'}"><span><strong>${htmlSafe(schedule.kelas?.nama_kelas || 'Kelas')} · ${htmlSafe(schedule.mata_pelajaran?.nama_mapel || 'Mata pelajaran')}</strong><br><span>${htmlSafe(schedule.jam_mulai)}–${htmlSafe(schedule.jam_selesai)} · Siklus ${htmlSafe(schedule.siklus_minggu || 'Mingguan')}</span>${schedule.agenda_pengganti ? `<br><small>${htmlSafe(schedule.agenda_pengganti)}</small>` : ''}</span>${action}</article>`;
+                const isOwner = Number(schedule.user_id) === Number(activeUser?.id);
+                const isFinished = journal?.status_sesi === 'selesai';
+                let subAction = '';
+                if (isOwner && !isFinished && !schedule.substitute_active) {
+                    if (schedule.substitute_status === 'PENDING') {
+                        subAction = `<div class="small text-warning mt-1"><i class="bi bi-hourglass-split"></i> Pengajuan pengganti menunggu persetujuan</div>`;
+                    } else {
+                        subAction = `<div class="mt-1"><button class="btn btn-sm btn-outline-info py-0 px-2" style="font-size:0.75rem;" data-substitute="${schedule.id}"><i class="bi bi-person-plus"></i> Ajukan pengganti</button></div>`;
+                    }
+                }
+                const substituteBadge = schedule.substitute_active ? `<div class="small text-info mt-1"><i class="bi bi-person-plus"></i> Mengajar pengganti: ${htmlSafe(schedule.substitute_teacher?.nama || 'Guru pengganti')}</div>` : '';
+                return `<article class="schedule-item ${schedule.kbm_ditangguhkan ? '' : 'current'}"><span><strong>${htmlSafe(schedule.kelas?.nama_kelas || 'Kelas')} · ${htmlSafe(schedule.mata_pelajaran?.nama_mapel || 'Mata pelajaran')}</strong><br><span>${htmlSafe(schedule.jam_mulai)}–${htmlSafe(schedule.jam_selesai)} · Siklus ${htmlSafe(schedule.siklus_minggu || 'Mingguan')}</span>${schedule.agenda_pengganti ? `<br><small>${htmlSafe(schedule.agenda_pengganti)}</small>` : ''}${substituteBadge}${subAction}</span>${action}</article>`;
             }).join('');
             list.querySelectorAll('[data-journal]').forEach((button) => button.addEventListener('click', () => {
                 const schedule = rows.find((item) => String(item.id) === button.dataset.journal);
                 openJournalForm(button.dataset.journal, schedule).catch((error) => showToast(error.message));
+            }));
+            list.querySelectorAll('[data-substitute]').forEach((button) => button.addEventListener('click', () => {
+                const schedule = rows.find((item) => String(item.id) === button.dataset.substitute);
+                openSubstituteRequestForm(button.dataset.substitute, schedule);
             }));
         } catch (error) {
             card.hidden = false;
@@ -223,6 +256,7 @@
             { key: 'classes', icon: 'bi-building', label: 'Kelola Kelas', text: 'Data kelas, tingkat, jurusan, dan wali kelas.' },
             { key: 'students', icon: 'bi-people', label: 'Kelola Siswa', text: 'Data siswa dan penempatan kelas.' },
             { key: 'schedules', icon: 'bi-calendar-week', label: 'Jadwal Pelajaran', text: 'Jadwal guru, kelas, mata pelajaran, dan siklus.' },
+            { key: 'substitute-approvals', icon: 'bi-person-badge', label: 'Guru Pengganti', text: 'Tinjau dan setujui permohonan delegasi mengajar guru pengganti.' },
             ...dashboardModules.map((module) => ({ key: module.key, icon: module.icon, label: module.title, text: module.description, module })),
         ];
         setAdminPanel('Dashboard Admin', `<div class="admin-welcome mb-4"><h1>Selamat datang, ${htmlSafe(activeUser?.nama || 'Pengguna')}</h1><p class="mb-0">Rekap kehadiran dan kegiatan pembelajaran hari ini.</p></div><div id="adminLiveReport"><div class="card"><div class="card-body text-secondary"><span class="spin"></span>Memuat rekap hari ini...</div></div></div><h2 class="h5 mt-4 mb-3">Menu Administrasi</h2><div class="row g-3">${quickLinks.map((item) => `<div class="col-12 col-md-6 col-xl-4"><article class="card h-100"><div class="card-body d-flex flex-column"><span class="module-icon mb-3"><i class="bi ${item.icon}"></i></span><h2 class="card-title">${htmlSafe(item.label)}</h2><p class="text-secondary small flex-grow-1">${htmlSafe(item.text)}</p><button class="btn btn-outline-success btn-sm align-self-start" data-admin-open="${htmlSafe(item.key)}">Buka menu <i class="bi bi-arrow-right"></i></button></div></article></div>`).join('')}</div>`);
@@ -241,6 +275,7 @@
         const module = dashboardModules.find((item) => item.key === action);
         if (action === 'home') return renderAdminHome();
         if (action === 'reports') return adminReports.open();
+        if (action === 'substitute-approvals') return openSubstituteApprovals();
         if (['classes', 'students', 'subjects', 'materials', 'schedules'].includes(action)) return academicData.openMaster(action);
         if (module) return openModule(module);
     }
@@ -490,6 +525,268 @@
         }));
     }
 
+    // Membuka formulir pengajuan guru pengganti untuk jadwal yang dipilih oleh guru utama.
+    async function openSubstituteRequestForm(scheduleId, schedule = null) {
+        if (!schedule) {
+            const todaySchedules = await api('/api/v1/teacher/schedules/today');
+            schedule = (todaySchedules.data || []).find((item) => String(item.id) === String(scheduleId));
+        }
+        if (!schedule) return showToast('Jadwal tidak ditemukan.');
+
+        setFeature('Ajukan Guru Pengganti', '<div class="card"><div class="card-body text-secondary"><span class="spin"></span>Memuat daftar rekan guru...</div></div>');
+
+        try {
+            const candidatesRes = await api('/api/v1/teacher/substitute-candidates');
+            const candidates = candidatesRes.data || [];
+            if (!candidates.length) {
+                setFeature('Ajukan Guru Pengganti', '<div class="alert alert-warning">Tidak ada data rekan guru yang tersedia untuk dipilih sebagai pengganti.</div>');
+                return;
+            }
+
+            const today = new Intl.DateTimeFormat('sv-SE', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Jakarta' }).format(new Date());
+
+            const content = `<div class="card mb-3">
+                <div class="card-body">
+                    <h2 class="h6 mb-2">Jadwal yang Ingin Didelegasikan</h2>
+                    <div class="text-secondary small">
+                        <strong>${htmlSafe(schedule.kelas?.nama_kelas || 'Kelas')} · ${htmlSafe(schedule.mata_pelajaran?.nama_mapel || 'Mata Pelajaran')}</strong><br>
+                        Waktu: ${htmlSafe(schedule.jam_mulai)}–${htmlSafe(schedule.jam_selesai)} (${htmlSafe(schedule.hari)}) · Siklus ${htmlSafe(schedule.siklus_minggu || 'Mingguan')}
+                    </div>
+                </div>
+            </div>
+            <form id="substituteRequestForm">
+                <input type="hidden" name="jadwal_pelajaran_id" value="${htmlSafe(scheduleId)}">
+                <div class="mb-3">
+                    <label class="form-label" for="substituteTeacherSelect">Pilih Guru Pengganti <span class="text-danger">*</span></label>
+                    <select class="form-select" id="substituteTeacherSelect" name="guru_pengganti_id" required>
+                        <option value="">-- Pilih rekan guru pengganti --</option>
+                        ${candidates.map((teacher) => `<option value="${teacher.id}">${htmlSafe(teacher.nama)}${teacher.nip ? ` (${htmlSafe(teacher.nip)})` : ''}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="substituteDate">Tanggal Mengajar <span class="text-danger">*</span></label>
+                    <input class="form-control" type="date" id="substituteDate" name="tanggal" value="${today}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="substituteReason">Alasan Penggantian <span class="text-danger">*</span></label>
+                    <textarea class="form-control" id="substituteReason" name="alasan" rows="3" minlength="10" maxlength="2000" placeholder="Jelaskan alasan mengapa membutuhkan guru pengganti (min. 10 karakter)..." required></textarea>
+                </div>
+                <div class="d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary" id="btnCancelSubstitute">Batal</button>
+                    <button type="submit" class="btn btn-primary" id="btnSubmitSubstitute"><i class="bi bi-send"></i> Kirim Pengajuan</button>
+                </div>
+            </form>`;
+
+            setFeature('Ajukan Guru Pengganti', content);
+
+            $('btnCancelSubstitute')?.addEventListener('click', openSchedules);
+
+            $('substituteRequestForm')?.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const form = event.currentTarget;
+                const submitBtn = $('btnSubmitSubstitute');
+                submitBtn.disabled = true;
+                const body = {
+                    jadwal_pelajaran_id: Number(form.jadwal_pelajaran_id.value),
+                    guru_pengganti_id: Number(form.guru_pengganti_id.value),
+                    tanggal: form.tanggal.value,
+                    alasan: form.alasan.value.trim(),
+                };
+
+                try {
+                    const response = await api('/api/v1/teacher/substitute-requests', {
+                        method: 'POST',
+                        body,
+                    });
+                    showToast(response.message || 'Pengajuan guru pengganti berhasil dikirim.');
+                    await loadHomeSchedules();
+                    openSchedules();
+                } catch (error) {
+                    showToast(error.message);
+                    setFeatureError(error);
+                } finally {
+                    submitBtn.disabled = false;
+                }
+            });
+        } catch (error) {
+            setFeature('Ajukan Guru Pengganti', `<div class="alert alert-danger">${htmlSafe(error.message)}</div>`);
+        }
+    }
+
+    // Menampilkan riwayat pengajuan guru pengganti milik guru yang sedang login.
+    async function openMySubstituteRequests() {
+        setFeature('Riwayat Pengajuan Guru Pengganti', '<div class="card"><div class="card-body text-secondary"><span class="spin"></span>Memuat riwayat pengajuan...</div></div>');
+
+        try {
+            const res = await api('/api/v1/teacher/substitute-requests/mine');
+            const items = res.data || [];
+
+            const statusBadge = {
+                PENDING: '<span class="badge text-bg-warning">Menunggu</span>',
+                APPROVED: '<span class="badge text-bg-success">Disetujui</span>',
+                REJECTED: '<span class="badge text-bg-danger">Ditolak</span>',
+            };
+
+            const rows = items.map((item) => `<tr>
+                <td class="text-nowrap">${htmlSafe(item.tanggal)}</td>
+                <td>
+                    <strong>${htmlSafe(item.jadwal_pelajaran?.kelas?.nama_kelas || 'Kelas')}</strong> · ${htmlSafe(item.jadwal_pelajaran?.mata_pelajaran?.nama_mapel || 'Mapel')}
+                </td>
+                <td>
+                    <strong>${htmlSafe(item.guru_pengganti?.nama || 'Guru')}</strong>
+                    ${item.guru_pengganti?.nip ? `<div class="small text-secondary">${htmlSafe(item.guru_pengganti.nip)}</div>` : ''}
+                </td>
+                <td class="small">${htmlSafe(item.alasan)}</td>
+                <td>${statusBadge[item.status_approval] || item.status_approval}</td>
+                <td class="small text-secondary">${htmlSafe(item.catatan_admin || '—')}</td>
+            </tr>`).join('');
+
+            const content = `<div class="d-flex justify-content-between align-items-center mb-3">
+                <p class="small text-secondary mb-0">Daftar permohonan guru pengganti yang pernah Anda ajukan.</p>
+                <button class="btn btn-outline-primary btn-sm" id="btnBackToSchedules"><i class="bi bi-arrow-left"></i> Kembali ke Jadwal</button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover table-striped align-middle">
+                    <thead>
+                        <tr>
+                            <th>Tanggal</th>
+                            <th>Jadwal</th>
+                            <th>Guru Pengganti</th>
+                            <th>Alasan</th>
+                            <th>Status</th>
+                            <th>Catatan Admin</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows || '<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada pengajuan guru pengganti.</td></tr>'}
+                    </tbody>
+                </table>
+            </div>`;
+
+            setFeature('Riwayat Pengajuan Guru Pengganti', content);
+            $('btnBackToSchedules')?.addEventListener('click', openSchedules);
+        } catch (error) {
+            setFeature('Riwayat Pengajuan Guru Pengganti', `<div class="alert alert-danger">${htmlSafe(error.message)}</div>`);
+        }
+    }
+
+    // Menampilkan panel moderasi persetujuan pengajuan guru pengganti untuk Admin, Kurikulum, dan Kepsek.
+    async function openSubstituteApprovals(statusFilter = '') {
+        const query = statusFilter ? `?status_approval=${encodeURIComponent(statusFilter)}` : '';
+        setFeature('Persetujuan Guru Pengganti', '<div class="card"><div class="card-body text-secondary"><span class="spin"></span>Memuat daftar pengajuan pengganti...</div></div>');
+
+        try {
+            const res = await api(`/api/v1/admin/substitute-requests${query}`);
+            const items = res.data || [];
+
+            const statusBadge = {
+                PENDING: '<span class="badge text-bg-warning">Menunggu</span>',
+                APPROVED: '<span class="badge text-bg-success">Disetujui</span>',
+                REJECTED: '<span class="badge text-bg-danger">Ditolak</span>',
+            };
+
+            const filterBar = `<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn ${!statusFilter ? 'btn-primary' : 'btn-outline-primary'}" data-sub-filter="">Semua</button>
+                    <button type="button" class="btn ${statusFilter === 'PENDING' ? 'btn-primary' : 'btn-outline-primary'}" data-sub-filter="PENDING">Menunggu</button>
+                    <button type="button" class="btn ${statusFilter === 'APPROVED' ? 'btn-primary' : 'btn-outline-primary'}" data-sub-filter="APPROVED">Disetujui</button>
+                    <button type="button" class="btn ${statusFilter === 'REJECTED' ? 'btn-primary' : 'btn-outline-primary'}" data-sub-filter="REJECTED">Ditolak</button>
+                </div>
+            </div>`;
+
+            const rows = items.map((item) => {
+                const actions = item.status_approval === 'PENDING'
+                    ? `<div class="d-flex gap-1">
+                        <button class="btn btn-success btn-sm" data-sub-action="${item.id}" data-decision="APPROVED" title="Setujui"><i class="bi bi-check-lg"></i> Setujui</button>
+                        <button class="btn btn-outline-danger btn-sm" data-sub-action="${item.id}" data-decision="REJECTED" title="Tolak"><i class="bi bi-x-lg"></i> Tolak</button>
+                       </div>`
+                    : `<span class="small text-secondary">Selesai</span>`;
+
+                return `<tr>
+                    <td class="text-nowrap">${htmlSafe(item.tanggal)}</td>
+                    <td>
+                        <strong>${htmlSafe(item.guru_utama?.nama || 'Guru Utama')}</strong>
+                        ${item.guru_utama?.nip ? `<div class="small text-secondary">${htmlSafe(item.guru_utama.nip)}</div>` : ''}
+                    </td>
+                    <td>
+                        <i class="bi bi-arrow-right text-secondary me-1"></i>
+                        <strong>${htmlSafe(item.guru_pengganti?.nama || 'Pengganti')}</strong>
+                        ${item.guru_pengganti?.nip ? `<div class="small text-secondary">${htmlSafe(item.guru_pengganti.nip)}</div>` : ''}
+                    </td>
+                    <td>
+                        <strong>${htmlSafe(item.jadwal_pelajaran?.kelas?.nama_kelas || 'Kelas')}</strong><br>
+                        <span class="small text-secondary">${htmlSafe(item.jadwal_pelajaran?.mata_pelajaran?.nama_mapel || 'Mapel')}</span>
+                    </td>
+                    <td class="small" style="max-width:200px;">${htmlSafe(item.alasan)}</td>
+                    <td>${statusBadge[item.status_approval] || item.status_approval}</td>
+                    <td class="text-nowrap">${actions}</td>
+                </tr>`;
+            }).join('');
+
+            const content = `<section class="card">
+                <div class="card-body">
+                    ${filterBar}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Guru Utama</th>
+                                    <th>Guru Pengganti</th>
+                                    <th>Kelas & Mapel</th>
+                                    <th>Alasan</th>
+                                    <th>Status</th>
+                                    <th>Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rows || '<tr><td colspan="7" class="text-center text-secondary py-4">Tidak ada pengajuan guru pengganti.</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>`;
+
+            setFeature('Persetujuan Guru Pengganti', content);
+
+            document.querySelectorAll('[data-sub-filter]').forEach((btn) => btn.addEventListener('click', () => {
+                openSubstituteApprovals(btn.dataset.subFilter);
+            }));
+
+            document.querySelectorAll('[data-sub-action]').forEach((btn) => btn.addEventListener('click', async () => {
+                const id = btn.dataset.subAction;
+                const decision = btn.dataset.decision;
+                const promptMsg = decision === 'APPROVED'
+                    ? 'Catatan persetujuan (opsional):'
+                    : 'Catatan penolakan (opsional):';
+                const note = window.prompt(promptMsg, '');
+                if (note === null) return;
+
+                btn.disabled = true;
+                try {
+                    await api(`/api/v1/admin/substitute-requests/${id}`, {
+                        method: 'PATCH',
+                        body: {
+                            status_approval: decision,
+                            catatan_admin: note ? note.trim() : null,
+                        },
+                    });
+                    showToast(decision === 'APPROVED' ? 'Pengajuan guru pengganti disetujui.' : 'Pengajuan guru pengganti ditolak.');
+                    openSubstituteApprovals(statusFilter);
+                    if (document.body.classList.contains('admin-mode')) {
+                        adminDashboard.loadAdminLiveReport();
+                    }
+                } catch (error) {
+                    showToast(error.message);
+                } finally {
+                    btn.disabled = false;
+                }
+            }));
+        } catch (error) {
+            setFeature('Persetujuan Guru Pengganti', `<div class="alert alert-danger">${htmlSafe(error.message)}</div>`);
+        }
+    }
+
     const userAccess = window.createAksaraUserAccess({ $, api, htmlSafe, setFeature, setFeatureError, showToast, token });
 
     // Form pengaturan sekolah menyatukan konfigurasi geofence, jadwal presensi, dan batas akurasi GPS.
@@ -574,6 +871,7 @@
             if (module.key === 'monitoring') return openMonitoring();
             if (module.key === 'discrepancy') return openDiscrepancies();
             if (module.key === 'leave-approvals' || module.key === 'leave-submit') return openLeave(module.key === 'leave-submit');
+            if (module.key === 'substitute-approvals') return openSubstituteApprovals();
             if (module.key === 'student-attendance') return openWaliSessions();
             if (module.key === 'settings') return openSettings();
         } catch (error) { setFeature(module.title, `<div class="alert alert-danger mb-0">${htmlSafe(error.message)}</div>`); }
@@ -687,6 +985,7 @@
         }
         if (is('kurikulum')) {
             add('journal', 'isi-ejurnal', 'bi-journal-text', 'E-Jurnal & Presensi Kelas', 'Isi jurnal dan presensi siswa pada jadwal mengajar yang ditugaskan.');
+            add('substitute-approvals', 'view-dashboard-kurikulum', 'bi-person-badge', 'Guru Pengganti', 'Tinjau dan setujui delegasi guru pengganti.');
             add('monitoring', 'view-dashboard-kurikulum', 'bi-bar-chart-line', 'Monitoring Pembelajaran', 'Lihat jumlah jadwal, jurnal, dan presensi hari ini.');
             add('discrepancy', 'view-audit-discrepancy', 'bi-clipboard2-data', 'Audit Discrepancy', 'Tinjau dan tindak lanjuti kasus yang tersedia.');
             add('academic-master', 'kelola-master-data', 'bi-database', 'Master Data Akademik', 'Kelola kelas, siswa, mapel, materi, dan jadwal.');
@@ -696,6 +995,7 @@
         }
         if (is('kepsek')) {
             add('journal', 'isi-ejurnal', 'bi-journal-text', 'E-Jurnal & Presensi Kelas', 'Isi jurnal dan presensi siswa pada jadwal mengajar yang ditugaskan.');
+            add('substitute-approvals', 'kelola-pengajuan-izin', 'bi-person-badge', 'Guru Pengganti', 'Tinjau dan setujui delegasi guru pengganti.');
             add('monitoring', 'view-dashboard-kurikulum', 'bi-speedometer2', 'Dashboard Eksekutif', 'Lihat jumlah jadwal, jurnal, dan presensi hari ini.');
             add('discrepancy', 'view-audit-discrepancy', 'bi-clipboard2-data', 'Audit Pembelajaran', 'Tinjau dan tindak lanjuti kasus yang tersedia.');
             add('leave-approvals', 'kelola-pengajuan-izin', 'bi-file-earmark-check', 'Persetujuan Perizinan', 'Verifikasi pengajuan cuti dan dinas guru.');
@@ -703,6 +1003,7 @@
         if (is('admin')) {
             add('journal', 'isi-ejurnal', 'bi-journal-text', 'E-Jurnal & Presensi Kelas', 'Isi jurnal dan presensi siswa pada jadwal mengajar yang ditugaskan.');
             add('admin-users', 'kelola-master-data', 'bi-person-gear', 'Kelola User & Akses', 'Kelola akun, reset kata sandi, role, dan permission.');
+            add('substitute-approvals', 'kelola-master-data', 'bi-person-badge', 'Guru Pengganti', 'Tinjau dan setujui delegasi guru pengganti.');
             add('flagged', 'review-absensi-flagged', 'bi-shield-check', 'Moderasi Presensi', 'Tinjau foto presensi masuk dan pulang yang belum diverifikasi.');
             add('academic-master', 'kelola-master-data', 'bi-database', 'Master Data Akademik', 'Kelola kelas, siswa, mapel, materi, dan jadwal.');
             add('years', 'kelola-tahun-ajaran', 'bi-calendar3', 'Tahun Ajaran', 'Buat tahun ajaran dan aktivasi tersinkron.');
@@ -731,6 +1032,9 @@
             document.body.classList.remove('sidebar-open');
             adminAction(button.dataset.adminAction);
         }));
+        window.addEventListener('aksara:open-substitutes', () => {
+            openSubstituteApprovals();
+        });
 
         const labels = { guru: 'Dashboard Guru', kurikulum: 'Dashboard Kurikulum', kepsek: 'Dashboard Kepala Sekolah', admin: 'Dashboard Admin / TU' };
         const dashboardLabel = ['admin', 'kurikulum', 'kepsek', 'guru'].filter((role) => is(role)).map((role) => labels[role]);

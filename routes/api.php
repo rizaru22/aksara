@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\MasterDataController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\ProfilePhotoController;
+use App\Http\Controllers\Api\SubstituteTeacherController;
 use App\Http\Controllers\Api\TeacherAttendanceController;
 use App\Http\Controllers\Api\TeacherScheduleController;
 use Illuminate\Support\Facades\Route;
@@ -54,6 +55,11 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
     Route::get('/admin/attendance-corrections/{attendanceCorrection}/evidence', [TeacherAttendanceController::class, 'correctionEvidence'])->middleware('permission:review-absensi-flagged');
 
     Route::get('/teacher/schedules/today', [TeacherScheduleController::class, 'today'])->middleware('permission:isi-ejurnal|view-dashboard-kurikulum|kelola-master-data');
+    Route::get('/teacher/substitute-candidates', [SubstituteTeacherController::class, 'candidates'])->middleware('permission:isi-ejurnal');
+    Route::get('/teacher/substitute-requests/mine', [SubstituteTeacherController::class, 'mine'])->middleware('permission:isi-ejurnal');
+    Route::post('/teacher/substitute-requests', [SubstituteTeacherController::class, 'store'])->middleware(['permission:isi-ejurnal', 'throttle:10,1']);
+    Route::get('/admin/substitute-requests', [SubstituteTeacherController::class, 'index'])->middleware('role_or_permission:admin|kepsek|kurikulum|kelola-master-data');
+    Route::patch('/admin/substitute-requests/{pengajuanGuruPengganti}', [SubstituteTeacherController::class, 'decide'])->middleware('role_or_permission:admin|kepsek|kurikulum|kelola-master-data');
     Route::get('/announcements', [TeacherScheduleController::class, 'announcements']);
     Route::get('/calendar/holidays', [HolidayCalendarController::class, 'index']);
     Route::get('/reports/my-attendance', [AttendanceReportController::class, 'mine']);

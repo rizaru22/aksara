@@ -8,6 +8,7 @@ use App\Models\AgendaSekolah;
 use App\Models\HariLibur;
 use App\Models\JadwalPelajaran;
 use App\Models\JurnalMengajar;
+use App\Models\PengajuanGuruPengganti;
 use App\Models\PengajuanIzin;
 use App\Models\Setting;
 use App\Models\TahunAjaran;
@@ -46,6 +47,12 @@ class DashboardController extends Controller
             ->orderByDesc('updated_at')
             ->get()
             ->groupBy('user_id');
+
+        $substituteRequests = PengajuanGuruPengganti::query()
+            ->with(['guruUtama:id,nama,nip', 'guruPengganti:id,nama,nip', 'jadwalPelajaran.kelas', 'jadwalPelajaran.mataPelajaran'])
+            ->whereDate('tanggal', $date)
+            ->latest('created_at')
+            ->get();
 
         $present = $notCheckedIn = $verificationPending = $rejected = [];
         $leave = $sick = $outsideDuty = [];
@@ -160,6 +167,9 @@ class DashboardController extends Controller
                 'in_class_teachers' => $inClassTeachers,
                 'in_class_sessions' => $inClassSessions,
                 'not_in_class_sessions' => $notInClassSessions,
+                'substitute_requests' => $substituteRequests,
+                'pending_substitute_requests_count' => $substituteRequests->where('status_approval', 'PENDING')->count(),
+                'approved_substitute_requests_count' => $substituteRequests->where('status_approval', 'APPROVED')->count(),
                 'meta' => $meta,
             ],
         ]);
