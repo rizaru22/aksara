@@ -4,17 +4,22 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Absensi;
+use App\Models\AttendanceCorrection;
 use App\Models\HariLibur;
 use App\Models\JadwalPresensiHarian;
 use App\Models\PengajuanIzin;
 use App\Models\Setting;
 use App\Models\User;
+use App\Notifications\TeacherAttendanceRejectedNotification;
+use App\Notifications\TeacherAttendanceCorrectionResultNotification;
 use App\Services\HaversineService;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 
@@ -33,6 +38,7 @@ class TeacherAttendanceController extends Controller
         $attendance = Absensi::query()
             ->where('user_id', $request->user()->id)
             ->whereDate('tanggal', $now->toDateString())
+            ->with(['corrections' => fn ($query) => $query->latest()->select('id', 'absensi_id', 'session', 'reason', 'status', 'review_note', 'created_at')])
             ->first();
         $approvedLeave = $this->approvedLeaveForDate($request->user(), $now);
         $holiday = $this->holidayForDate($now);
@@ -285,6 +291,120 @@ class TeacherAttendanceController extends Controller
         return response()->json($items);
     }
 
+    public function submitCorrection(Request $request, Absensi $absensi)
+    {
+        abort_unless((int) $absensi->user_id === (int) $request->user()->id, 404);
+
+        $data = $request->validate([
+            'session' => ['required', 'in:masuk,pulang'],
+            'reason' => ['required', 'string', 'min:5', 'max:2000'],
+            'evidence' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+        ]);
+        $statusColumn = $data['session'] === 'masuk' ? 'status_verifikasi_masuk' : 'status_verifikasi_pulang';
+        if ($absensi->{$statusColumn} !== 'REJECTED') {
+            throw ValidationException::withMessages(['session' => 'Koreksi hanya dapat diajukan untuk sesi yang ditolak admin.']);
+        }
+
+        if ($absensi->corrections()->where('session', $data['session'])->where('status', 'PENDING')->exists()) {
+            throw ValidationException::withMessages(['session' => 'Pengajuan koreksi sesi ini masih menunggu tinjauan admin.']);
+        }
+
+        $evidencePath = $request->file('evidence')?->store('attendance-corrections', 'local');
+        try {
+            $correction = DB::transaction(function () use ($request, $absensi, $data, $statusColumn, $evidencePath): AttendanceCorrection {
+                $lockedAttendance = Absensi::query()->lockForUpdate()->findOrFail($absensi->id);
+                if ($lockedAttendance->{$statusColumn} !== 'REJECTED') {
+                    throw ValidationException::withMessages(['session' => 'Status presensi sudah berubah; perbarui halaman lalu coba lagi.']);
+                }
+                if ($lockedAttendance->corrections()->where('session', $data['session'])->where('status', 'PENDING')->exists()) {
+                    throw ValidationException::withMessages(['session' => 'Pengajuan koreksi sesi ini masih menunggu tinjauan admin.']);
+                }
+
+                return AttendanceCorrection::query()->create([
+                    'absensi_id' => $lockedAttendance->id,
+                    'user_id' => $request->user()->id,
+                    'session' => $data['session'],
+                    'reason' => $data['reason'],
+                    'evidence_photo' => $evidencePath,
+                    'original_status' => $lockedAttendance->{$statusColumn},
+                    'status' => 'PENDING',
+                ]);
+            });
+        } catch (Throwable $exception) {
+            if ($evidencePath) Storage::disk('local')->delete($evidencePath);
+            throw $exception;
+        }
+
+        return response()->json(['message' => 'Pengajuan koreksi terkirim dan menunggu tinjauan admin.', 'data' => $correction], 201);
+    }
+
+    public function corrections()
+    {
+        $items = AttendanceCorrection::query()
+            ->with(['user:id,nama,nip', 'attendance:id,tanggal,jam_masuk,jam_pulang,foto_masuk,foto_pulang,status_verifikasi_masuk,status_verifikasi_pulang'])
+            ->where('status', 'PENDING')
+            ->latest()
+            ->paginate(20);
+
+        return response()->json($items);
+    }
+
+    public function reviewCorrection(Request $request, AttendanceCorrection $attendanceCorrection)
+    {
+        $data = $request->validate([
+            'decision' => ['required', 'in:APPROVED,REJECTED'],
+            'note' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        DB::transaction(function () use ($request, $attendanceCorrection, $data): void {
+            $correction = AttendanceCorrection::query()->lockForUpdate()->findOrFail($attendanceCorrection->id);
+            if ($correction->status !== 'PENDING') {
+                throw ValidationException::withMessages(['decision' => 'Pengajuan koreksi ini sudah ditinjau.']);
+            }
+
+            $attendance = Absensi::query()->lockForUpdate()->findOrFail($correction->absensi_id);
+            $statusColumn = $correction->session === 'masuk' ? 'status_verifikasi_masuk' : 'status_verifikasi_pulang';
+            if ($attendance->{$statusColumn} !== 'REJECTED') {
+                throw ValidationException::withMessages(['decision' => 'Status presensi berubah, sehingga koreksi ini tidak dapat diterapkan.']);
+            }
+
+            $correction->forceFill([
+                'status' => $data['decision'],
+                'reviewed_by' => $request->user()->id,
+                'review_note' => $data['note'] ?? null,
+            ])->save();
+
+            if ($data['decision'] === 'APPROVED') {
+                $attendance->forceFill([$statusColumn => 'APPROVED'])->save();
+            }
+        });
+
+        try {
+            $correction = $attendanceCorrection->refresh()->load(['user:id,nama', 'attendance:id,tanggal']);
+            $correction->user?->notify(new TeacherAttendanceCorrectionResultNotification(
+                $correction->session,
+                Carbon::parse($correction->attendance?->tanggal)->format('d/m/Y'),
+                $data['decision'],
+                "attendance-correction-result-{$correction->id}",
+            ));
+        } catch (Throwable $exception) {
+            Log::warning('Could not send attendance correction result push notification.', [
+                'correction_id' => $attendanceCorrection->id,
+                'exception' => $exception->getMessage(),
+            ]);
+        }
+
+        return response()->json(['message' => 'Tinjauan koreksi tersimpan.', 'data' => $attendanceCorrection->refresh()]);
+    }
+
+    public function correctionEvidence(AttendanceCorrection $attendanceCorrection)
+    {
+        $path = $attendanceCorrection->evidence_photo;
+        abort_unless($path && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->download($path);
+    }
+
     public function review(Request $request, Absensi $absensi)
     {
         $data = $request->validate([
@@ -303,6 +423,23 @@ class TeacherAttendanceController extends Controller
             'catatan_admin' => $data['note'] ?? null,
             'approved_by' => $request->user()->id,
         ])->save();
+
+        if ($data['decision'] === 'REJECTED') {
+            try {
+                $sessionLabel = $data['session'] === 'masuk' ? 'masuk' : 'pulang';
+                $absensi->user?->notify(new TeacherAttendanceRejectedNotification(
+                    $sessionLabel,
+                    Carbon::parse($absensi->tanggal)->format('d/m/Y'),
+                    "attendance-rejected-{$absensi->id}-{$data['session']}",
+                ));
+            } catch (Throwable $exception) {
+                Log::warning('Could not send attendance rejection push notification.', [
+                    'absensi_id' => $absensi->id,
+                    'session' => $data['session'],
+                    'exception' => $exception->getMessage(),
+                ]);
+            }
+        }
 
         return response()->json(['message' => 'Tinjauan presensi tersimpan.', 'data' => $absensi->refresh()]);
     }

@@ -33,6 +33,7 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
                 return;
             }
             if (!item || !item.jam_masuk) {
+                $('attendanceCorrectionActions').hidden = true;
                 const opensAt = result.check_in_opens_at || '07:00';
                 const tooEarly = result.check_in_available === false;
                 $('attendanceState').textContent = tooEarly
@@ -43,14 +44,65 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
                 return;
             }
             const checkoutStatus = item.status_waktu_pulang ? ` · ${item.status_waktu_pulang.replaceAll('_', ' ')}` : '';
-            $('attendanceState').textContent = `Masuk ${item.jam_masuk || '—'} · Pulang ${item.jam_pulang || 'belum tercatat'}${checkoutStatus} · ${item.status_verifikasi_masuk}`;
+            $('attendanceState').textContent = `Masuk ${item.jam_masuk || '—'} · ${item.status_verifikasi_masuk} · Pulang ${item.jam_pulang || 'belum tercatat'}${item.jam_pulang ? ` · ${item.status_verifikasi_pulang || 'PENDING'}` : ''}${checkoutStatus}`;
             $('checkIn').disabled = Boolean(item.jam_masuk);
             $('checkOut').disabled = !item.jam_masuk || Boolean(item.jam_pulang);
+            renderCorrectionActions(item);
         } catch (error) {
             $('attendanceState').textContent = error.message;
             $('checkIn').disabled = true;
             $('checkOut').disabled = true;
         }
+    }
+
+    function renderCorrectionActions(item) {
+        const container = $('attendanceCorrectionActions');
+        const sessions = ['masuk', 'pulang'].filter((session) => item[`status_verifikasi_${session}`] === 'REJECTED');
+        if (!sessions.length) {
+            container.hidden = true;
+            container.innerHTML = '';
+            return;
+        }
+
+        const corrections = item.corrections || [];
+        container.hidden = false;
+        container.innerHTML = `<div class="alert alert-danger py-2 small mb-2">Ada sesi presensi yang ditolak. Periksa catatan admin${item.catatan_admin ? `: ${escapeHtml(item.catatan_admin)}` : ''}, lalu ajukan koreksi jika diperlukan.</div>${sessions.map((session) => {
+            const latest = corrections.find((entry) => entry.session === session);
+            if (latest?.status === 'PENDING') return `<div class="small text-warning mb-2">Koreksi absen ${session} sedang menunggu tinjauan admin.</div>`;
+            const previousDecision = latest?.status === 'REJECTED'
+                ? `<div class="small text-secondary mb-2">Koreksi sebelumnya ditolak${latest.review_note ? `: ${escapeHtml(latest.review_note)}` : '.'}</div>`
+                : '';
+            return `${previousDecision}<button type="button" class="btn btn-outline-danger btn-sm me-2 mb-2" data-attendance-correction="${session}" data-attendance-id="${item.id}"><i class="bi bi-arrow-repeat"></i> Ajukan koreksi absen ${session}</button>`;
+        }).join('')}`;
+        container.querySelectorAll('[data-attendance-correction]').forEach((button) => button.addEventListener('click', () => openCorrectionForm(button.dataset.attendanceId, button.dataset.attendanceCorrection)));
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]);
+    }
+
+    function openCorrectionForm(attendanceId, session) {
+        const label = session === 'masuk' ? 'Absen masuk' : 'Absen pulang';
+        setFeature('Ajukan Koreksi Presensi', `<form id="attendanceCorrectionForm"><div class="alert alert-info small">Jelaskan mengapa keputusan penolakan perlu ditinjau ulang. Admin akan memeriksa alasan dan bukti tambahan Anda.</div><div class="mb-3"><label class="form-label" for="attendanceCorrectionReason">Alasan koreksi <span class="text-danger">*</span></label><textarea class="form-control" id="attendanceCorrectionReason" name="reason" rows="4" minlength="5" maxlength="2000" required placeholder="Tuliskan penjelasan dengan jelas"></textarea></div><div class="mb-3"><label class="form-label" for="attendanceCorrectionEvidence">Bukti tambahan (opsional)</label><input class="form-control" id="attendanceCorrectionEvidence" name="evidence" type="file" accept="image/jpeg,image/png,image/webp"><div class="form-text">JPG, PNG, atau WebP. Maksimal 5 MB.</div></div><div class="d-flex gap-2"><button class="btn btn-outline-secondary" type="button" data-dismiss-correction>Batal</button><button class="btn btn-primary" type="submit">Kirim koreksi ${label.toLowerCase()}</button></div></form>`);
+
+        $('featureContent').querySelector('[data-dismiss-correction]').addEventListener('click', () => featureModal.hide());
+        $('attendanceCorrectionForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const button = form.querySelector('[type="submit"]');
+            const body = new FormData(form);
+            body.append('session', session);
+            button.disabled = true;
+            try {
+                await api(`/api/v1/teacher/attendance/${attendanceId}/corrections`, { method: 'POST', body });
+                featureModal.hide();
+                showToast('Koreksi terkirim dan menunggu tinjauan admin.');
+                await refreshAttendance();
+            } catch (error) {
+                button.disabled = false;
+                setFeatureError(error);
+            }
+        });
     }
 
     function findPreciseLocation(status, preflight, signal, action = 'check-in') {

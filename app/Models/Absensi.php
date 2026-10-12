@@ -30,4 +30,9 @@ class Absensi extends Model
     {
         return $this->hasMany(LivenessLog::class);
     }
+
+    public function corrections(): HasMany
+    {
+        return $this->hasMany(AttendanceCorrection::class, 'absensi_id');
+    }
 }

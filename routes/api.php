@@ -45,9 +45,13 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
     Route::post('/teacher/attendance/location-check', [TeacherAttendanceController::class, 'verifyLocation'])->middleware(['permission:absen-masuk|absen-pulang', 'throttle:20,1']);
     Route::post('/teacher/attendance/check-in', [TeacherAttendanceController::class, 'checkIn'])->middleware(['permission:absen-masuk', 'throttle:10,1']);
     Route::post('/teacher/attendance/check-out', [TeacherAttendanceController::class, 'checkOut'])->middleware(['permission:absen-pulang', 'throttle:10,1']);
+    Route::post('/teacher/attendance/{absensi}/corrections', [TeacherAttendanceController::class, 'submitCorrection'])->middleware(['permission:absen-masuk|absen-pulang', 'throttle:5,1']);
     Route::get('/admin/flagged-attendances', [TeacherAttendanceController::class, 'flagged'])->middleware('permission:review-absensi-flagged');
     Route::post('/admin/flagged-attendances/{absensi}/review', [TeacherAttendanceController::class, 'review'])->middleware('permission:review-absensi-flagged');
     Route::get('/admin/flagged-attendances/{absensi}/photo/{session}', [TeacherAttendanceController::class, 'photo'])->middleware('permission:review-absensi-flagged');
+    Route::get('/admin/attendance-corrections', [TeacherAttendanceController::class, 'corrections'])->middleware('permission:review-absensi-flagged');
+    Route::post('/admin/attendance-corrections/{attendanceCorrection}/review', [TeacherAttendanceController::class, 'reviewCorrection'])->middleware('permission:review-absensi-flagged');
+    Route::get('/admin/attendance-corrections/{attendanceCorrection}/evidence', [TeacherAttendanceController::class, 'correctionEvidence'])->middleware('permission:review-absensi-flagged');
 
     Route::get('/teacher/schedules/today', [TeacherScheduleController::class, 'today'])->middleware('permission:isi-ejurnal|view-dashboard-kurikulum|kelola-master-data');
     Route::get('/announcements', [TeacherScheduleController::class, 'announcements']);
