@@ -290,7 +290,7 @@ class TeacherAttendanceController extends Controller
         $data = $request->validate([
             'session' => ['required', 'in:masuk,pulang'],
             'decision' => ['required', 'in:APPROVED,REJECTED'],
-            'note' => ['required', 'string', 'max:2000'],
+            'note' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $column = $data['session'] === 'masuk' ? 'status_verifikasi_masuk' : 'status_verifikasi_pulang';
@@ -300,7 +300,7 @@ class TeacherAttendanceController extends Controller
 
         $absensi->forceFill([
             $column => $data['decision'],
-            'catatan_admin' => $data['note'],
+            'catatan_admin' => $data['note'] ?? null,
             'approved_by' => $request->user()->id,
         ])->save();
 

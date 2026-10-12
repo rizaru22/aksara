@@ -11,7 +11,7 @@
 | `laporan.js` | Merender ringkasan halaman laporan. |
 | `dashboard_admin.js` | Rekap guru hadir, izin/sakit/dinas, dan kelengkapan kehadiran kelas. |
 | `kelola_user_akses.js` | Daftar, tambah, ubah, hapus pengguna, role/permission, dan reset kata sandi. |
-| `moderasi_presensi.js` | Review presensi flagged dan unduh foto bukti. |
+| `moderasi_presensi.js` | Review presensi pending/flagged, paginasi daftar, dan tampilkan foto bukti dalam modal. |
 | `data_akademik.js` | Kelas, siswa, mata pelajaran, materi, jadwal, impor, dan template Excel. |
 | `tahun_ajaran.js` | Membuka pengelolaan tahun ajaran dari menu role. |
 
