@@ -253,6 +253,7 @@
     function renderAdminHome() {
         const quickLinks = [
             { key: 'reports', icon: 'bi-clipboard-data', label: 'Laporan Harian, Mingguan & Bulanan', text: 'Rekap kehadiran guru dan jurnal mengajar berdasarkan periode.' },
+            { key: 'student-attendance-report', icon: 'bi-people-fill', label: 'Laporan Presensi Siswa', text: 'Rekap kehadiran siswa per bulan dan kelas.' },
             { key: 'classes', icon: 'bi-building', label: 'Kelola Kelas', text: 'Data kelas, tingkat, jurusan, dan wali kelas.' },
             { key: 'students', icon: 'bi-people', label: 'Kelola Siswa', text: 'Data siswa dan penempatan kelas.' },
             { key: 'schedules', icon: 'bi-calendar-week', label: 'Jadwal Pelajaran', text: 'Jadwal guru, kelas, mata pelajaran, dan siklus.' },
@@ -275,6 +276,7 @@
         const module = dashboardModules.find((item) => item.key === action);
         if (action === 'home') return renderAdminHome();
         if (action === 'reports') return adminReports.open();
+        if (action === 'student-attendance-report') return adminReports.open('student-monthly');
         if (action === 'substitute-approvals') return openSubstituteApprovals();
         if (['classes', 'students', 'subjects', 'materials', 'schedules'].includes(action)) return academicData.openMaster(action);
         if (module) return openModule(module);
@@ -1262,6 +1264,7 @@
             if (module.key === 'substitute-approvals') return openSubstituteApprovals();
             if (module.key === 'journal-monitoring') return openJournalMonitoring();
             if (module.key === 'student-attendance') return openWaliSessions();
+            if (module.key === 'student-attendance-report') return adminReports.open('student-monthly');
             if (module.key === 'settings') return openSettings();
         } catch (error) { setFeature(module.title, `<div class="alert alert-danger mb-0">${htmlSafe(error.message)}</div>`); }
     }
@@ -1373,6 +1376,7 @@
         }
         if (is('kurikulum')) {
             add('substitute-approvals', 'view-dashboard-kurikulum', 'bi-person-badge', 'Guru Pengganti', 'Tinjau dan setujui delegasi guru pengganti.');
+            add('student-attendance-report', 'view-dashboard-kurikulum', 'bi-people-fill', 'Laporan Presensi Siswa', 'Rekap kehadiran siswa per bulan dan kelas.');
             add('monitoring', 'view-dashboard-kurikulum', 'bi-bar-chart-line', 'Monitoring Pembelajaran', 'Lihat jumlah jadwal, jurnal, dan presensi hari ini.');
             add('journal-monitoring', 'view-dashboard-kurikulum', 'bi-journal-check', 'Monitoring E-Jurnal', 'Pantau status jurnal mengajar guru berdasarkan tanggal kegiatan.');
             add('discrepancy', 'view-audit-discrepancy', 'bi-clipboard2-data', 'Audit Discrepancy', 'Tinjau dan tindak lanjuti kasus yang tersedia.');
@@ -1391,6 +1395,7 @@
         if (is('admin')) {
             add('admin-users', 'kelola-master-data', 'bi-person-gear', 'Kelola User & Akses', 'Kelola akun, reset kata sandi, role, dan permission.');
             add('substitute-approvals', 'kelola-master-data', 'bi-person-badge', 'Guru Pengganti', 'Tinjau dan setujui delegasi guru pengganti.');
+            add('student-attendance-report', 'view-dashboard-kurikulum', 'bi-people-fill', 'Laporan Presensi Siswa', 'Rekap kehadiran siswa per bulan dan kelas.');
             add('journal-monitoring', 'kelola-master-data', 'bi-journal-check', 'Monitoring E-Jurnal', 'Pantau status jurnal mengajar guru berdasarkan tanggal kegiatan.');
             add('flagged', 'review-absensi-flagged', 'bi-shield-check', 'Moderasi Presensi', 'Tinjau foto presensi masuk dan pulang yang belum diverifikasi.');
             add('academic-master', 'kelola-master-data', 'bi-database', 'Master Data Akademik', 'Kelola kelas, siswa, mapel, materi, dan jadwal.');

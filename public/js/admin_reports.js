@@ -103,9 +103,11 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
     }
 
     // Menyiapkan UI pelaporan admin dengan pilihan harian, mingguan, dan bulanan serta tombol cetak.
-    async function open() {
-        period = 'daily';
-        setAdminPanel('Laporan', `<div class="admin-report-heading d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3"><div><h2 class="h4 mb-1" id="adminReportPeriodLabel" aria-live="polite">Laporan Harian</h2><p class="small text-secondary mb-0">Cetak langsung atau pilih Simpan sebagai PDF pada dialog berikutnya.</p></div><div class="admin-report-actions d-flex gap-2"><button type="button" class="btn btn-primary" id="pdfAdminReport"><i class="bi bi-printer"></i> Cetak / Ekspor PDF</button></div></div><div class="card mb-3 admin-report-controls"><div class="card-body"><div class="d-flex flex-wrap gap-2 mb-3" role="group" aria-label="Jenis laporan"><button type="button" class="btn btn-success" data-report-period="daily">Harian</button><button type="button" class="btn btn-outline-success" data-report-period="weekly">Mingguan</button><button type="button" class="btn btn-outline-success" data-report-period="monthly">Bulanan</button><button type="button" class="btn btn-outline-success" data-report-period="student-monthly">Siswa</button></div><form id="adminReportFilter" class="row g-2 align-items-end"><div class="col-12 col-sm-6 col-md-4"><label class="form-label" for="adminReportDate">Tanggal acuan</label><input class="form-control" id="adminReportDate" type="date" value="${localDate()}"></div><div class="col-12 col-sm-6 col-md-4" hidden><label class="form-label" for="adminReportMonth">Bulan laporan</label><input class="form-control" id="adminReportMonth" type="month" value="${localMonth()}"></div><div class="col-12 col-sm-6 col-md-4" hidden><label class="form-label" for="adminReportClass">Kelas</label><select class="form-select" id="adminReportClass"><option value="">Semua kelas</option></select></div><div class="col-12 col-md-2"><button class="btn btn-primary w-100" type="submit">Tampilkan</button></div></form></div></div><div id="adminReportResults" class="admin-report-results" aria-live="polite"></div>`);
+    async function open(initialPeriod = 'daily') {
+        period = initialPeriod;
+        const initialTitle = initialPeriod === 'student-monthly' ? 'Laporan Presensi Siswa' : 'Laporan';
+        const initialHeading = initialPeriod === 'student-monthly' ? 'Laporan Presensi Siswa' : 'Laporan Harian';
+        setAdminPanel(initialTitle, `<div class="admin-report-heading d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3"><div><h2 class="h4 mb-1" id="adminReportPeriodLabel" aria-live="polite">${initialHeading}</h2><p class="small text-secondary mb-0">Cetak langsung atau pilih Simpan sebagai PDF pada dialog berikutnya.</p></div><div class="admin-report-actions d-flex gap-2"><button type="button" class="btn btn-primary" id="pdfAdminReport"><i class="bi bi-printer"></i> Cetak / Ekspor PDF</button></div></div><div class="card mb-3 admin-report-controls"><div class="card-body"><div class="d-flex flex-wrap gap-2 mb-3" role="group" aria-label="Jenis laporan"><button type="button" class="btn ${initialPeriod === 'daily' ? 'btn-success' : 'btn-outline-success'}" data-report-period="daily">Harian</button><button type="button" class="btn ${initialPeriod === 'weekly' ? 'btn-success' : 'btn-outline-success'}" data-report-period="weekly">Mingguan</button><button type="button" class="btn ${initialPeriod === 'monthly' ? 'btn-success' : 'btn-outline-success'}" data-report-period="monthly">Bulanan</button><button type="button" class="btn ${initialPeriod === 'student-monthly' ? 'btn-success' : 'btn-outline-success'}" data-report-period="student-monthly">Siswa</button></div><form id="adminReportFilter" class="row g-2 align-items-end"><div class="col-12 col-sm-6 col-md-4"><label class="form-label" for="adminReportDate">Tanggal acuan</label><input class="form-control" id="adminReportDate" type="date" value="${localDate()}"></div><div class="col-12 col-sm-6 col-md-4" hidden><label class="form-label" for="adminReportMonth">Bulan laporan</label><input class="form-control" id="adminReportMonth" type="month" value="${localMonth()}"></div><div class="col-12 col-sm-6 col-md-4" hidden><label class="form-label" for="adminReportClass">Kelas</label><select class="form-select" id="adminReportClass"><option value="">Semua kelas</option></select></div><div class="col-12 col-md-2"><button class="btn btn-primary w-100" type="submit">Tampilkan</button></div></form></div></div><div id="adminReportResults" class="admin-report-results" aria-live="polite"></div>`);
         const form = document.getElementById('adminReportFilter');
         const dateInput = document.getElementById('adminReportDate');
         const monthField = document.getElementById('adminReportMonth').parentElement;
@@ -150,6 +152,14 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
         }));
         form.addEventListener('submit', (event) => { event.preventDefault(); load(); });
         classInput.addEventListener('change', load);
+        dateInput.parentElement.hidden = !(period === 'daily' || period === 'weekly');
+        monthField.hidden = !(period === 'monthly' || period === 'student-monthly');
+        classField.hidden = period !== 'student-monthly';
+        if (initialPeriod === 'student-monthly') {
+            dateInput.parentElement.hidden = true;
+            monthField.hidden = false;
+            classField.hidden = false;
+        }
         await loadClasses();
         load();
     }
