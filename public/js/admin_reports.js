@@ -120,6 +120,40 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
         const classInput = document.getElementById('adminReportClass');
         const buttons = [...document.querySelectorAll('[data-report-period]')];
         const print = () => {
+            const results = document.getElementById('adminReportResults');
+            const targetTable = results?.querySelector('table');
+            if (targetTable && window.DataTable && window.DataTable.isDataTable(targetTable)) {
+                const dt = new window.DataTable(targetTable);
+                dt.destroy();
+            }
+            const printableTable = results?.querySelector('table')?.cloneNode(true);
+            if (printableTable) {
+                printableTable.querySelectorAll('*').forEach((node) => {
+                    ['id', 'data-dt-order', 'data-dt-length', 'aria-controls', 'aria-label', 'tabindex', 'role'].forEach((attr) => node.removeAttribute(attr));
+                    node.classList?.remove('sorting', 'sorting_asc', 'sorting_desc', 'dt-head-center', 'dt-orderable-asc', 'dt-orderable-desc', 'dt-body-center');
+                });
+                printableTable.removeAttribute('style');
+                printableTable.querySelectorAll('thead th, tbody td').forEach((cell) => cell.removeAttribute('style'));
+                const printWindow = window.open('', '_blank', 'width=1200,height=900');
+                if (!printWindow) {
+                    const oldTitle = document.title;
+                    const label = document.getElementById('adminReportPeriodLabel')?.textContent || 'Laporan';
+                    document.title = `AKSARA - ${label}`;
+                    const restoreTitle = () => {
+                        document.title = oldTitle;
+                        window.removeEventListener('afterprint', restoreTitle);
+                    };
+                    window.addEventListener('afterprint', restoreTitle);
+                    window.print();
+                    return;
+                }
+                printWindow.document.write(`<!doctype html><html><head><title>AKSARA - ${htmlSafe(document.getElementById('adminReportPeriodLabel')?.textContent || 'Laporan')}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #d1d5db;padding:8px 10px;text-align:left;vertical-align:top}thead th{background:#f3f4f6;font-weight:700}.badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#e5e7eb;color:#111;font-size:11px}.text-secondary{color:#4b5563}.small{font-size:11px}.text-center{text-align:center}.text-nowrap{white-space:nowrap}</style></head><body>${printableTable.outerHTML}</body></html>`);
+                printWindow.document.close();
+                printWindow.focus();
+                printWindow.print();
+                printWindow.onafterprint = () => printWindow.close();
+                return;
+            }
             const oldTitle = document.title;
             const label = document.getElementById('adminReportPeriodLabel')?.textContent || 'Laporan';
             document.title = `AKSARA - ${label}`;
