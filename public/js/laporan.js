@@ -109,7 +109,6 @@
                     <div id="attendanceReportList" aria-live="polite"></div>
                 </div></article>
                 <div class="report-grid mt-3">
-                    <div class="report-tile"><i class="bi bi-person-check"></i><strong>Presensi</strong><span>Tanggal dan waktu masuk/pulang</span></div>
                     <div class="report-tile"><i class="bi bi-journal-bookmark"></i><strong>Jurnal Mengajar</strong><span>Rekap kegiatan mengajar</span></div>
                 </div>`;
             document.getElementById('attendanceReportFilter')?.addEventListener('submit', (submitEvent) => {

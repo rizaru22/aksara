@@ -217,6 +217,42 @@ class LessonJournalTransactionTest extends TestCase
         $this->assertDatabaseHas('jurnal_mengajars', ['id' => $draftId, 'status_sesi' => 'selesai']);
     }
 
+    public function test_admin_journal_detail_exposes_student_attendance_alias_used_by_ui(): void
+    {
+        [$teacher, $schedule, $students] = $this->prepareSession();
+        $this->actingAs($teacher, 'sanctum');
+
+        $journal = \App\Models\JurnalMengajar::query()->create([
+            'user_id' => $teacher->id,
+            'jadwal_pelajaran_id' => $schedule->id,
+            'materi_pelajaran_id' => null,
+            'tanggal' => Carbon::now(config('app.timezone'))->toDateString(),
+            'materi_pembahasan' => 'Materi monitoring admin',
+            'status_sesi' => 'selesai',
+        ]);
+
+        $students->each(fn (Siswa $student) => $journal->presensiSiswas()->create([
+            'siswa_id' => $student->id,
+            'status' => 'HADIR',
+            'keterangan' => 'hadir',
+        ]));
+
+        $admin = User::query()->create([
+            'nama' => 'Admin Monitoring',
+            'email' => 'admin.monitoring@test.local',
+            'password' => 'test-password-123',
+        ]);
+        $adminRole = Role::query()->firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->assignRole($adminRole);
+
+        $this->actingAs($admin, 'sanctum');
+
+        $this->getJson('/api/v1/admin/journal-monitoring/'.$journal->id)
+            ->assertOk()
+            ->assertJsonPath('data.presensi.0.nama', 'Siswa Satu')
+            ->assertJsonPath('data.presensi_siswas.0.nama', 'Siswa Satu');
+    }
+
     private function prepareSession(): array
     {
         $permission = Permission::query()->firstOrCreate(['name' => 'isi-ejurnal', 'guard_name' => 'web']);

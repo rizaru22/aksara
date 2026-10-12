@@ -235,6 +235,8 @@ class JournalMonitoringController extends Controller
             'keterangan' => $p->keterangan,
         ]);
 
+        $presensiSiswaData = $presensiData->values();
+
         $tanggal = $jurnalMengajar->tanggal instanceof \Carbon\Carbon
             ? $jurnalMengajar->tanggal->toDateString()
             : (string) $jurnalMengajar->tanggal;
@@ -274,7 +276,8 @@ class JournalMonitoringController extends Controller
                     'id'         => $jadwal->mataPelajaran->id,
                     'nama_mapel' => $jadwal->mataPelajaran->nama_mapel,
                 ] : null,
-                'presensi'               => $presensiData,
+                'presensi'               => $presensiSiswaData,
+                'presensi_siswas'        => $presensiSiswaData,
                 'presensi_count'         => $presensiCount,
                 'total_siswa'            => $totalSiswa,
                 'lengkap'                => $lengkap,

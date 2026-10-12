@@ -1276,7 +1276,6 @@
             add('student-attendance', 'kelola-presensi-siswa', 'bi-people', 'Koreksi Presensi Siswa', 'Koreksi status pada sesi jurnal di kelas yang Anda ampu.', Boolean(user.is_wali_kelas));
         }
         if (is('kurikulum')) {
-            add('journal', 'isi-ejurnal', 'bi-journal-text', 'E-Jurnal & Presensi Kelas', 'Isi jurnal dan presensi siswa pada jadwal mengajar yang ditugaskan.');
             add('substitute-approvals', 'view-dashboard-kurikulum', 'bi-person-badge', 'Guru Pengganti', 'Tinjau dan setujui delegasi guru pengganti.');
             add('monitoring', 'view-dashboard-kurikulum', 'bi-bar-chart-line', 'Monitoring Pembelajaran', 'Lihat jumlah jadwal, jurnal, dan presensi hari ini.');
             add('journal-monitoring', 'view-dashboard-kurikulum', 'bi-journal-check', 'Monitoring E-Jurnal', 'Pantau status jurnal mengajar guru berdasarkan tanggal kegiatan.');
@@ -1287,7 +1286,6 @@
             add('holidays', 'kelola-agenda-sekolah', 'bi-calendar2-x', 'Kalender Hari Libur', 'Atur libur nasional, cuti bersama, dan libur sekolah.');
         }
         if (is('kepsek')) {
-            add('journal', 'isi-ejurnal', 'bi-journal-text', 'E-Jurnal & Presensi Kelas', 'Isi jurnal dan presensi siswa pada jadwal mengajar yang ditugaskan.');
             add('substitute-approvals', 'kelola-pengajuan-izin', 'bi-person-badge', 'Guru Pengganti', 'Tinjau dan setujui delegasi guru pengganti.');
             add('monitoring', 'view-dashboard-kurikulum', 'bi-speedometer2', 'Dashboard Eksekutif', 'Lihat jumlah jadwal, jurnal, dan presensi hari ini.');
             add('journal-monitoring', 'view-dashboard-kurikulum', 'bi-journal-check', 'Monitoring E-Jurnal', 'Pantau status jurnal mengajar guru berdasarkan tanggal kegiatan.');
@@ -1295,7 +1293,6 @@
             add('leave-approvals', 'kelola-pengajuan-izin', 'bi-file-earmark-check', 'Persetujuan Perizinan', 'Verifikasi pengajuan cuti dan dinas guru.');
         }
         if (is('admin')) {
-            add('journal', 'isi-ejurnal', 'bi-journal-text', 'E-Jurnal & Presensi Kelas', 'Isi jurnal dan presensi siswa pada jadwal mengajar yang ditugaskan.');
             add('admin-users', 'kelola-master-data', 'bi-person-gear', 'Kelola User & Akses', 'Kelola akun, reset kata sandi, role, dan permission.');
             add('substitute-approvals', 'kelola-master-data', 'bi-person-badge', 'Guru Pengganti', 'Tinjau dan setujui delegasi guru pengganti.');
             add('journal-monitoring', 'kelola-master-data', 'bi-journal-check', 'Monitoring E-Jurnal', 'Pantau status jurnal mengajar guru berdasarkan tanggal kegiatan.');
