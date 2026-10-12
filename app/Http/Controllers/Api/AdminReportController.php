@@ -9,8 +9,11 @@ use App\Models\HariLibur;
 use App\Models\JadwalPelajaran;
 use App\Models\JurnalMengajar;
 use App\Models\JadwalPresensiHarian;
+use App\Models\Kelas;
 use App\Models\PengajuanIzin;
+use App\Models\PresensiSiswa;
 use App\Models\Setting;
+use App\Models\Siswa;
 use App\Models\TahunAjaran;
 use App\Models\User;
 use App\Services\CycleScheduleService;
@@ -40,6 +43,22 @@ class AdminReportController extends Controller
             'weekly' => response()->json(['data' => $this->weekly($filters['date'], $cycles)]),
             'monthly' => response()->json(['data' => $this->monthly($filters['month'])]),
         };
+    }
+
+    /**
+     * Endpoint GET /api/v1/admin/reports/student-attendance.
+     * Menyediakan laporan bulanan kehadiran siswa yang bisa difilter per bulan dan kelas.
+     */
+    public function studentAttendance(Request $request)
+    {
+        abort_unless($request->user()->hasRole('admin') || $request->user()->can('view-dashboard-kurikulum'), 403);
+
+        $filters = $request->validate([
+            'month' => ['required', 'date_format:Y-m'],
+            'class_id' => ['nullable', 'integer', 'exists:kelas,id'],
+        ]);
+
+        return response()->json(['data' => $this->studentMonthly($filters['month'], $filters['class_id'] ?? null)]);
     }
 
     /**
@@ -211,6 +230,80 @@ class AdminReportController extends Controller
             ],
             'users' => $userRows,
             'meta' => ['denominator' => 'Jumlah guru × hari kerja (Senin–Sabtu, tidak termasuk hari libur sekolah). Hadir mencakup presensi VERIFIED/APPROVED dan dinas luar yang disetujui.'],
+        ];
+    }
+
+    /**
+     * Menyusun laporan bulanan kehadiran siswa per kelas berdasarkan jurnal dan presensi siswa yang sudah diisi.
+     */
+    private function studentMonthly(string $month, ?int $classId): array
+    {
+        [$year, $monthNumber] = array_map('intval', explode('-', $month));
+        $start = Carbon::create($year, $monthNumber, 1, 0, 0, 0, config('app.timezone'));
+        $class = $classId ? Kelas::query()->find($classId) : null;
+        $students = Siswa::query()
+            ->when($classId, fn ($query) => $query->where('kelas_id', $classId))
+            ->with('kelas:id,nama_kelas')
+            ->orderBy('nama')
+            ->get(['id', 'nama', 'nisn', 'kelas_id']);
+
+        $attendance = PresensiSiswa::query()
+            ->whereIn('siswa_id', $students->pluck('id'))
+            ->whereHas('jurnalMengajar', fn ($query) => $query
+                ->whereYear('tanggal', $year)
+                ->whereMonth('tanggal', $monthNumber)
+                ->when($classId, fn ($scheduleQuery) => $scheduleQuery->whereHas('jadwalPelajaran', fn ($jadwalQuery) => $jadwalQuery->where('kelas_id', $classId))))
+            ->get(['id', 'siswa_id', 'status']);
+
+        $byStudent = $attendance->groupBy('siswa_id');
+        $statusTotals = ['HADIR' => 0, 'IZIN' => 0, 'SAKIT' => 0, 'ALPHA' => 0, 'CABUT' => 0];
+        $rows = $students->map(function (Siswa $student) use ($byStudent, &$statusTotals): array {
+            $records = $byStudent->get($student->id, collect());
+            $counts = ['present' => 0, 'izin' => 0, 'sick' => 0, 'alpha' => 0, 'cabut' => 0];
+            foreach ($records as $record) {
+                $status = strtoupper((string) $record->status);
+                $key = match ($status) {
+                    'HADIR' => 'present',
+                    'IZIN' => 'izin',
+                    'SAKIT' => 'sick',
+                    'ALPHA' => 'alpha',
+                    'CABUT' => 'cabut',
+                    default => 'alpha',
+                };
+                $counts[$key]++;
+                if (isset($statusTotals[$status])) {
+                    $statusTotals[$status]++;
+                }
+            }
+
+            $present = $counts['present'];
+            $total = $records->count();
+
+            return [
+                'id' => $student->id,
+                'nama' => $student->nama,
+                'nisn' => $student->nisn,
+                'kelas' => $student->kelas?->nama_kelas ?? '—',
+                'present_count' => $present,
+                'izin_count' => $counts['izin'],
+                'sick_count' => $counts['sick'],
+                'alpha_count' => $counts['alpha'],
+                'cabut_count' => $counts['cabut'],
+                'total_records' => $total,
+                'attendance_percentage' => $total > 0 ? round(($present / $total) * 100, 2) : 0.0,
+            ];
+        })->values();
+
+        return [
+            'period' => ['month' => $month, 'label' => $start->translatedFormat('F Y')],
+            'summary' => [
+                'total_students' => $rows->count(),
+                'total_records' => $attendance->count(),
+                'total_present' => $rows->sum('present_count'),
+                'class_name' => $class?->nama_kelas ?? 'Semua Kelas',
+                'by_status' => $statusTotals,
+            ],
+            'students' => $rows,
         ];
     }
 

@@ -55,9 +55,24 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
         return `<div class="row g-3 mb-3">${items.map(([label, value, note]) => `<div class="col-12 col-sm-6 col-xl-3"><article class="card admin-kpi h-100"><div class="card-body"><div class="admin-kpi-caption">${htmlSafe(label)}</div><div class="admin-kpi-number mt-2">${htmlSafe(value)}</div><div class="small text-secondary mt-2">${htmlSafe(note)}</div></div></article></div>`).join('')}</div><section class="card mb-3"><div class="card-body"><h2 class="h5">Persentase kehadiran per user</h2><p class="small text-secondary">Persentase mencakup hari hadir terverifikasi dan hari dinas luar yang disetujui, dibanding hari kerja pada bulan terpilih.</p>${renderTable(['Nama', 'NIP', 'Total hadir', 'Persentase hadir', 'Izin', 'Sakit', 'Dinas luar', 'Alpha'], userRows, 'Tidak ada data user.')}</div></section><section class="card"><div class="card-body"><h2 class="h6">Rincian rekapitulasi</h2><p class="small text-secondary">${htmlSafe(meta.denominator || '')}</p>${renderTable(['Metrik', 'Jumlah hari-guru', 'Persentase'], summaryRows, 'Tidak ada data.')}</div></section>`;
     }
 
+    // Membangun laporan bulanan kehadiran siswa berdasarkan bulan dan kelas yang dipilih.
+    function renderStudentMonthly(data) {
+        const summary = data.summary || {};
+        const statusBreakdown = summary.by_status || {};
+        const rows = (data.students || []).map((student) => `<tr><td>${htmlSafe(student.nama)}</td><td>${htmlSafe(student.nisn || '—')}</td><td>${htmlSafe(student.kelas || '—')}</td><td>${htmlSafe(student.present_count)}</td><td>${htmlSafe(student.izin_count)}</td><td>${htmlSafe(student.sick_count)}</td><td>${htmlSafe(student.alpha_count)}</td><td>${htmlSafe(student.cabut_count)}</td><td><strong>${htmlSafe(student.attendance_percentage ?? 0)}%</strong></td></tr>`);
+        const summaryCards = [
+            ['Hadir', statusBreakdown.HADIR ?? 0, 'Catatan hadir siswa'],
+            ['Alpha', statusBreakdown.ALPHA ?? 0, 'Tidak hadir tanpa keterangan'],
+            ['Sakit', statusBreakdown.SAKIT ?? 0, 'Siswa sakit'],
+            ['Izin', statusBreakdown.IZIN ?? 0, 'Izin mengikuti pembelajaran'],
+        ];
+        return `<div class="row g-3 mb-3"><div class="col-12 col-md-4"><article class="card admin-kpi h-100"><div class="card-body"><div class="admin-kpi-caption">Total siswa</div><div class="admin-kpi-number mt-2">${htmlSafe(summary.total_students ?? 0)}</div><div class="small text-secondary mt-2">${htmlSafe(summary.class_name || 'Semua kelas')}</div></div></article></div><div class="col-12 col-md-4"><article class="card admin-kpi h-100"><div class="card-body"><div class="admin-kpi-caption">Total hadir</div><div class="admin-kpi-number mt-2">${htmlSafe(summary.total_present ?? 0)}</div><div class="small text-secondary mt-2">Catatan presensi pada bulan ini</div></div></article></div><div class="col-12 col-md-4"><article class="card admin-kpi h-100"><div class="card-body"><div class="admin-kpi-caption">Total catatan</div><div class="admin-kpi-number mt-2">${htmlSafe(summary.total_records ?? 0)}</div><div class="small text-secondary mt-2">Data jurnal siswa yang telah diisi</div></div></article></div></div><div class="row g-3 mb-3">${summaryCards.map(([label, value, note]) => `<div class="col-12 col-sm-6 col-xl-3"><article class="card admin-kpi h-100"><div class="card-body"><div class="admin-kpi-caption">${htmlSafe(label)}</div><div class="admin-kpi-number mt-2">${htmlSafe(value)}</div><div class="small text-secondary mt-2">${htmlSafe(note)}</div></div></article></div>`).join('')}</div><section class="card"><div class="card-body"><h2 class="h5">Kehadiran siswa per kelas</h2><p class="small text-secondary mb-3">Persentase hadir dihitung dari catatan presensi siswa yang tercatat dalam jurnal pada bulan yang dipilih.</p>${renderTable(['Nama siswa', 'NISN', 'Kelas', 'Hadir', 'Izin', 'Sakit', 'Alpha', 'Cabut', 'Persentase'], rows, 'Tidak ada data kehadiran siswa pada filter ini.')}</div></section>`;
+    }
+
     // Memilih komponen renderer yang cocok untuk periode laporan yang sedang dibuka oleh admin.
     function renderResults(data, selectedPeriod) {
         if (selectedPeriod === 'monthly') return renderMonthly(data.summary, data.meta, data.users);
+        if (selectedPeriod === 'student-monthly') return renderStudentMonthly(data);
         if (selectedPeriod === 'daily') {
             const holiday = data.holiday ? `<div class="alert alert-info">${htmlSafe(data.holiday.nama)}${data.holiday.jenis === 'MINGGU' ? '' : ` · ${htmlSafe(data.holiday.jenis)}`}</div>` : '';
             return `${holiday}<section class="card mb-3"><div class="card-body"><h2 class="h5">Kehadiran guru</h2>${renderAttendanceTable(data.attendance || [])}</div></section><section class="card"><div class="card-body"><h2 class="h5">Kelas dan jurnal mengajar</h2>${renderClassTable(data.classes || [])}</div></section>`;
@@ -68,13 +83,17 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
     }
 
     // Mengambil data laporan dari backend sesuai periode yang dipilih dan me-render hasil ke panel admin.
-    async function fetchReport(selectedPeriod, value) {
+    async function fetchReport(selectedPeriod, value, classId = '') {
         const target = document.getElementById('adminReportResults');
         if (!target) return;
         target.innerHTML = '<div class="card"><div class="card-body text-secondary"><span class="spin"></span>Memuat laporan...</div></div>';
-        const query = new URLSearchParams({ period: selectedPeriod, [selectedPeriod === 'monthly' ? 'month' : 'date']: value });
+        const query = new URLSearchParams({ period: selectedPeriod, [selectedPeriod === 'monthly' || selectedPeriod === 'student-monthly' ? 'month' : 'date']: value });
+        if (selectedPeriod === 'student-monthly' && classId) {
+            query.set('class_id', classId);
+        }
+        const endpoint = selectedPeriod === 'student-monthly' ? '/api/v1/admin/reports/student-attendance' : '/api/v1/admin/reports';
         try {
-            const result = await api(`/api/v1/admin/reports?${query.toString()}`);
+            const result = await api(`${endpoint}?${query.toString()}`);
             const data = result.data || {};
             document.getElementById('adminReportPeriodLabel').textContent = data.period?.label || `${data.period?.from || ''} – ${data.period?.to || ''}`;
             target.innerHTML = renderResults(data, selectedPeriod);
@@ -84,13 +103,15 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
     }
 
     // Menyiapkan UI pelaporan admin dengan pilihan harian, mingguan, dan bulanan serta tombol cetak.
-    function open() {
+    async function open() {
         period = 'daily';
-        setAdminPanel('Laporan', `<div class="admin-report-heading d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3"><div><h2 class="h4 mb-1" id="adminReportPeriodLabel" aria-live="polite">Laporan Harian</h2><p class="small text-secondary mb-0">Cetak langsung atau pilih Simpan sebagai PDF pada dialog berikutnya.</p></div><div class="admin-report-actions d-flex gap-2"><button type="button" class="btn btn-primary" id="pdfAdminReport"><i class="bi bi-printer"></i> Cetak / Ekspor PDF</button></div></div><div class="card mb-3 admin-report-controls"><div class="card-body"><div class="d-flex flex-wrap gap-2 mb-3" role="group" aria-label="Jenis laporan"><button type="button" class="btn btn-success" data-report-period="daily">Harian</button><button type="button" class="btn btn-outline-success" data-report-period="weekly">Mingguan</button><button type="button" class="btn btn-outline-success" data-report-period="monthly">Bulanan</button></div><form id="adminReportFilter" class="row g-2 align-items-end"><div class="col-12 col-sm-6 col-md-5"><label class="form-label" for="adminReportDate">Tanggal acuan</label><input class="form-control" id="adminReportDate" type="date" value="${localDate()}"></div><div class="col-12 col-sm-6 col-md-5" hidden><label class="form-label" for="adminReportMonth">Bulan laporan</label><input class="form-control" id="adminReportMonth" type="month" value="${localMonth()}"></div><div class="col-12 col-md-2"><button class="btn btn-primary w-100" type="submit">Tampilkan</button></div></form></div></div><div id="adminReportResults" class="admin-report-results" aria-live="polite"></div>`);
+        setAdminPanel('Laporan', `<div class="admin-report-heading d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3"><div><h2 class="h4 mb-1" id="adminReportPeriodLabel" aria-live="polite">Laporan Harian</h2><p class="small text-secondary mb-0">Cetak langsung atau pilih Simpan sebagai PDF pada dialog berikutnya.</p></div><div class="admin-report-actions d-flex gap-2"><button type="button" class="btn btn-primary" id="pdfAdminReport"><i class="bi bi-printer"></i> Cetak / Ekspor PDF</button></div></div><div class="card mb-3 admin-report-controls"><div class="card-body"><div class="d-flex flex-wrap gap-2 mb-3" role="group" aria-label="Jenis laporan"><button type="button" class="btn btn-success" data-report-period="daily">Harian</button><button type="button" class="btn btn-outline-success" data-report-period="weekly">Mingguan</button><button type="button" class="btn btn-outline-success" data-report-period="monthly">Bulanan</button><button type="button" class="btn btn-outline-success" data-report-period="student-monthly">Siswa</button></div><form id="adminReportFilter" class="row g-2 align-items-end"><div class="col-12 col-sm-6 col-md-4"><label class="form-label" for="adminReportDate">Tanggal acuan</label><input class="form-control" id="adminReportDate" type="date" value="${localDate()}"></div><div class="col-12 col-sm-6 col-md-4" hidden><label class="form-label" for="adminReportMonth">Bulan laporan</label><input class="form-control" id="adminReportMonth" type="month" value="${localMonth()}"></div><div class="col-12 col-sm-6 col-md-4" hidden><label class="form-label" for="adminReportClass">Kelas</label><select class="form-select" id="adminReportClass"><option value="">Semua kelas</option></select></div><div class="col-12 col-md-2"><button class="btn btn-primary w-100" type="submit">Tampilkan</button></div></form></div></div><div id="adminReportResults" class="admin-report-results" aria-live="polite"></div>`);
         const form = document.getElementById('adminReportFilter');
         const dateInput = document.getElementById('adminReportDate');
         const monthField = document.getElementById('adminReportMonth').parentElement;
         const monthInput = document.getElementById('adminReportMonth');
+        const classField = document.getElementById('adminReportClass').parentElement;
+        const classInput = document.getElementById('adminReportClass');
         const buttons = [...document.querySelectorAll('[data-report-period]')];
         const print = () => {
             const oldTitle = document.title;
@@ -103,16 +124,33 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
             window.addEventListener('afterprint', restoreTitle);
             window.print();
         };
+        const loadClasses = async () => {
+            try {
+                const result = await api('/api/v1/academic/classes');
+                const classes = Array.isArray(result) ? result : (result.data || result.items || []);
+                classInput.innerHTML = '<option value="">Semua kelas</option>' + classes.map((item) => `<option value="${item.id}">${htmlSafe(item.nama_kelas || item.name || 'Kelas')}</option>`).join('');
+            } catch {
+                classInput.innerHTML = '<option value="">Semua kelas</option>';
+            }
+        };
         document.getElementById('pdfAdminReport').addEventListener('click', print);
-        const load = () => fetchReport(period, period === 'monthly' ? monthInput.value : dateInput.value);
+        const load = async () => {
+            const activeValue = period === 'student-monthly' || period === 'monthly' ? monthInput.value : dateInput.value;
+            await fetchReport(period, activeValue, classInput.value);
+        };
         buttons.forEach((button) => button.addEventListener('click', () => {
             period = button.dataset.reportPeriod;
             buttons.forEach((item) => item.className = `btn ${item === button ? 'btn-success' : 'btn-outline-success'}`);
-            dateInput.parentElement.hidden = period === 'monthly';
-            monthField.hidden = period !== 'monthly';
+            const isDatePeriod = period === 'daily' || period === 'weekly';
+            const isMonthPeriod = period === 'monthly' || period === 'student-monthly';
+            dateInput.parentElement.hidden = !isDatePeriod;
+            monthField.hidden = !isMonthPeriod;
+            classField.hidden = period !== 'student-monthly';
             load();
         }));
         form.addEventListener('submit', (event) => { event.preventDefault(); load(); });
+        classInput.addEventListener('change', load);
+        await loadClasses();
         load();
     }
 

@@ -253,6 +253,59 @@ class LessonJournalTransactionTest extends TestCase
             ->assertJsonPath('data.presensi_siswas.0.nama', 'Siswa Satu');
     }
 
+    public function test_admin_student_attendance_report_can_be_filtered_by_month_and_class(): void
+    {
+        [$teacher, $schedule, $students] = $this->prepareSession();
+        $class = $schedule->kelas;
+        $month = Carbon::now(config('app.timezone'))->format('Y-m');
+        $firstDate = Carbon::createFromFormat('Y-m', $month, config('app.timezone'))->startOfMonth()->addDay();
+
+        $firstJournal = \App\Models\JurnalMengajar::query()->create([
+            'user_id' => $teacher->id,
+            'jadwal_pelajaran_id' => $schedule->id,
+            'materi_pelajaran_id' => null,
+            'tanggal' => $firstDate->toDateString(),
+            'materi_pembahasan' => 'Pertemuan 1',
+            'status_sesi' => 'selesai',
+        ]);
+
+        $firstJournal->presensiSiswas()->create(['siswa_id' => $students[0]->id, 'status' => 'HADIR', 'keterangan' => 'hadir']);
+        $firstJournal->presensiSiswas()->create(['siswa_id' => $students[1]->id, 'status' => 'IZIN', 'keterangan' => 'izin']);
+
+        $secondJournal = \App\Models\JurnalMengajar::query()->create([
+            'user_id' => $teacher->id,
+            'jadwal_pelajaran_id' => $schedule->id,
+            'materi_pelajaran_id' => null,
+            'tanggal' => $firstDate->copy()->addDay()->toDateString(),
+            'materi_pembahasan' => 'Pertemuan 2',
+            'status_sesi' => 'selesai',
+        ]);
+
+        $secondJournal->presensiSiswas()->create(['siswa_id' => $students[0]->id, 'status' => 'HADIR', 'keterangan' => 'hadir']);
+        $secondJournal->presensiSiswas()->create(['siswa_id' => $students[1]->id, 'status' => 'SAKIT', 'keterangan' => 'sakit']);
+
+        $admin = User::query()->create([
+            'nama' => 'Admin Laporan Siswa',
+            'email' => 'admin.student.report@test.local',
+            'password' => 'test-password-123',
+        ]);
+        $adminRole = Role::query()->firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->assignRole($adminRole);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/admin/reports/student-attendance?month='.$month.'&class_id='.$class->id)
+            ->assertOk()
+            ->assertJsonPath('data.summary.total_students', 2)
+            ->assertJsonPath('data.summary.by_status.HADIR', 2)
+            ->assertJsonPath('data.summary.by_status.IZIN', 1)
+            ->assertJsonPath('data.summary.by_status.SAKIT', 1)
+            ->assertJsonPath('data.summary.by_status.ALPHA', 0)
+            ->assertJsonPath('data.students.0.present_count', 0)
+            ->assertJsonPath('data.students.0.izin_count', 1)
+            ->assertJsonPath('data.students.0.sick_count', 1)
+            ->assertJsonPath('data.students.1.present_count', 2);
+    }
+
     private function prepareSession(): array
     {
         $permission = Permission::query()->firstOrCreate(['name' => 'isi-ejurnal', 'guard_name' => 'web']);
