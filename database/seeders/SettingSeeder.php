@@ -89,6 +89,14 @@ class SettingSeeder extends Seeder
                 'label'       => 'Batas Akurasi GPS Presensi (Meter)',
                 'description' => 'Akurasi GPS maksimum yang diterima untuk presensi masuk dan pulang.',
             ],
+            [
+                'key'         => 'journal_gps_accuracy_meters',
+                'value'       => '40',
+                'group'       => 'presensi',
+                'type'        => 'number',
+                'label'       => 'Batas Akurasi GPS Jurnal (Meter)',
+                'description' => 'Akurasi GPS maksimum yang diterima untuk finalisasi jurnal mengajar.',
+            ],
 
             // --- IDENTITAS SEKOLAH ---
             [

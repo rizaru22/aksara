@@ -169,7 +169,7 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
                 finish(reject, new Error(message));
             }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
             if (settled) navigator.geolocation.clearWatch(watchId);
-            timer = setTimeout(() => finish(reject, new Error('Akurasi GPS belum mencapai 3 meter setelah 60 detik. Pastikan GPS aktif dan coba lagi di area terbuka.')), 60000);
+            timer = setTimeout(() => finish(reject, new Error(`Akurasi GPS belum mencapai ${maxGpsAccuracy} meter setelah 60 detik. Pastikan GPS aktif dan coba lagi di area terbuka.`)), 60000);
         });
     }
 

@@ -24,7 +24,12 @@ class LessonJournalController extends Controller
 
     private function maxGpsAccuracyMeters(): int
     {
-        return max(1, min(100, (int) Setting::value('attendance_gps_accuracy_meters', self::DEFAULT_GPS_ACCURACY_METERS)));
+        $configured = Setting::value('journal_gps_accuracy_meters');
+        if ($configured !== null && $configured !== '') {
+            return max(1, min(100, (int) $configured));
+        }
+
+        return max(1, min(100, (int) config('aksara.gps_accuracy.journal_meters', config('aksara.gps_accuracy.attendance_meters', self::DEFAULT_GPS_ACCURACY_METERS))));
     }
 
     public function students(Request $request, JadwalPelajaran $jadwalPelajaran, CycleScheduleService $cycles)

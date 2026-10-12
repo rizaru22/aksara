@@ -8,7 +8,8 @@ window.createAksaraJournalProof = function (config = {}) {
                 headers: { Accept: 'application/json', Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token')}` },
             });
             const data = await response.json().catch(() => ({}));
-            const serverLimit = Number(data?.gps_accuracy_limit_meters ?? data?.data?.gps_accuracy_limit_meters ?? DEFAULT_MAX_GPS_ACCURACY);
+            const payload = data?.data ?? data;
+            const serverLimit = Number(payload?.journal_gps_accuracy_limit_meters ?? payload?.gps_accuracy_limit_meters ?? data?.journal_gps_accuracy_limit_meters ?? data?.gps_accuracy_limit_meters ?? DEFAULT_MAX_GPS_ACCURACY);
             return Number.isFinite(serverLimit) && serverLimit > 0 ? serverLimit : DEFAULT_MAX_GPS_ACCURACY;
         } catch {
             return DEFAULT_MAX_GPS_ACCURACY;

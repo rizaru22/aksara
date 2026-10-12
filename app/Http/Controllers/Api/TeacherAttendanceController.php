@@ -29,7 +29,22 @@ class TeacherAttendanceController extends Controller
 
     private function maxGpsAccuracyMeters(): int
     {
-        return max(1, min(100, (int) Setting::value('attendance_gps_accuracy_meters', self::DEFAULT_GPS_ACCURACY_METERS)));
+        $configured = Setting::value('attendance_gps_accuracy_meters');
+        if ($configured !== null && $configured !== '') {
+            return max(1, min(100, (int) $configured));
+        }
+
+        return max(1, min(100, (int) config('aksara.gps_accuracy.attendance_meters', self::DEFAULT_GPS_ACCURACY_METERS)));
+    }
+
+    private function journalMaxGpsAccuracyMeters(): int
+    {
+        $configured = Setting::value('journal_gps_accuracy_meters');
+        if ($configured !== null && $configured !== '') {
+            return max(1, min(100, (int) $configured));
+        }
+
+        return max(1, min(100, (int) config('aksara.gps_accuracy.journal_meters', $this->maxGpsAccuracyMeters())));
     }
 
     public function today(Request $request)
@@ -62,6 +77,7 @@ class TeacherAttendanceController extends Controller
             'check_in_opens_at' => $checkInStart->format('H:i'),
             'check_in_seconds_until' => max(0, $checkInStart->getTimestamp() - $now->getTimestamp()),
             'gps_accuracy_limit_meters' => $this->maxGpsAccuracyMeters(),
+            'journal_gps_accuracy_limit_meters' => $this->journalMaxGpsAccuracyMeters(),
         ]);
     }
 

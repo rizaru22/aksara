@@ -20,4 +20,14 @@ return [
     'academic' => [
         'semester_start_date' => env('SEMESTER_START_DATE', '2026-07-13'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Batas akurasi GPS per fitur
+    |--------------------------------------------------------------------------
+    */
+    'gps_accuracy' => [
+        'attendance_meters' => (int) env('ATTENDANCE_GPS_ACCURACY_METERS', 40),
+        'journal_meters' => (int) env('JOURNAL_GPS_ACCURACY_METERS', env('ATTENDANCE_GPS_ACCURACY_METERS', 40)),
+    ],
 ];
