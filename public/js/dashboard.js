@@ -280,6 +280,103 @@
         if (module) return openModule(module);
     }
 
+    async function openTeacherJournalDetail(journalId) {
+        try {
+            const result = await api(`/api/v1/lesson-journals/${journalId}`);
+            const journal = result.data || {};
+            const attendance = Array.isArray(journal.presensi_siswas) ? journal.presensi_siswas : (Array.isArray(journal.presensi) ? journal.presensi : []);
+            const rows = attendance.map((row) => {
+                const studentName = row.siswa?.nama || row.nama || '—';
+                const status = row.status || '—';
+                const keterangan = row.keterangan || '—';
+                return `<tr><td>${htmlSafe(studentName)}</td><td><span class="badge text-bg-light border">${htmlSafe(status)}</span></td><td>${htmlSafe(keterangan)}</td></tr>`;
+            }).join('') || '<tr><td colspan="3" class="text-center text-secondary py-3">Belum ada data presensi siswa untuk jurnal ini.</td></tr>';
+            const statusText = journal.status_sesi === 'selesai' ? 'Final' : (journal.status_sesi === 'berlangsung' ? 'Draft' : (journal.status_sesi || '—'));
+            const materi = journal.materi_pembahasan || '<span class="text-secondary fst-italic">Belum diisi</span>';
+            const catatan = journal.catatan_kejadian_kelas || '<span class="text-secondary fst-italic">Belum diisi</span>';
+            setFeature('Detail Jurnal Mengajar', `
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <div>
+                                <div class="small text-secondary">Tanggal kegiatan</div>
+                                <strong>${htmlSafe(journal.tanggal || '—')}</strong>
+                            </div>
+                            <span class="badge ${journal.status_sesi === 'selesai' ? 'bg-success' : 'bg-warning text-dark'}">${htmlSafe(statusText)}</span>
+                        </div>
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4">Kelas</dt><dd class="col-sm-8">${htmlSafe(journal.jadwal_pelajaran?.kelas?.nama_kelas || '—')}</dd>
+                            <dt class="col-sm-4">Mata pelajaran</dt><dd class="col-sm-8">${htmlSafe(journal.jadwal_pelajaran?.mata_pelajaran?.nama_mapel || '—')}</dd>
+                            <dt class="col-sm-4">Materi</dt><dd class="col-sm-8">${materi}</dd>
+                            <dt class="col-sm-4">Catatan kejadian</dt><dd class="col-sm-8">${catatan}</dd>
+                            <dt class="col-sm-4">Jam mulai</dt><dd class="col-sm-8">${htmlSafe(journal.jam_mulai_realisasi || '—')}</dd>
+                            <dt class="col-sm-4">Jam selesai</dt><dd class="col-sm-8">${htmlSafe(journal.jam_selesai_realisasi || '—')}</dd>
+                        </dl>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><strong>Presensi Siswa</strong> <span class="badge bg-secondary ms-1">${attendance.length}</span></div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead><tr><th>Nama Siswa</th><th>Status</th><th>Keterangan</th></tr></thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `);
+        } catch (error) {
+            setFeature('Detail Jurnal Mengajar', `<div class="alert alert-danger mb-0">${htmlSafe(error.message)}</div>`);
+        }
+    }
+
+    async function openTeacherJournalHistory() {
+        try {
+            const response = await api('/api/v1/lesson-journals?per_page=20');
+            const journals = response.data || [];
+            const rows = journals.map((journal) => {
+                const kelas = journal.kelas?.nama_kelas || '—';
+                const mapel = journal.mata_pelajaran?.nama_mapel || '—';
+                const status = journal.status_sesi === 'selesai' ? '<span class="badge bg-success">Final</span>' : '<span class="badge bg-warning text-dark">Draft</span>';
+                const lengkap = journal.lengkap ? '<span class="badge bg-success">Lengkap</span>' : '<span class="badge bg-danger">Belum lengkap</span>';
+                return `<tr>
+                    <td>${htmlSafe(journal.tanggal || '—')}</td>
+                    <td>${htmlSafe(kelas)}</td>
+                    <td>${htmlSafe(mapel)}</td>
+                    <td>${htmlSafe(journal.materi_pembahasan || '—')}</td>
+                    <td>${status}</td>
+                    <td>${lengkap}</td>
+                    <td><button class="btn btn-outline-secondary btn-sm" data-teacher-journal="${journal.id}">Lihat detail</button></td>
+                </tr>`;
+            }).join('') || '<tr><td colspan="7" class="text-center text-secondary py-4">Belum ada jurnal yang diampu oleh guru ini.</td></tr>';
+
+            setFeature('Jurnal Mengajar', `
+                <div class="card">
+                    <div class="card-header"><strong>Riwayat jurnal yang diampu</strong></div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead>
+                                    <tr><th>Tanggal</th><th>Kelas</th><th>Mata Pelajaran</th><th>Materi</th><th>Status</th><th>Kelengkapan</th><th>Aksi</th></tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `);
+
+            document.querySelectorAll('[data-teacher-journal]').forEach((button) => {
+                button.addEventListener('click', () => openTeacherJournalDetail(button.dataset.teacherJournal));
+            });
+        } catch (error) {
+            setFeature('Jurnal Mengajar', `<div class="alert alert-danger mb-0">${htmlSafe(error.message)}</div>`);
+        }
+    }
+
+    window.openTeacherJournalHistory = openTeacherJournalHistory;
+
     // Membuka form jurnal dan presensi siswa untuk jadwal yang dipilih, termasuk mode draft dan finalisasi dengan foto/GPS.
     async function openJournalForm(scheduleId, schedule = null) {
         const rosterResult = await api(`/api/v1/teacher/schedules/${scheduleId}/students`);
@@ -1272,7 +1369,6 @@
         };
 
         if (is('guru')) {
-            add('journal', 'isi-ejurnal', 'bi-journal-text', 'E-Jurnal & Presensi Kelas', 'Pilih jadwal aktif, isi presensi siswa, dan catat materi mengajar.');
             add('student-attendance', 'kelola-presensi-siswa', 'bi-people', 'Koreksi Presensi Siswa', 'Koreksi status pada sesi jurnal di kelas yang Anda ampu.', Boolean(user.is_wali_kelas));
         }
         if (is('kurikulum')) {

@@ -109,8 +109,22 @@
                     <div id="attendanceReportList" aria-live="polite"></div>
                 </div></article>
                 <div class="report-grid mt-3">
-                    <div class="report-tile"><i class="bi bi-journal-bookmark"></i><strong>Jurnal Mengajar</strong><span>Rekap kegiatan mengajar</span></div>
+                    <div class="report-tile" id="journalHistoryTile" role="button" tabindex="0"><i class="bi bi-journal-bookmark"></i><strong>Jurnal Mengajar</strong><span>Rekap kegiatan mengajar</span></div>
                 </div>`;
+            const journalHistoryTile = document.getElementById('journalHistoryTile');
+            journalHistoryTile?.addEventListener('click', () => {
+                if (typeof window.openTeacherJournalHistory === 'function') {
+                    window.openTeacherJournalHistory();
+                    return;
+                }
+                window.alert('Fungsi riwayat jurnal belum tersedia.');
+            });
+            journalHistoryTile?.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    journalHistoryTile.click();
+                }
+            });
             document.getElementById('attendanceReportFilter')?.addEventListener('submit', (submitEvent) => {
                 submitEvent.preventDefault();
                 loadAttendanceReport(document.getElementById('attendanceReportMonth').value);
