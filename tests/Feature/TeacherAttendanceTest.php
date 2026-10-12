@@ -25,8 +25,8 @@ class TeacherAttendanceTest extends TestCase
         $this->postJson('/api/v1/teacher/attendance/check-in', $payload)->assertUnprocessable();
         $this->postJson('/api/v1/teacher/attendance/check-out', $payload)->assertOk();
         $this->assertDatabaseCount('absensis', 1);
-        $this->assertDatabaseHas('absensis', ['user_id' => $user->id, 'status_verifikasi_masuk' => 'UNVERIFIED']);
-        $this->assertDatabaseHas('absensis', ['user_id' => $user->id, 'status_verifikasi_pulang' => 'UNVERIFIED']);
+        $this->assertDatabaseHas('absensis', ['user_id' => $user->id, 'status_verifikasi_masuk' => 'PENDING']);
+        $this->assertDatabaseHas('absensis', ['user_id' => $user->id, 'status_verifikasi_pulang' => 'PENDING']);
     }
 
     public function test_non_strict_geofence_flags_and_admin_review_records_actor(): void
