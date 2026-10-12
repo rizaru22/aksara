@@ -1,5 +1,19 @@
-window.createAksaraJournalProof = function () {
-    const MAX_GPS_ACCURACY = 3;
+window.createAksaraJournalProof = function (config = {}) {
+    const DEFAULT_MAX_GPS_ACCURACY = 40;
+    const getMaxGpsAccuracy = async () => {
+        const limit = Number(config.maxGpsAccuracy ?? window.aksaraJournalProofMaxGpsAccuracy ?? DEFAULT_MAX_GPS_ACCURACY);
+        if (Number.isFinite(limit) && limit > 0) return limit;
+        try {
+            const response = await fetch(window.aksaraApiUrl('/api/v1/teacher/attendance/today'), {
+                headers: { Accept: 'application/json', Authorization: `Bearer ${localStorage.getItem('token') || sessionStorage.getItem('token')}` },
+            });
+            const data = await response.json().catch(() => ({}));
+            const serverLimit = Number(data?.gps_accuracy_limit_meters ?? data?.data?.gps_accuracy_limit_meters ?? DEFAULT_MAX_GPS_ACCURACY);
+            return Number.isFinite(serverLimit) && serverLimit > 0 ? serverLimit : DEFAULT_MAX_GPS_ACCURACY;
+        } catch {
+            return DEFAULT_MAX_GPS_ACCURACY;
+        }
+    };
 
     async function startCamera(video) {
         if (!navigator.mediaDevices?.getUserMedia) {
@@ -33,8 +47,9 @@ window.createAksaraJournalProof = function () {
         }, 'image/jpeg', 0.9));
     }
 
-    function findPreciseLocation(status) {
+    async function findPreciseLocation(status) {
         if (!navigator.geolocation) return Promise.reject(new Error('Browser ini tidak menyediakan GPS.'));
+        const maxGpsAccuracy = await getMaxGpsAccuracy();
         return new Promise((resolve, reject) => {
             let watchId;
             let timer;
@@ -48,8 +63,8 @@ window.createAksaraJournalProof = function () {
             };
             watchId = navigator.geolocation.watchPosition((position) => {
                 const accuracy = Number(position.coords.accuracy);
-                status.textContent = `Akurasi GPS ±${Math.ceil(accuracy)} meter; membutuhkan maksimal ${MAX_GPS_ACCURACY} meter.`;
-                if (accuracy <= MAX_GPS_ACCURACY) finish(resolve, {
+                status.textContent = `Akurasi GPS ±${Math.ceil(accuracy)} meter; membutuhkan maksimal ${maxGpsAccuracy} meter.`;
+                if (accuracy <= maxGpsAccuracy) finish(resolve, {
                     latitude: position.coords.latitude,
                     longitude: position.coords.longitude,
                     accuracy,
@@ -63,7 +78,7 @@ window.createAksaraJournalProof = function () {
                     ? 'Izin lokasi ditolak. Aktifkan GPS dan izinkan lokasi untuk situs ini.'
                     : 'Lokasi GPS tidak tersedia. Periksa pengaturan lokasi perangkat.'));
             }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
-            timer = setTimeout(() => finish(reject, new Error('GPS belum mencapai akurasi 3 meter. Coba lagi di area terbuka.')), 60000);
+            timer = setTimeout(() => finish(reject, new Error(`GPS belum mencapai akurasi ${maxGpsAccuracy} meter. Coba lagi di area terbuka.`)), 60000);
             status.textContent = 'Mencari lokasi GPS akurasi tinggi...';
         });
     }

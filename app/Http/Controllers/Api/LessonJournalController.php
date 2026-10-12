@@ -20,6 +20,13 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class LessonJournalController extends Controller
 {
+    private const DEFAULT_GPS_ACCURACY_METERS = 40;
+
+    private function maxGpsAccuracyMeters(): int
+    {
+        return max(1, min(100, (int) Setting::value('attendance_gps_accuracy_meters', self::DEFAULT_GPS_ACCURACY_METERS)));
+    }
+
     public function students(Request $request, JadwalPelajaran $jadwalPelajaran, CycleScheduleService $cycles)
     {
         abort_unless($request->user()->can('isi-ejurnal'), 403);
@@ -144,7 +151,7 @@ class LessonJournalController extends Controller
             'foto_kegiatan' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'accuracy' => ['required', 'numeric', 'min:0', 'max:3'],
+            'accuracy' => ['required', 'numeric', 'min:0', 'max:'.$this->maxGpsAccuracyMeters()],
             'darurat' => ['nullable', 'boolean'],
             'catatan_penutupan' => ['nullable', 'string', 'max:2000'],
         ]);
