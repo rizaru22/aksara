@@ -78,6 +78,7 @@ window.createAksaraAttendanceCapture = function () {
 
         let eyesOpened = false;
         let eyesClosed = false;
+        let lowestClosedEyeRatio = 1;
         let lastTimestamp = -1;
         let lastInference = 0;
         let cancelled = false;
@@ -110,7 +111,7 @@ window.createAksaraAttendanceCapture = function () {
             const processFrame = () => {
                 if (cancelled) { reject(new DOMException('Pengambilan dibatalkan.', 'AbortError')); return; }
                 if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.currentTime === lastTimestamp
-                    || performance.now() - lastInference < 80) {
+                    || performance.now() - lastInference < 50) {
                     frameId = requestAnimationFrame(processFrame);
                     return;
                 }
@@ -124,6 +125,7 @@ window.createAksaraAttendanceCapture = function () {
                         guide.classList.remove('is-ready');
                         eyesOpened = false;
                         eyesClosed = false;
+                        lowestClosedEyeRatio = 1;
                         status.textContent = 'Arahkan wajah ke dalam lingkaran.';
                         frameId = requestAnimationFrame(processFrame);
                         return;
@@ -146,6 +148,7 @@ window.createAksaraAttendanceCapture = function () {
                         guide.classList.remove('is-ready');
                         eyesOpened = false;
                         eyesClosed = false;
+                        lowestClosedEyeRatio = 1;
                         status.textContent = 'Posisikan wajah di dalam lingkaran.';
                         frameId = requestAnimationFrame(processFrame);
                         return;
@@ -156,16 +159,20 @@ window.createAksaraAttendanceCapture = function () {
                     const right = eyeRatio(points, [362, 263], 386, 374, 387, 373);
                     const ratio = (left + right) / 2;
 
-                    if (ratio > 0.18) {
-                        if (eyesClosed) {
+                    if (eyesClosed) {
+                        lowestClosedEyeRatio = Math.min(lowestClosedEyeRatio, ratio);
+                        if (ratio > Math.max(0.14, lowestClosedEyeRatio + 0.015)) {
                             status.textContent = 'Kedipan terdeteksi. Mengambil foto…';
                             takePhoto();
                             return;
                         }
+                        status.textContent = 'Kedipan terdeteksi. Buka mata…';
+                    } else if (ratio > 0.18) {
                         eyesOpened = true;
                         status.textContent = 'Wajah pas. Kedipkan mata satu kali.';
-                    } else if (eyesOpened) {
+                    } else if (ratio < 0.2 && eyesOpened) {
                         eyesClosed = true;
+                        lowestClosedEyeRatio = ratio;
                         status.textContent = 'Kedipan terdeteksi. Buka mata…';
                     } else {
                         status.textContent = 'Arahkan wajah ke lingkaran, lalu kedipkan mata satu kali.';
