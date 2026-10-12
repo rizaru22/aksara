@@ -96,6 +96,43 @@ class LessonJournalTransactionTest extends TestCase
             ->assertJsonPath('data.0.can_finalize_journal', true);
     }
 
+    public function test_finalization_reports_location_issue_before_time_window_message(): void
+    {
+        [$teacher, $schedule, $students] = $this->prepareSession();
+        $now = Carbon::now(config('app.timezone'));
+        $schedule->update([
+            'jam_mulai' => $now->copy()->subMinutes(15)->format('H:i'),
+            'jam_selesai' => $now->copy()->addMinutes(40)->format('H:i'),
+        ]);
+
+        Setting::query()->updateOrCreate(['key' => 'geofence_location_verified'], ['value' => '1', 'group' => 'school', 'type' => 'boolean', 'label' => 'Lokasi sekolah diverifikasi']);
+        Setting::query()->updateOrCreate(['key' => 'geofence_latitude'], ['value' => '0.00000000', 'group' => 'school', 'type' => 'decimal', 'label' => 'Lintang sekolah']);
+        Setting::query()->updateOrCreate(['key' => 'geofence_longitude'], ['value' => '0.00000000', 'group' => 'school', 'type' => 'decimal', 'label' => 'Bujur sekolah']);
+        Setting::query()->updateOrCreate(['key' => 'geofence_radius_meters'], ['value' => '100', 'group' => 'school', 'type' => 'integer', 'label' => 'Radius geofence']);
+
+        $this->actingAs($teacher, 'sanctum');
+        $draftId = $this->postJson('/api/v1/lesson-journals', [
+            'jadwal_pelajaran_id' => $schedule->id,
+            'materi_pembahasan' => 'Pengenalan basis data relasional dan primary key.',
+            'presensi' => $students->map(fn (Siswa $student) => ['siswa_id' => $student->id, 'status' => 'HADIR'])->all(),
+        ])->assertCreated()->json('data.id');
+
+        $schedule->update([
+            'jam_mulai' => $now->copy()->subHours(2)->format('H:i'),
+            'jam_selesai' => $now->copy()->subMinutes(5)->format('H:i'),
+        ]);
+
+        $response = $this->postJson('/api/v1/lesson-journals/'.$draftId.'/finalize', [
+            'foto_kegiatan' => \Illuminate\Http\UploadedFile::fake()->image('journal.jpg', 1200, 800),
+            'latitude' => 10.0000,
+            'longitude' => 10.0000,
+            'accuracy' => 1,
+        ]);
+
+        $response->assertUnprocessable();
+        $this->assertStringContainsString('Finalisasi harus dilakukan di area sekolah.', $response->json('message'));
+    }
+
     public function test_journal_can_be_finalized_outside_normal_window_when_emergency_is_declared(): void
     {
         [$teacher, $schedule, $students] = $this->prepareSession();

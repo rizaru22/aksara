@@ -345,7 +345,12 @@
                 showToast('Jurnal dan presensi berhasil difinalisasi.');
                 await loadHomeSchedules();
                 openSchedules();
-            } catch (error) { setFeatureError(error); }
+            } catch (error) {
+                const reason = error.message || 'Finalisasi jurnal gagal.';
+                proofStatus.textContent = `Finalisasi gagal: ${reason}`;
+                showToast(`Finalisasi gagal: ${reason}`);
+                setFeatureError(error);
+            }
             finally { journalForm.querySelectorAll('button[type="submit"]').forEach((button) => { button.disabled = button.value === 'finalize' ? !(photoBlob && verifiedLocation) : false; }); }
         });
         featureModal._element?.addEventListener('hidden.bs.modal', () => {

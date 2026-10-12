@@ -155,8 +155,8 @@ class LessonJournalController extends Controller
         $schedule = $jurnalMengajar->jadwalPelajaran()->firstOrFail();
         $this->authorizeSchedule($request, $schedule, $now, $cycles);
         $isEmergency = filter_var($data['darurat'] ?? false, FILTER_VALIDATE_BOOLEAN) || filled($data['catatan_penutupan'] ?? null);
-        $this->authorizeFinalizationWindow($schedule, $now, $isEmergency);
         $distanceMeters = $this->verifyFinalizationLocation($data, $distance);
+        $this->authorizeFinalizationWindow($schedule, $now, $isEmergency);
 
         $expectedIds = DB::table('siswas')->where('kelas_id', $schedule->kelas_id)->pluck('id')->map(fn ($id) => (int) $id)->sort()->values();
         $draftIds = $jurnalMengajar->presensiSiswas()->pluck('siswa_id')->map(fn ($id) => (int) $id)->sort()->values();
