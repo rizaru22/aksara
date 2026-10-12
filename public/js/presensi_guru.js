@@ -1,5 +1,5 @@
 window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature, setFeatureError, featureModal }) {
-    const MAX_GPS_ACCURACY = 3;
+    const MAX_GPS_ACCURACY = 40;
     const captureModule = window.createAksaraAttendanceCapture();
     let checkInWindowTimer;
 
@@ -134,7 +134,7 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
     async function startCheckIn() {
         $('featureModal').querySelector('.modal-content').classList.remove('attendance-camera-active');
         setFeature('Absen Masuk · Verifikasi Lokasi dan Wajah', `
-            <div class="attendance-long-help alert alert-info small">Aplikasi akan menunggu GPS berakurasi maksimal 3 meter dan memeriksa geofence sekolah. Setelah lolos, kamera depan melakukan deteksi wajah dan tantangan liveness. Video diproses di perangkat; hanya satu foto hasil tangkapan yang dikirim untuk presensi.</div>
+            <div class="attendance-long-help alert alert-info small">Aplikasi mencari GPS dengan akurasi maksimal ${MAX_GPS_ACCURACY} meter dan memeriksa area sekolah. Setelah lolos, ikuti arahan kamera dan kedipkan mata satu kali.</div>
             <div class="attendance-capture-status alert alert-secondary mb-3" id="attendanceCaptureStatus" role="status" aria-live="polite">Menyiapkan pencarian lokasi…</div>
             <div class="attendance-camera" id="attendanceCamera" hidden><div class="attendance-camera-frame"><video id="attendanceCameraVideo" autoplay muted playsinline></video><div class="attendance-face-guide" id="attendanceFaceGuide" aria-hidden="true"><span></span></div></div><p class="small text-secondary mt-2 mb-0">Pastikan wajah terang, tidak membelakangi jendela/cahaya, dan berada di dalam lingkaran.</p></div>
             <button type="button" class="btn btn-outline-secondary w-100 mt-3" id="cancelAttendanceCapture">Batal</button>`);
@@ -155,11 +155,9 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
             status.textContent = 'Lokasi sesuai geofence. Membuka kamera depan…';
             const result = await captureModule.capture($('attendanceCameraVideo'), $('attendanceFaceGuide'), status, controller.signal);
             if (controller.signal.aborted) return;
-            status.textContent = 'Foto berhasil diambil. Memeriksa kembali posisi GPS…';
-            const finalLocation = await findPreciseLocation(status, true, controller.signal);
             cancel.disabled = true;
-            status.textContent = 'Lokasi terverifikasi. Mengirim presensi…';
-            await submitAttendance('check-in', finalLocation, result.photo, result.livenessType);
+            status.textContent = 'Foto berhasil. Mengirim presensi…';
+            await submitAttendance('check-in', location, result.photo, result.livenessType);
         } catch (error) {
             if (error.name !== 'AbortError') setFeatureError(error);
         } finally {
@@ -170,8 +168,8 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
     async function startCheckOut() {
         $('featureModal').querySelector('.modal-content').classList.remove('attendance-camera-active');
         setFeature('Absen Pulang · Verifikasi Lokasi dan Wajah', `
-            <div class="attendance-long-help alert alert-info small">Absen pulang memerlukan GPS akurasi maksimal 3 meter di area sekolah serta verifikasi wajah dan liveness. Jika dilakukan di luar rentang jam pulang, isi alasan yang diminta.</div>
-            <div class="mb-3"><label class="form-label" for="earlyReason">Alasan di luar jadwal (isi bila diminta)</label><textarea class="form-control" id="earlyReason" rows="2" maxlength="2000" placeholder="Contoh: tugas sekolah / keperluan mendesak"></textarea></div>
+            <div class="attendance-long-help alert alert-info small">Cari GPS dengan akurasi maksimal ${MAX_GPS_ACCURACY} meter. Setelah lolos, ikuti arahan kamera dan kedipkan mata satu kali. Jika absen di luar jadwal, isi alasan yang diminta.</div>
+            <div class="attendance-checkout-reason mb-3"><label class="form-label" for="earlyReason">Alasan di luar jadwal (isi bila diminta)</label><textarea class="form-control" id="earlyReason" rows="2" maxlength="2000" placeholder="Contoh: tugas sekolah / keperluan mendesak"></textarea></div>
             <div class="attendance-capture-status alert alert-secondary mb-3" id="attendanceCaptureStatus" role="status" aria-live="polite">Menyiapkan pencarian lokasi…</div>
             <div class="attendance-camera" id="attendanceCamera" hidden><div class="attendance-camera-frame"><video id="attendanceCameraVideo" autoplay muted playsinline></video><div class="attendance-face-guide" id="attendanceFaceGuide" aria-hidden="true"><span></span></div></div><p class="small text-secondary mt-2 mb-0">Pastikan wajah terang, tidak membelakangi jendela/cahaya, dan berada di dalam lingkaran.</p></div>
             <button type="button" class="btn btn-outline-secondary w-100 mt-3" id="cancelAttendanceCapture">Batal</button>`);
@@ -184,7 +182,7 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
         $('featureModal').addEventListener('hidden.bs.modal', cancelCapture, { once: true });
         cancel.addEventListener('click', () => featureModal.hide());
         try {
-            await findPreciseLocation(status, true, controller.signal, 'check-out');
+            const location = await findPreciseLocation(status, true, controller.signal, 'check-out');
             if (controller.signal.aborted) return;
             $('featureModal').querySelector('.modal-content').classList.add('attendance-camera-active');
             camera.hidden = false;
@@ -192,11 +190,9 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
             status.textContent = 'Lokasi sesuai geofence. Membuka kamera depan…';
             const result = await captureModule.capture($('attendanceCameraVideo'), $('attendanceFaceGuide'), status, controller.signal);
             if (controller.signal.aborted) return;
-            status.textContent = 'Foto berhasil diambil. Memeriksa kembali posisi GPS…';
-            const finalLocation = await findPreciseLocation(status, true, controller.signal, 'check-out');
             cancel.disabled = true;
-            status.textContent = 'Lokasi terverifikasi. Mengirim absen pulang…';
-            await submitAttendance('check-out', finalLocation, result.photo, result.livenessType);
+            status.textContent = 'Foto berhasil. Mengirim absen pulang…';
+            await submitAttendance('check-out', location, result.photo, result.livenessType);
         } catch (error) {
             if (error.name !== 'AbortError') setFeatureError(error);
         } finally {
