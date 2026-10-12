@@ -228,7 +228,13 @@ class JournalMonitoringController extends Controller
 
         // --- Format presensi siswa ---
         $presensiData = $jurnalMengajar->presensiSiswas->map(fn ($p) => [
+            'id'         => $p->id,
             'siswa_id'   => $p->siswa_id,
+            'siswa'      => [
+                'id'   => $p->siswa_id,
+                'nama' => $p->siswa?->nama,
+                'nisn' => $p->siswa?->nisn,
+            ],
             'nama'       => $p->siswa?->nama,
             'nisn'       => $p->siswa?->nisn,
             'status'     => $p->status,

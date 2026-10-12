@@ -108,7 +108,7 @@
                     <form id="attendanceReportFilter" class="d-flex gap-2"><label class="visually-hidden" for="attendanceReportMonth">Bulan laporan</label><input class="form-control" id="attendanceReportMonth" type="month" value="${currentMonth()}" required><button class="btn btn-outline-primary" type="submit">Tampilkan</button></form></div>
                     <div id="attendanceReportList" aria-live="polite"></div>
                 </div></article>
-                <div class="report-grid mt-3">
+                <div class="report-grid mt-3 ">
                     <div class="report-tile" id="journalHistoryTile" role="button" tabindex="0"><i class="bi bi-journal-bookmark"></i><strong>Jurnal Mengajar</strong><span>Rekap kegiatan mengajar</span></div>
                 </div>`;
             const journalHistoryTile = document.getElementById('journalHistoryTile');

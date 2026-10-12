@@ -196,8 +196,8 @@
             card.hidden = false;
             list.innerHTML = rows.map((schedule) => {
                 const journal = schedule.jurnal_hari_ini;
-                const canUseJournal = dashboardModules.some((module) => module.key === 'journal');
-                const action = renderJournalAction(schedule, canUseJournal);
+                const hasJournalPermission = activeRoleNames.includes('guru') || (Array.isArray(activeUser?.permissions) && activeUser.permissions.includes('isi-ejurnal')) || dashboardModules.some((module) => module.key === 'journal');
+                const action = renderJournalAction(schedule, hasJournalPermission);
                 const isOwner = Number(schedule.user_id) === Number(activeUser?.id);
                 const isFinished = journal?.status_sesi === 'selesai';
                 let subAction = '';
@@ -281,7 +281,7 @@
     }
 
     async function openTeacherJournalDetail(journalId) {
-        try {
+        try { 
             const result = await api(`/api/v1/lesson-journals/${journalId}`);
             const journal = result.data || {};
             const attendance = Array.isArray(journal.presensi_siswas) ? journal.presensi_siswas : (Array.isArray(journal.presensi) ? journal.presensi : []);
