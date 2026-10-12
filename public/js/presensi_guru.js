@@ -2,7 +2,7 @@
 window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature, setFeatureError, featureModal }) {
     let maxGpsAccuracy = 40;
     const captureModule = window.createAksaraAttendanceCapture();
-    let checkInWindowTimer;
+    let checkInWindowTimer; 
 
     async function refreshAttendance() {
         const attendanceState = $('attendanceState');
