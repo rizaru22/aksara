@@ -6,6 +6,7 @@ window.createAksaraHolidayCalendar = function ({ api, htmlSafe, setFeature, setF
     };
     let pendingDeleteId = null;
 
+    // Membuka form pengelolaan hari libur dengan daftar, edit, dan konfirmasi hapus yang interaktif.
     async function open(editId = null) {
         try {
             const response = await api('/api/v1/admin/holidays');

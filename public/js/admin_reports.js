@@ -9,10 +9,12 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
     const duration = (minutes) => `${Math.floor(Number(minutes || 0) / 60)} jam ${String(Number(minutes || 0) % 60).padStart(2, '0')} menit`;
     const empty = (columns, message) => `<tr><td colspan="${columns}" class="text-center text-secondary py-3">${htmlSafe(message)}</td></tr>`;
 
+    // Membuat template tabel laporan agar hasil rendering konsisten untuk laporan harian, mingguan, dan bulanan.
     function renderTable(headers, rows, emptyMessage) {
         return `<div class="table-responsive"><table class="table table-sm table-striped table-hover align-middle"><thead><tr>${headers.map((header) => `<th>${htmlSafe(header)}</th>`).join('')}</tr></thead><tbody>${rows.length ? rows.join('') : empty(headers.length, emptyMessage)}</tbody></table></div>`;
     }
 
+    // Menampilkan rekap kehadiran guru per hari atau per minggu sesuai kebutuhan laporan admin.
     function renderAttendanceTable(rows, weekly = false) {
         const headers = weekly
             ? ['Guru', 'NIP', 'Hari tercatat', 'Total jam minggu ini']
@@ -23,6 +25,7 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
         return renderTable(headers, body, 'Tidak ada data guru.');
     }
 
+    // Menampilkan jadwal kelas dan status jurnal untuk memberi gambaran pembelajaran yang sedang berjalan.
     function renderClassTable(rows) {
         return renderTable(
             ['Tanggal', 'Jam', 'Kelas', 'Mata pelajaran', 'Guru', 'Status jurnal', 'Materi / keterangan'],
@@ -31,6 +34,7 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
         );
     }
 
+    // Membangun laporan bulanan dengan ringkasan KPI, detail persentase, dan list user per presensi.
     function renderMonthly(summary, meta, users) {
         const items = [
             ['Persentase kehadiran', `${summary.present_percentage}%`, `${summary.present_count} hari-guru hadir`],
@@ -51,6 +55,7 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
         return `<div class="row g-3 mb-3">${items.map(([label, value, note]) => `<div class="col-12 col-sm-6 col-xl-3"><article class="card admin-kpi h-100"><div class="card-body"><div class="admin-kpi-caption">${htmlSafe(label)}</div><div class="admin-kpi-number mt-2">${htmlSafe(value)}</div><div class="small text-secondary mt-2">${htmlSafe(note)}</div></div></article></div>`).join('')}</div><section class="card mb-3"><div class="card-body"><h2 class="h5">Persentase kehadiran per user</h2><p class="small text-secondary">Persentase mencakup hari hadir terverifikasi dan hari dinas luar yang disetujui, dibanding hari kerja pada bulan terpilih.</p>${renderTable(['Nama', 'NIP', 'Total hadir', 'Persentase hadir', 'Izin', 'Sakit', 'Dinas luar', 'Alpha'], userRows, 'Tidak ada data user.')}</div></section><section class="card"><div class="card-body"><h2 class="h6">Rincian rekapitulasi</h2><p class="small text-secondary">${htmlSafe(meta.denominator || '')}</p>${renderTable(['Metrik', 'Jumlah hari-guru', 'Persentase'], summaryRows, 'Tidak ada data.')}</div></section>`;
     }
 
+    // Memilih komponen renderer yang cocok untuk periode laporan yang sedang dibuka oleh admin.
     function renderResults(data, selectedPeriod) {
         if (selectedPeriod === 'monthly') return renderMonthly(data.summary, data.meta, data.users);
         if (selectedPeriod === 'daily') {
@@ -62,6 +67,7 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
         return `<section class="card mb-3"><div class="card-body"><h2 class="h5">Kehadiran guru dan total jam</h2><p class="small text-secondary">${htmlSafe(data.attendance_hours_note || 'Total jam dihitung dari durasi presensi tercatat.')}</p>${renderAttendanceTable(data.attendance || [], true)}</div></section><section class="card mb-3"><div class="card-body"><h2 class="h5">Rekap jurnal kelas</h2><p class="small text-secondary">${htmlSafe(summary.filled || 0)} selesai, ${htmlSafe(summary.draft || 0)} draf, dan ${htmlSafe(summary.missing || 0)} belum diisi dari ${htmlSafe(summary.total || 0)} sesi terjadwal.</p>${renderClassTable(data.classes || [])}</div></section><section class="card"><div class="card-body"><h2 class="h5">Guru yang jurnalnya belum selesai</h2>${renderTable(['Guru', 'Sesi belum selesai', 'Rincian jadwal'], missing, 'Semua jurnal pada jadwal minggu ini sudah selesai.')}</div></section>`;
     }
 
+    // Mengambil data laporan dari backend sesuai periode yang dipilih dan me-render hasil ke panel admin.
     async function fetchReport(selectedPeriod, value) {
         const target = document.getElementById('adminReportResults');
         if (!target) return;
@@ -77,6 +83,7 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
         }
     }
 
+    // Menyiapkan UI pelaporan admin dengan pilihan harian, mingguan, dan bulanan serta tombol cetak.
     function open() {
         period = 'daily';
         setAdminPanel('Laporan', `<div class="admin-report-heading d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3"><div><h2 class="h4 mb-1" id="adminReportPeriodLabel" aria-live="polite">Laporan Harian</h2><p class="small text-secondary mb-0">Cetak langsung atau pilih Simpan sebagai PDF pada dialog berikutnya.</p></div><div class="admin-report-actions d-flex gap-2"><button type="button" class="btn btn-primary" id="pdfAdminReport"><i class="bi bi-printer"></i> Cetak / Ekspor PDF</button></div></div><div class="card mb-3 admin-report-controls"><div class="card-body"><div class="d-flex flex-wrap gap-2 mb-3" role="group" aria-label="Jenis laporan"><button type="button" class="btn btn-success" data-report-period="daily">Harian</button><button type="button" class="btn btn-outline-success" data-report-period="weekly">Mingguan</button><button type="button" class="btn btn-outline-success" data-report-period="monthly">Bulanan</button></div><form id="adminReportFilter" class="row g-2 align-items-end"><div class="col-12 col-sm-6 col-md-5"><label class="form-label" for="adminReportDate">Tanggal acuan</label><input class="form-control" id="adminReportDate" type="date" value="${localDate()}"></div><div class="col-12 col-sm-6 col-md-5" hidden><label class="form-label" for="adminReportMonth">Bulan laporan</label><input class="form-control" id="adminReportMonth" type="month" value="${localMonth()}"></div><div class="col-12 col-md-2"><button class="btn btn-primary w-100" type="submit">Tampilkan</button></div></form></div></div><div id="adminReportResults" class="admin-report-results" aria-live="polite"></div>`);

@@ -1,9 +1,11 @@
 window.createAksaraAttendanceCapture = function () {
+    // URL model MediaPipe dan root WebAssembly untuk deteksi wajah yang dipakai di flow liveness presensi.
     const tasksVisionUrl = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/vision_bundle.mjs';
     const wasmRoot = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm';
     const modelUrl = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
     let landmarkerPromise;
 
+    // Membuat instance FaceLandmarker satu kali agar deteksi wajah tidak perlu di-load ulang setiap kali kamera dibuka.
     async function getLandmarker() {
         if (!landmarkerPromise) {
             landmarkerPromise = (async () => {
@@ -25,13 +27,16 @@ window.createAksaraAttendanceCapture = function () {
         return landmarkerPromise;
     }
 
+    // Menghitung jarak Euclidean antara dua titik landmark untuk kebutuhan deteksi mata dan overlay face guide.
     const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
+    // Menghitung rasio pembukaan mata berdasarkan jarak antar landmark mata dan ukuran wajah yang terdeteksi.
     function eyeRatio(points, corners, upper1, lower1, upper2, lower2) {
         return (distance(points[upper1], points[lower1]) + distance(points[upper2], points[lower2]))
             / (2 * distance(points[corners[0]], points[corners[1]]));
     }
 
+    // Menentukan area crop yang paling terlihat dari video saat object-fit menggunakan cover agar landmark tetap konsisten.
     function getVisibleCrop(video, frame) {
         const width = video.videoWidth;
         const height = video.videoHeight;
@@ -50,6 +55,7 @@ window.createAksaraAttendanceCapture = function () {
         return { x, y, width: cropWidth, height: cropHeight };
     }
 
+    // Mengaktifkan alur pengambilan foto dengan liveness blink: buka kamera, deteksi wajah, tunggu kedipan mata, lalu ambil foto.
     async function capture(video, guide, status, signal) {
         if (!navigator.mediaDevices?.getUserMedia) throw new Error('Browser ini tidak mendukung kamera. Buka aplikasi melalui HTTPS dan izinkan akses kamera.');
         if (signal?.aborted) throw new DOMException('Pengambilan dibatalkan.', 'AbortError');

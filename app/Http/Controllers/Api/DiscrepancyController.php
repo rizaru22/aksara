@@ -9,6 +9,10 @@ use Illuminate\Validation\ValidationException;
 
 class DiscrepancyController extends Controller
 {
+    /**
+     * Endpoint GET /api/v1/discrepancy-cases.
+     * Menampilkan daftar kasus discrepancy dengan filter status dan rentang tanggal untuk proses review admin.
+     */
     public function index(Request $request)
     {
         $data = $request->validate([
@@ -29,6 +33,10 @@ class DiscrepancyController extends Controller
         ]);
     }
 
+    /**
+     * Endpoint PATCH /api/v1/discrepancy-cases/{discrepancyCase}.
+     * Mengubah status kasus discrepancy sekaligus menambah catatan resolusi saat masalah ditutup oleh admin.
+     */
     public function update(Request $request, DiscrepancyCase $discrepancyCase)
     {
         $data = $request->validate([

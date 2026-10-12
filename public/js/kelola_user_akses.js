@@ -1,5 +1,6 @@
 window.createAksaraUserAccess = function ({ $, api, htmlSafe, setFeature, setFeatureError, showToast, token }) {
     const genderLabel = (value) => ({ L: 'Laki-laki', P: 'Perempuan' })[value] || '—';
+    // Mengunduh template Excel untuk import akun baru agar administrasi user lebih cepat dan konsisten.
     async function downloadTemplate() {
         const response = await fetch(window.aksaraApiUrl('/api/v1/admin/users/template'), { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' } });
         if (!response.ok) {
@@ -14,6 +15,7 @@ window.createAksaraUserAccess = function ({ $, api, htmlSafe, setFeature, setFea
         URL.revokeObjectURL(url);
     }
 
+    // Menampilkan daftar user dan menyediakan tombol untuk tambah, ubah, reset password, import, dan hapus akun.
     async function openUsers() {
         const [users, roleResult] = await Promise.all([window.aksaraFetchAllPages(api, '/api/v1/admin/users'), api('/api/v1/admin/users/roles')]);
         setFeature('Kelola User & Akses', `<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><p class="text-secondary mb-0">Daftar seluruh akun pengguna yang tersimpan.</p><button class="btn btn-success" id="newUser"><i class="bi bi-person-plus"></i> Tambah pengguna</button></div><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Nama</th><th>Email</th><th>NIP</th><th>Jenis kelamin</th><th>Role</th><th class="text-end">Aksi</th></tr></thead><tbody>${users.map((user) => `<tr><td class="fw-semibold">${htmlSafe(user.nama)}</td><td>${htmlSafe(user.email)}</td><td>${htmlSafe(user.nip || '—')}</td><td>${htmlSafe(genderLabel(user.jenis_kelamin))}</td><td>${htmlSafe((user.roles || []).map((role) => role.name).join(', ') || 'Belum ada role')}</td><td class="text-end"><div class="d-inline-flex flex-wrap gap-1"><button class="btn btn-outline-primary btn-sm" data-user-edit="${user.id}">Ubah</button><button class="btn btn-outline-secondary btn-sm" data-password-reset="${user.id}">Kirim reset</button><button class="btn btn-outline-danger btn-sm" data-user-delete="${user.id}">Hapus</button></div></td></tr>`).join('') || '<tr><td colspan="6" class="text-center text-secondary py-4">Belum ada pengguna di database.</td></tr>'}</tbody></table></div>`);
@@ -74,6 +76,7 @@ window.createAksaraUserAccess = function ({ $, api, htmlSafe, setFeature, setFea
         }));
     }
 
+    // Menyiapkan form tambah atau edit akun dengan role, permissions, validasi password, dan mapping role yang aman.
     async function openUserForm(user = null) {
         const lists = await api('/api/v1/admin/users/roles');
         const selectedRoles = (user?.roles || []).map((role) => typeof role === 'string' ? role : role.name);
@@ -127,6 +130,7 @@ window.createAksaraUserAccess = function ({ $, api, htmlSafe, setFeature, setFea
         });
     }
 
+    // Validasi kombinasi role agar konfigurasi akses tetap sesuai aturan bisnis, misalnya kepsek tidak bisa digabungkan dengan role lain.
     function getRoleCombinationError(roles) {
         if (!roles.length) return 'Pilih minimal satu role.';
         if (roles.includes('kepsek') && roles.length > 1) return 'Role kepsek tidak dapat digabung dengan role lain.';

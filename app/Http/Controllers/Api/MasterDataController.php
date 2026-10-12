@@ -29,6 +29,10 @@ class MasterDataController extends Controller
         'agendas' => AgendaSekolah::class,
     ];
 
+    /**
+     * Endpoint GET /api/v1/master-data/teachers.
+     * Menyediakan daftar guru dan tenaga pendidik yang bisa dipilih untuk resource master seperti kelas dan jadwal.
+     */
     public function teachers(Request $request)
     {
         abort_unless($request->user()->can('kelola-master-data'), 403);
@@ -36,6 +40,10 @@ class MasterDataController extends Controller
         return response()->json(['data' => User::role(['guru', 'admin', 'kurikulum', 'kepsek'])->orderBy('nama')->get(['id', 'nama', 'nip'])]);
     }
 
+    /**
+     * Endpoint GET /api/v1/master-data/{resource}.
+     * Mengambil daftar record untuk satu resource master, seperti kelas, siswa, mapel, jadwal, atau agenda sekolah.
+     */
     public function index(Request $request, string $resource)
     {
         $this->authorizeResource($request, $resource);
@@ -45,6 +53,10 @@ class MasterDataController extends Controller
         return response()->json($query->latest()->paginate(30));
     }
 
+    /**
+     * Endpoint GET /api/v1/master-data/{resource}/{id}.
+     * Menampilkan satu record master beserta relasi yang dibutuhkan untuk edit atau detail view.
+     */
     public function show(Request $request, string $resource, int $id)
     {
         $this->authorizeResource($request, $resource);
@@ -54,6 +66,10 @@ class MasterDataController extends Controller
         return response()->json(['data' => $query->findOrFail($id)]);
     }
 
+    /**
+     * Endpoint POST /api/v1/master-data/{resource}.
+     * Membuat data master baru untuk resource yang dipilih dengan validasi field dan pengecekan konflik jadwal.
+     */
     public function store(Request $request, string $resource)
     {
         $this->authorizeResource($request, $resource);
@@ -67,6 +83,10 @@ class MasterDataController extends Controller
         return response()->json(['message' => 'Data berhasil dibuat.', 'data' => $model->refresh()], 201);
     }
 
+    /**
+     * Endpoint PUT/PATCH /api/v1/master-data/{resource}/{id}.
+     * Memperbarui data master yang ada sambil menjaga validasi relasi dan konflik jadwal tetap konsisten.
+     */
     public function update(Request $request, string $resource, int $id)
     {
         $this->authorizeResource($request, $resource);
@@ -78,6 +98,10 @@ class MasterDataController extends Controller
         return response()->json(['message' => 'Data berhasil diperbarui.', 'data' => $model->refresh()], 200);
     }
 
+    /**
+     * Endpoint DELETE /api/v1/master-data/{resource}/{id}.
+     * Menghapus data master hanya jika tidak memiliki relasi atau riwayat yang masih digunakan oleh sistem.
+     */
     public function destroy(Request $request, string $resource, int $id)
     {
         $this->authorizeResource($request, $resource);
@@ -90,6 +114,10 @@ class MasterDataController extends Controller
         return response()->json(['message' => 'Data berhasil dihapus.']);
     }
 
+    /**
+     * Endpoint POST /api/v1/master-data/academic-years/{tahunAjaran}/activate.
+     * Menyetel tahun ajaran yang dipilih sebagai aktif dan menyinkronkan data referensi terkait.
+     */
     public function activateAcademicYear(Request $request, TahunAjaran $tahunAjaran, ActiveAcademicYearService $service)
     {
         abort_unless($request->user()->can('kelola-tahun-ajaran'), 403);
@@ -98,6 +126,9 @@ class MasterDataController extends Controller
         return response()->json(['message' => 'Tahun ajaran aktif berhasil disinkronkan.', 'data' => $active]);
     }
 
+    /**
+     * Memastikan resource master yang diminta valid dan user memiliki permission sesuai jenis datanya.
+     */
     private function authorizeResource(Request $request, string $resource): void
     {
         abort_unless(isset(self::MAP[$resource]), 404);
@@ -109,6 +140,9 @@ class MasterDataController extends Controller
         abort_unless($request->user()->can($permission), 403);
     }
 
+    /**
+     * Mengambil query builder untuk resource master tertentu agar operasi CRUD bisa dipakai secara konsisten.
+     */
     private function query(string $resource)
     {
         $class = self::MAP[$resource] ?? abort(404);
@@ -116,6 +150,9 @@ class MasterDataController extends Controller
         return $class::query();
     }
 
+    /**
+     * Memuat relasi penting yang dibutuhkan tampilan list atau form edit master data agar UI punya konteks yang lengkap.
+     */
     private function withRelations(string $resource, $query): void
     {
         $relations = match ($resource) {
@@ -128,6 +165,9 @@ class MasterDataController extends Controller
         if ($relations) $query->with($relations);
     }
 
+    /**
+     * Menyediakan aturan validasi field untuk tiap resource master agar backend dan frontend tetap memiliki satu aturan yang sama.
+     */
     private function rules(string $resource, ?int $id = null, bool $sometimes = false): array
     {
         $prefix = $sometimes ? 'sometimes|' : '';
@@ -185,6 +225,9 @@ class MasterDataController extends Controller
         };
     }
 
+    /**
+     * Mencegah jadwal baru bertabrakan dengan jadwal guru atau kelas yang sudah ada pada periode sama.
+     */
     private function validateScheduleConflict(string $resource, array $data, ?int $ignoreId = null): void
     {
         if ($resource !== 'schedules') return;
@@ -210,6 +253,9 @@ class MasterDataController extends Controller
         }
     }
 
+    /**
+     * Mengecek apakah data master masih dipakai oleh relasi lain sebelum dihapus untuk menghindari data rusak atau kehilangan referensi.
+     */
     private function hasDependents(string $resource, Model $model): bool
     {
         return match ($resource) {

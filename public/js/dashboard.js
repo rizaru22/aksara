@@ -16,6 +16,7 @@
     let dashboardModules = [];
     let activeRoleNames = [];
 
+    // Menampilkan jumlah notifikasi yang belum dibaca dari service worker.
     function updateUnreadNotificationCount(count) {
         const badge = $('notificationCount');
         if (!badge) return;
@@ -36,6 +37,7 @@
             .catch(() => {});
     }
 
+    // Menampilkan pesan singkat untuk memberi feedback kepada user setelah aksi berhasil atau gagal.
     function showToast(message) {
         $('toast').textContent = message;
         $('toast').classList.add('show');
@@ -48,6 +50,7 @@
         : { show() {}, hide() {} };
     const htmlSafe = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]);
 
+    // Wrapper request yang menambahkan token autentikasi dan menangani error dari backend secara konsisten.
     async function api(path, options = {}) {
         const headers = { Accept: 'application/json', Authorization: `Bearer ${token}`, ...(options.headers || {}) };
         let body = options.body;
@@ -64,6 +67,7 @@
         return result;
     }
 
+    // Mengambil semua halaman data paginated dari endpoint API agar daftar master data tetap lengkap.
     window.aksaraFetchAllPages = async (request, path, parameters = {}) => {
         const query = new URLSearchParams(parameters);
         query.set('page', '1');
@@ -91,6 +95,7 @@
         return firstPage.rows.concat(...pages.map((page) => page.rows));
     };
 
+    // Menampilkan modal fitur dengan layout yang bisa berubah antara mode user biasa dan mode admin.
     function setFeature(title, content) {
         if (document.body.classList.contains('admin-mode')) {
             setAdminPanel(title, content);
@@ -107,12 +112,14 @@
         target.insertAdjacentHTML('afterbegin', `<div class="alert alert-danger feature-error">${htmlSafe(error.message || error)}</div>`);
     }
 
+    // Inisialisasi modul utama yang membangun alur presensi guru dan bukti jurnal untuk dashboard.
     const teacherAttendance = window.createAksaraTeacherAttendance({ $, api, showToast, setFeature, setFeatureError, featureModal });
     const journalProof = window.createAksaraJournalProof();
 
     const academicData = window.createAksaraAcademicData({ $, api, htmlSafe, setFeature, setFeatureError, showToast, token });
     const academicYears = window.createAksaraAcademicYears({ openMaster: academicData.openMaster });
 
+    // Menentukan tombol aksi yang tampil di kartu jadwal berdasarkan status jurnal dan status finalisasi.
     function renderJournalAction(schedule, visible = true) {
         if (!visible) return '';
         if (schedule.kbm_ditangguhkan) return `<span class="badge text-bg-warning">KBM ditangguhkan</span>`;
@@ -127,6 +134,7 @@
         return `<span class="text-end"><button class="btn btn-sm btn-outline-secondary" disabled>${schedule.journal_availability_message?.startsWith('Waktu') ? 'Waktu berakhir' : 'Belum waktunya'}</button><small class="d-block text-secondary mt-1">${htmlSafe(schedule.journal_availability_message || '')}</small></span>`;
     }
 
+    // Menampilkan daftar jadwal mengajar hari ini serta tombol untuk membuat atau melanjutkan jurnal.
     async function openSchedules() {
         const result = await api('/api/v1/teacher/schedules/today');
         const rows = result.data || [];
@@ -145,6 +153,7 @@
         }));
     }
 
+    // Mengambil jadwal hari ini ke kartu home dashboard agar guru melihat agenda aktif secara cepat.
     async function loadHomeSchedules() {
         const card = $('homeScheduleCard');
         const list = $('homeScheduleList');
@@ -185,6 +194,7 @@
 
     const notifications = window.createAksaraNotifications({ $, api, htmlSafe });
 
+    // Memindahkan user ke mode admin untuk menampilkan panel operasional dan rekap sistem.
     function enterAdminDashboard() {
         document.body.classList.add('admin-mode');
         $('dashboard').hidden = true;
@@ -200,11 +210,13 @@
         $('dashboard').hidden = false;
     }
 
+    // Menetapkan isi panel admin agar semua modul seperti laporan, master data, dan moderasi tampil konsisten.
     function setAdminPanel(title, content) {
         $('adminPanelContent').innerHTML = `<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3"><div><div class="text-secondary small">AKSARA / Administrasi</div><h1 class="mb-0">${htmlSafe(title)}</h1></div><button class="btn btn-outline-secondary d-lg-none" id="adminPanelBack"><i class="bi bi-arrow-left"></i> Dashboard</button></div>${content}`;
         $('adminPanelBack')?.addEventListener('click', renderAdminHome);
     }
 
+    // Membuat halaman beranda admin yang menampilkan ringkasan hari ini dan shortcut ke menu utama.
     function renderAdminHome() {
         const quickLinks = [
             { key: 'reports', icon: 'bi-clipboard-data', label: 'Laporan Harian, Mingguan & Bulanan', text: 'Rekap kehadiran guru dan jurnal mengajar berdasarkan periode.' },
@@ -223,6 +235,7 @@
     const adminReports = window.createAksaraAdminReports({ api, htmlSafe, setAdminPanel });
     const holidayCalendar = window.createAksaraHolidayCalendar({ api, htmlSafe, setFeature, setFeatureError, showToast });
 
+    // Mengarahkan tombol menu admin ke handler modul yang sesuai seperti laporan, data akademik, atau moderasi.
     function adminAction(action) {
         document.querySelectorAll('.admin-side-link').forEach((button) => button.classList.toggle('active', button.dataset.adminAction === action));
         const module = dashboardModules.find((item) => item.key === action);
@@ -232,6 +245,7 @@
         if (module) return openModule(module);
     }
 
+    // Membuka form jurnal dan presensi siswa untuk jadwal yang dipilih, termasuk mode draft dan finalisasi dengan foto/GPS.
     async function openJournalForm(scheduleId, schedule = null) {
         const rosterResult = await api(`/api/v1/teacher/schedules/${scheduleId}/students`);
         const students = rosterResult.data || [];
@@ -359,6 +373,7 @@
         }, { once: true });
     }
 
+    // Menampilkan sesi presensi siswa yang menjadi tanggung jawab wali kelas agar bisa dikoreksi secara cepat.
     async function openWaliSessions() {
         const result = await api('/api/v1/student-attendances/wali-sessions');
         const journals = result.data?.data || [];
@@ -372,6 +387,7 @@
 
     const moderation = window.createAksaraModeration({ $, api, htmlSafe, setFeature, showToast, token });
 
+    // Menampilkan formulir maupun daftar persetujuan pengajuan perizinan untuk user dan admin.
     async function openLeave(submitMode = false, page = 1, search = '', perPage = 20) {
         if (submitMode) {
             const adminWorkspace = document.body.classList.contains('admin-mode');
@@ -438,6 +454,7 @@
         }));
     }
 
+    // Menampilkan riwayat pengajuan izin milik user beserta status dan lampiran pendukung.
     async function openMyLeaveRequests() {
         const adminWorkspace = document.body.classList.contains('admin-mode');
         if (adminWorkspace) setFeature('Riwayat Pengajuan Saya', '<div id="myLeaveRequestsContent"></div>');
@@ -475,6 +492,9 @@
 
     const userAccess = window.createAksaraUserAccess({ $, api, htmlSafe, setFeature, setFeatureError, showToast, token });
 
+    // Form pengaturan sekolah menyatukan konfigurasi geofence, jadwal presensi, dan batas akurasi GPS.
+    // Semua nilai yang berubah akan dikirim ke API admin/settings dan disimpan ke table settings.
+    // Memuat form pengaturan sekolah untuk geofence, GPS, semester aktif, dan jam presensi harian.
     async function openSettings() {
         const result = await api('/api/v1/admin/settings');
         const settings = Object.fromEntries((result.data || []).map((setting) => [setting.key, setting.value]));
@@ -541,6 +561,7 @@
         });
     }
 
+    // Menangani routing modul berdasarkan permission dan key menu yang dipilih dari user dashboard.
     async function openModule(module) {
         try {
             if (module.key === 'journal') return openSchedules();
@@ -558,6 +579,7 @@
         } catch (error) { setFeature(module.title, `<div class="alert alert-danger mb-0">${htmlSafe(error.message)}</div>`); }
     }
 
+    // Menampilkan monitoring pembelajaran untuk mengecek jumlah jadwal, jurnal, dan presensi pada tanggal tertentu.
     async function openMonitoring(filters = {}) {
         const params = new URLSearchParams(Object.entries(filters).filter(([, value]) => value));
         const result = await api(`/api/v1/dashboard/curriculum${params.size ? `?${params}` : ''}`);
@@ -572,6 +594,7 @@
         $('monitoringFilters').addEventListener('submit', (event) => { event.preventDefault(); const form = new FormData(event.currentTarget); openMonitoring(Object.fromEntries(form.entries())); });
     }
 
+    // Menampilkan daftar kasus discrepancy dan menyediakan tombol resolve atau review untuk admin.
     async function openDiscrepancies() {
         const result = await api('/api/v1/discrepancy-cases');
         const cases = result.data?.data || [];
@@ -587,6 +610,7 @@
         }));
     }
 
+    // Mengubah halaman aktif pada dashboard utama dan menyiapkan event agar panel sesuai dengan view yang dipilih.
     function setPage(page) {
         if (!['home', 'leave', 'notifications', 'reports', 'profile'].includes(page)) page = 'home';
         if (page === 'notifications') {
@@ -631,6 +655,7 @@
     }));
     const dateFormatter = new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' });
     const clockFormatter = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Jakarta' });
+    // Memperbarui jam dan tanggal di header aplikasi agar user selalu melihat waktu lokal yang akurat.
     function updateHeaderDateTime() {
         const now = new Date();
         const date = dateFormatter.format(now);
@@ -643,6 +668,7 @@
     updateHeaderDateTime();
     window.setInterval(updateHeaderDateTime, 1000);
 
+    // Menyusun daftar menu yang tersedia sesuai role dan permission pengguna agar dashboard terasa dinamis.
     function renderRoleModules(user) {
         const roles = Array.isArray(user.roles) ? user.roles.map((role) => String(typeof role === 'string' ? role : role.name).toLowerCase()) : [];
         activeRoleNames = roles;
@@ -752,6 +778,7 @@
         }
     }
 
+    // Memuat profil user aktif, memvalidasi token, dan menyusun state dashboard sesuai role yang dimiliki.
     async function loadProfile() {
         if (!token || ['undefined', 'null', ''].includes(token)) {
             localStorage.removeItem('token');

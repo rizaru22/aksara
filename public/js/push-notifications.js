@@ -1,6 +1,7 @@
 (() => {
     const token = localStorage.getItem('token') || sessionStorage.getItem('token');
 
+    // Wrapper request untuk notifikasi push agar semua permintaan ke endpoint API konsisten dengan token user.
     async function api(path, options = {}) {
         const response = await fetch(window.aksaraApiUrl(path), {
             method: options.method || 'GET',
@@ -16,12 +17,14 @@
         return result;
     }
 
+    // Mengubah kunci publik VAPID dari format base64url ke Uint8Array agar browser bisa mendaftarkan subscription push.
     function decodeVapidKey(value) {
         const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
         const binary = atob(normalized.padEnd(normalized.length + (4 - normalized.length % 4) % 4, '='));
         return Uint8Array.from(binary, (character) => character.charCodeAt(0));
     }
 
+    // Membuat card UI notifikasi push yang nantinya dipasang pada halaman notifikasi atau profil user.
     function makeCard() {
         const card = document.createElement('section');
         card.className = 'row g-3 mb-3';
@@ -30,6 +33,7 @@
         return card;
     }
 
+    // Mengecek dukungan browser, permission notifikasi, dan subscription push untuk mengaktifkan atau menonaktifkan notifikasi.
     async function setup(user) {
         const roles = (user.roles || []).map((role) => typeof role === 'string' ? role : role.name);
         const supportedRoles = ['guru', 'tendik', 'admin', 'kepsek', 'kurikulum'];

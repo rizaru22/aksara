@@ -34,6 +34,11 @@ class AdminSettingsController extends Controller
         'school_name' => ['group' => 'school_info', 'type' => 'string', 'label' => 'Nama Sekolah'],
     ];
 
+    /**
+     * Endpoint GET /api/v1/admin/settings.
+     * Mengambil seluruh parameter pengaturan yang dapat diedit di panel admin beserta detail jadwal presensi harian.
+     * Data ini menjadi sumber konfigurasi utama untuk geofence, GPS, semester aktif, dan waktu masuk/pulang.
+     */
     public function index(Request $request)
     {
         abort_unless($request->user()->hasRole('admin'), 403);
@@ -53,6 +58,11 @@ class AdminSettingsController extends Controller
         ]);
     }
 
+    /**
+     * Endpoint PUT/PATCH /api/v1/admin/settings.
+     * Memvalidasi input pengaturan admin, memperbarui nilai di tabel settings, dan menyinkronkan jadwal presensi harian.
+     * Proses ini menjaga konsistensi konfigurasi agar frontend dan backend membaca nilai yang sama.
+     */
     public function update(Request $request)
     {
         abort_unless($request->user()->hasRole('admin'), 403);

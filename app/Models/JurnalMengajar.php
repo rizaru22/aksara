@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class JurnalMengajar extends Model
-{
+{ 
     protected $fillable = [
         'user_id', 'guru_pengganti_id', 'jadwal_pelajaran_id', 'materi_pelajaran_id',
         'tanggal', 'materi_pembahasan', 'catatan_kejadian_kelas', 'foto_kegiatan',
@@ -15,21 +15,35 @@ class JurnalMengajar extends Model
         'jam_mulai_realisasi', 'jam_selesai_realisasi', 'status_sesi', 'catatan_penutupan',
     ];
 
+    /**
+     * Relasi ke guru yang membuat jurnal; digunakan saat menampilkan riwayat, validasi kepemilikan,
+     * dan query yang berjalan berdasarkan user yang sedang login.
+     */
     public function guru(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
     }
 
+    /**
+     * Relasi ke guru pengganti jika sesi ini diisi oleh pengganti kelas.
+     */
     public function guruPengganti(): BelongsTo
     {
         return $this->belongsTo(User::class, 'guru_pengganti_id');
     }
 
+    /**
+     * Relasi ke jadwal pembelajaran yang menjadi konteks jurnal hari itu.
+     */
     public function jadwalPelajaran(): BelongsTo
     {
         return $this->belongsTo(JadwalPelajaran::class);
     }
 
+    /**
+     * Semua presensi siswa yang terkait dengan jurnal ini.
+     * Relasi ini dipakai untuk memastikan kelengkapan daftar siswa sebelum finalisasi.
+     */
     public function presensiSiswas(): HasMany
     {
         return $this->hasMany(PresensiSiswa::class);

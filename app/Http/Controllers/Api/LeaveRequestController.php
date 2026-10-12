@@ -18,6 +18,10 @@ class LeaveRequestController extends Controller
 {
     private const SUBMITTER_ROLES = ['guru', 'tendik', 'admin', 'kurikulum'];
 
+    /**
+     * Endpoint GET /api/v1/leave-requests.
+     * Menampilkan daftar pengajuan izin/cuti untuk admin atau user yang sedang login, termasuk filter pencarian.
+     */
     public function index(Request $request)
     {
         $user = $request->user();
@@ -49,6 +53,10 @@ class LeaveRequestController extends Controller
         return response()->json($query->paginate((int) ($filters['per_page'] ?? 20)));
     }
 
+    /**
+     * Endpoint GET /api/v1/leave-requests/mine.
+     * Mengambil riwayat pengajuan izin milik user aktif untuk ditampilkan di halaman pribadi.
+     */
     public function mine(Request $request)
     {
         abort_unless($this->canSubmitLeave($request->user()), 403);
@@ -62,6 +70,10 @@ class LeaveRequestController extends Controller
         return response()->json($items);
     }
 
+    /**
+     * Endpoint POST /api/v1/leave-requests.
+     * Membuat pengajuan izin/cuti baru dengan validasi tanggal, alasan, dan lampiran bila ada.
+     */
     public function store(Request $request)
     {
         abort_unless($this->canSubmitLeave($request->user()), 403);
@@ -122,6 +134,9 @@ class LeaveRequestController extends Controller
         return response()->json(['message' => 'Pengajuan berhasil dikirim.', 'data' => $requestRecord], 201);
     }
 
+    /**
+     * Mengirim notifikasi push ke pihak yang berwenang agar pengajuan izin baru segera ditinjau.
+     */
     private function notifyApprovers(PengajuanIzin $leaveRequest, User $submitter): void
     {
         if (! $this->canSubmitLeave($submitter)
@@ -159,11 +174,18 @@ class LeaveRequestController extends Controller
         }
     }
 
+    /**
+     * Mengecek apakah user memiliki hak mengajukan izin atau cuti berdasarkan role dan permission.
+     */
     private function canSubmitLeave(User $user): bool
     {
         return $user->can('ajukan-pengajuan-izin') || $user->hasAnyRole(self::SUBMITTER_ROLES);
     }
 
+    /**
+     * Endpoint PATCH /api/v1/leave-requests/{pengajuanIzin}/decide.
+     * Menetapkan keputusan persetujuan atau penolakan terhadap pengajuan cuti atau dinas.
+     */
     public function decide(Request $request, PengajuanIzin $pengajuanIzin)
     {
         abort_unless($request->user()->can('kelola-pengajuan-izin'), 403);
@@ -180,6 +202,10 @@ class LeaveRequestController extends Controller
         return response()->json(['message' => 'Keputusan pengajuan tersimpan.', 'data' => $pengajuanIzin->refresh()]);
     }
 
+    /**
+     * Endpoint GET /api/v1/leave-requests/{pengajuanIzin}/attachment.
+     * Mengunduh file lampiran pengajuan yang telah diupload oleh pemohon.
+     */
     public function attachment(Request $request, PengajuanIzin $pengajuanIzin)
     {
         $user = $request->user();

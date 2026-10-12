@@ -16,6 +16,11 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class TeacherScheduleController extends Controller
 {
+    /**
+     * Endpoint GET /api/v1/teacher/schedules/today.
+     * Mengambil jadwal hari ini milik guru yang sedang login, termasuk status KBM, hari libur, siklus aktif, dan ketersediaan jurnal.
+     * Data ini dipakai oleh dashboard untuk menampilkan tombol isi jurnal atau finalisasi dengan pesan yang tepat.
+     */
     public function today(Request $request, CycleScheduleService $cycles, ActiveAcademicYearService $academicYears)
     {
         $now = now(config('app.timezone'));
@@ -98,6 +103,10 @@ class TeacherScheduleController extends Controller
         ]);
     }
 
+    /**
+     * Endpoint GET /api/v1/teacher/schedules/announcements.
+     * Mengambil agenda sekolah yang akan datang untuk ditampilkan pada dashboard atau panel pengumuman guru.
+     */
     public function announcements()
     {
         $today = now(config('app.timezone'))->toDateString();

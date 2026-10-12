@@ -18,6 +18,10 @@ class AdminUserController extends Controller
     private const USER_TEMPLATE = ['Pengguna', ['nama', 'email', 'nip', 'jenis_kelamin', 'sandi']];
     private const ROLES = ['guru', 'tendik', 'admin', 'kurikulum', 'kepsek'];
 
+    /**
+     * Endpoint GET /api/v1/admin/users/roles.
+     * Mengembalikan daftar role dan permission yang tersedia agar form manajemen akun dapat dibangun dinamis.
+     */
     public function roles(Request $request)
     {
         abort_unless($request->user()->hasRole('admin'), 403);
@@ -28,12 +32,20 @@ class AdminUserController extends Controller
         ]);
     }
 
+    /**
+     * Endpoint GET /api/v1/admin/users.
+     * Menampilkan semua akun yang bisa dikelola admin, termasuk role dan permission tiap user.
+     */
     public function index(Request $request)
     {
         abort_unless($request->user()->hasRole('admin'), 403);
         return response()->json(User::query()->with(['roles:id,name', 'permissions:id,name'])->orderBy('nama')->paginate(30));
     }
 
+    /**
+     * Endpoint GET /api/v1/admin/users/template.
+     * Mengunduh template Excel untuk import akun baru dalam format yang sudah sesuai dengan validasi backend.
+     */
     public function template(Request $request, SimpleXlsx $xlsx)
     {
         abort_unless($request->user()->hasRole('admin'), 403);
@@ -51,6 +63,10 @@ class AdminUserController extends Controller
         ]);
     }
 
+    /**
+     * Endpoint POST /api/v1/admin/users/import.
+     * Memproses file Excel user, memvalidasi kolom dan kombinasi role, lalu membuat akun baru dalam satu transaksi.
+     */
     public function import(Request $request, SimpleXlsx $xlsx)
     {
         abort_unless($request->user()->hasRole('admin'), 403);
@@ -99,6 +115,9 @@ class AdminUserController extends Controller
         }
     }
 
+    /**
+     * Memetakan setiap baris Excel user ke array atribut model User dan mengecek duplikat email/NIP di dalam file.
+     */
     private function mapUsers(array $rows): array
     {
         $mapped = [];
@@ -153,6 +172,10 @@ class AdminUserController extends Controller
         return $mapped;
     }
 
+    /**
+     * Endpoint POST /api/v1/admin/users.
+     * Membuat akun baru beserta role dan permission yang dipilih, dengan validasi kombinasi akses yang aman.
+     */
     public function store(Request $request)
     {
         abort_unless($request->user()->hasRole('admin'), 403);
@@ -182,6 +205,10 @@ class AdminUserController extends Controller
         return response()->json(['message' => 'Akun berhasil dibuat.', 'data' => $user->load('roles:id,name')], 201);
     }
 
+    /**
+     * Endpoint PUT/PATCH /api/v1/admin/users/{user}.
+     * Memperbarui identitas, role, dan permission akun tanpa mengubah data relasi penting yang sudah ada.
+     */
     public function update(Request $request, User $user)
     {
         abort_unless($request->user()->hasRole('admin'), 403);
@@ -211,6 +238,10 @@ class AdminUserController extends Controller
         return response()->json(['message' => 'Akun berhasil diperbarui.', 'data' => $user->load('roles:id,name')]);
     }
 
+    /**
+     * Endpoint DELETE /api/v1/admin/users/{user}.
+     * Menghapus akun hanya jika tidak terhubung dengan riwayat absensi, jadwal, jurnal, atau data sensitif lainnya.
+     */
     public function destroy(Request $request, User $user)
     {
         abort_unless($request->user()->hasRole('admin'), 403);
@@ -237,6 +268,9 @@ class AdminUserController extends Controller
         return response()->json(['message' => 'Akun tanpa riwayat berhasil dihapus.']);
     }
 
+    /**
+     * Validasi kombinasi role untuk memastikan aturan bisnis tetap aman, misalnya kepsek tidak bisa gabung dengan role lain.
+     */
     private function validateRoleCombination(array $roles): void
     {
         $roles = array_values(array_unique($roles));

@@ -1,4 +1,5 @@
 window.createAksaraNotifications = function ({ $, api, htmlSafe }) {
+    // Mengambil agenda dan pengumuman sekolah dari API untuk ditampilkan di halaman home user.
     async function loadHomeAnnouncements() {
         const list = $('homeAnnouncements');
         try {

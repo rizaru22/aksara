@@ -1,3 +1,5 @@
+// Membuat modul pengambilan bukti jurnal: kamera, GPS, dan validasi finalisasi.
+// Flow ini dipanggil dari dashboard saat guru menutup jurnal sesi mengajar.
 window.createAksaraJournalProof = function (config = {}) {
     const DEFAULT_MAX_GPS_ACCURACY = 40;
     const getMaxGpsAccuracy = async () => {
@@ -16,6 +18,7 @@ window.createAksaraJournalProof = function (config = {}) {
         }
     };
 
+    // Menyiapkan stream kamera belakang agar foto jurnal bisa diambil dari perangkat mobile.
     async function startCamera(video) {
         if (!navigator.mediaDevices?.getUserMedia) {
             throw new Error('Browser tidak mendukung kamera. Buka aplikasi melalui HTTPS dan izinkan akses kamera.');
@@ -48,6 +51,8 @@ window.createAksaraJournalProof = function (config = {}) {
         }, 'image/jpeg', 0.9));
     }
 
+    // Mencari lokasi GPS dengan akurasi tinggi hingga mencapai batas yang diizinkan.
+    // Batas ini diambil dari setting sistem agar jurnal bisa memiliki ambang yang berbeda dari absensi.
     async function findPreciseLocation(status) {
         if (!navigator.geolocation) return Promise.reject(new Error('Browser ini tidak menyediakan GPS.'));
         const maxGpsAccuracy = await getMaxGpsAccuracy();

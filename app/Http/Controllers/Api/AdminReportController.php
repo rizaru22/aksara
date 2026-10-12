@@ -20,6 +20,11 @@ use Illuminate\Http\Request;
 
 class AdminReportController extends Controller
 {
+    /**
+     * Endpoint GET /api/v1/admin/reports.
+     * Menyediakan laporan admin untuk periode harian, mingguan, atau bulanan berdasarkan filter yang dipilih.
+     * Kontrol ini memanggil helper yang sesuai lalu mereturn payload yang siap ditampilkan di UI rekap admin.
+     */
     public function index(Request $request, CycleScheduleService $cycles)
     {
         abort_unless($request->user()->hasRole('admin') || $request->user()->can('view-dashboard-kurikulum'), 403);
@@ -37,6 +42,9 @@ class AdminReportController extends Controller
         };
     }
 
+    /**
+     * Menyusun data laporan harian untuk semua guru, termasuk status kehadiran, cuti, libur, dan sesi kelas yang berjalan.
+     */
     private function daily(string $date, CycleScheduleService $cycles): array
     {
         $day = Carbon::parse($date, config('app.timezone'))->startOfDay();
@@ -67,6 +75,9 @@ class AdminReportController extends Controller
         ];
     }
 
+    /**
+     * Menghitung ringkasan satu pekan kerja, termasuk durasi hadir, daftar guru yang belum mengisi jurnal, dan status kelas.
+     */
     private function weekly(string $date, CycleScheduleService $cycles): array
     {
         $start = Carbon::parse($date, config('app.timezone'))->startOfWeek(Carbon::MONDAY)->startOfDay();
@@ -132,6 +143,9 @@ class AdminReportController extends Controller
         ];
     }
 
+    /**
+     * Membuat rekap bulanan berdasarkan jumlah hari kerja, presensi, izin, sakit, dinas luar, dan kuota kehadiran per guru.
+     */
     private function monthly(string $month): array
     {
         [$year, $monthNumber] = array_map('intval', explode('-', $month));
@@ -200,6 +214,9 @@ class AdminReportController extends Controller
         ];
     }
 
+    /**
+     * Mengambil seluruh sesi kelas untuk rentang tanggal tertentu dan menandai apakah jurnal sudah diisi atau belum.
+     */
     private function classSessions($dates, CycleScheduleService $cycles)
     {
         $year = TahunAjaran::query()->where('is_active', true)->first();
@@ -234,12 +251,18 @@ class AdminReportController extends Controller
         return $rows->sortBy([['date', 'asc'], ['start', 'asc']])->values();
     }
 
+    /**
+     * Mengambil cuti atau dinas yang sudah disetujui dalam periode tertentu untuk dihitung dalam status guru.
+     */
     private function approvedLeaves(array $teacherIds, string $from, string $to)
     {
         return PengajuanIzin::query()->whereIn('user_id', $teacherIds)->where('status_approval', 'APPROVED')
             ->whereDate('tanggal_mulai', '<=', $to)->whereDate('tanggal_selesai', '>=', $from)->orderByDesc('updated_at')->get();
     }
 
+    /**
+     * Menyediakan daftar guru yang masuk dalam scope laporan admin untuk semua rekap harian, mingguan, dan bulanan.
+     */
     private function userRoster()
     {
         return User::query()
@@ -247,6 +270,9 @@ class AdminReportController extends Controller
             ->get(['id', 'nama', 'nip']);
     }
 
+    /**
+     * Mengubah kondisi presensi, cuti, dan hari libur menjadi status ringkas yang dipakai di report admin.
+     */
     private function attendanceStatus(?Absensi $record, ?PengajuanIzin $leave, bool $holiday): string
     {
         if ($record?->jam_masuk) {

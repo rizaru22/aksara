@@ -32,6 +32,11 @@ class LessonJournalController extends Controller
         return max(1, min(100, (int) config('aksara.gps_accuracy.journal_meters', config('aksara.gps_accuracy.attendance_meters', self::DEFAULT_GPS_ACCURACY_METERS))));
     }
 
+    /**
+     * Endpoint GET /api/v1/teacher/schedules/{jadwalPelajaran}/students.
+     * Mengambil daftar siswa satu kelas untuk dimunculkan di modal jurnal.
+     * Endpoint ini juga memastikan jadwal yang dibuka benar-benar milik guru saat ini dan aktif di siklus yang berlaku.
+     */
     public function students(Request $request, JadwalPelajaran $jadwalPelajaran, CycleScheduleService $cycles)
     {
         abort_unless($request->user()->can('isi-ejurnal'), 403);
@@ -51,6 +56,11 @@ class LessonJournalController extends Controller
         ]);
     }
 
+    /**
+     * Endpoint POST /api/v1/lesson-journals.
+     * Menyimpan atau memperbarui draft jurnal yang masih berlangsung.
+     * Flow ini memastikan seluruh siswa kelas masuk dalam presensi dan data tidak dibuat secara parsial.
+     */
     public function store(Request $request, CycleScheduleService $cycles)
     {
         abort_unless($request->user()->can('isi-ejurnal'), 403);
@@ -139,6 +149,10 @@ class LessonJournalController extends Controller
         ], $created ? 201 : 200);
     }
 
+    /**
+     * Endpoint GET /api/v1/lesson-journals/{jurnalMengajar}.
+     * Menampilkan draf jurnal yang sudah tersimpan agar UI dapat melanjutkan pengisian tanpa mengulang input.
+     */
     public function show(Request $request, JurnalMengajar $jurnalMengajar)
     {
         $user = $request->user();
@@ -148,6 +162,11 @@ class LessonJournalController extends Controller
         return response()->json(['data' => $jurnalMengajar->load(['jadwalPelajaran.kelas', 'jadwalPelajaran.mataPelajaran', 'presensiSiswas.siswa'])]);
     }
 
+    /**
+     * Endpoint POST /api/v1/lesson-journals/{jurnalMengajar}/finalize.
+     * Proses finalisasi bertahap: validasi foto + GPS + geofence + waktu + kelengkapan daftar presensi.
+     * Jika kondisi darurat, sistem memperbolehkan finalisasi lewat mode emergency dengan catatan penutupan.
+     */
     public function finalize(Request $request, JurnalMengajar $jurnalMengajar, CycleScheduleService $cycles, HaversineService $distance)
     {
         abort_unless($request->user()->can('isi-ejurnal'), 403);
@@ -208,6 +227,10 @@ class LessonJournalController extends Controller
         return response()->json(['message' => $message, 'data' => $journal]);
     }
 
+    /**
+     * Endpoint PATCH /api/v1/student-attendances/{presensiSiswa}.
+     * Memperbarui status presensi siswa pada draf jurnal yang sedang dibuka oleh guru atau wali kelas yang berwenang.
+     */
     public function updateStudentAttendance(Request $request, PresensiSiswa $presensiSiswa)
     {
         $user = $request->user();
@@ -227,6 +250,10 @@ class LessonJournalController extends Controller
         return response()->json(['message' => 'Koreksi presensi sesi tersimpan.', 'data' => $presensiSiswa->refresh()]);
     }
 
+    /**
+     * Endpoint GET /api/v1/student-attendances/wali-sessions.
+     * Menyediakan sesi jurnal yang relevan untuk wali kelas agar mereka dapat meninjau atau mengoreksi presensi siswa.
+     */
     public function waliSessions(Request $request)
     {
         $user = $request->user();
@@ -241,6 +268,10 @@ class LessonJournalController extends Controller
         return response()->json($query->paginate(25));
     }
 
+    /**
+     * Mengijinkan akses ke jadwal yang benar-benar milik guru, aktif pada hari/siklus/semester yang berlaku,
+     * dan masih dalam jendela pengisian jurnal. Jika draf sudah dibuka, akses lanjutan tetap diperbolehkan.
+     */
     private function authorizeSchedule(Request $request, JadwalPelajaran $schedule, Carbon $now, CycleScheduleService $cycles): void
     {
         if ($schedule->user_id !== $request->user()->id) {
@@ -275,6 +306,11 @@ class LessonJournalController extends Controller
         }
     }
 
+    /**
+     * Menentukan apakah finalisasi jurnal dibuka untuk saat ini.
+     * Jika bukan darurat, sistem hanya menerima pada 30 menit terakhir sesi.
+     * Jika darurat, sistem tetap mengizinkan finalisasi selama masih masuk per jangkauan sesi yang valid.
+     */
     private function authorizeFinalizationWindow(JadwalPelajaran $schedule, Carbon $now, bool $isEmergency = false): void
     {
         $sessionStart = Carbon::parse($now->toDateString().' '.$schedule->jam_mulai, config('app.timezone'));
@@ -291,6 +327,10 @@ class LessonJournalController extends Controller
         }
     }
 
+    /**
+     * Mengecek apakah lokasi saat finalisasi masih berada dalam batas geofence sekolah.
+     * Jika jarak melebihi radius, finalisasi ditolak sebelum menerima foto atau menutup jurnal.
+     */
     private function verifyFinalizationLocation(array $data, HaversineService $distance): float
     {
         $verified = filter_var(Setting::value('geofence_location_verified', false), FILTER_VALIDATE_BOOLEAN);

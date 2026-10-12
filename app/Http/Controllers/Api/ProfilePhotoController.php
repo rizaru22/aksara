@@ -9,6 +9,10 @@ use Throwable;
 
 class ProfilePhotoController extends Controller
 {
+    /**
+     * Endpoint POST /api/v1/profile/photo.
+     * Mengunggah dan menyimpan foto profil user serta mengganti foto lama jika sebelumnya sudah ada.
+     */
     public function update(Request $request)
     {
         $request->validate([

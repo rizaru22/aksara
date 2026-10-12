@@ -4,11 +4,13 @@
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]);
     const holidayTypes = { NASIONAL: 'Libur nasional', CUTI_BERSAMA: 'Cuti bersama', SEKOLAH: 'Libur sekolah', MINGGU: 'Hari Minggu' };
 
+    // Mengembalikan bulan aktif dalam format YYYY-MM untuk default filter laporan presensi guru.
     function currentMonth() {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     }
 
+    // Menghitung total menit kerja dari data absensi masuk dan pulang yang tercatat pada satu bulan.
     function durationMinutes(items) {
         return items.reduce((total, item) => {
             if (!item.jam_masuk || !item.jam_pulang || item.status === 'LIBUR') return total;
@@ -21,10 +23,12 @@
         }, 0);
     }
 
+    // Mengubah menit menjadi string yang lebih mudah dibaca, misalnya 6 jam 30 menit.
     function formatDuration(minutes) {
         return `${Math.floor(minutes / 60)} jam ${String(minutes % 60).padStart(2, '0')} menit`;
     }
 
+    // Menyusun ringkasan total jam kerja bulanan beserta rekap mingguan untuk laporan user.
     function renderDurationSummary(items, year, monthNumber) {
         const monthStart = new Date(year, monthNumber - 1, 1);
         const monthEnd = new Date(year, monthNumber, 0);
@@ -51,6 +55,7 @@
         return `<section class="row g-3 mb-3" aria-label="Rekap durasi presensi"><div class="col-sm-12"><article class="card"><div class="card-body"><h2 class="h5 mb-1">Total jam kerja</h2><p class="small text-secondary mb-3">Durasi dihitung dari jam masuk hingga jam pulang yang tercatat.</p><div class="row g-3"><div class="col-12 col-md-5"><div class="border rounded-3 p-3 h-100"><div class="small text-secondary">Total bulan ini</div><strong class="fs-4">${formatDuration(durationMinutes(items))}</strong><div class="small text-secondary">${completeDays} hari dengan presensi masuk dan pulang</div></div></div><div class="col-12 col-md-7"><div class="small text-secondary fw-semibold mb-1">Rekap mingguan</div><ul class="list-unstyled mb-0">${weeks.join('')}</ul></div></div></div></article></div></section>`;
     }
 
+    // Mengambil data laporan presensi dari backend dan merender ringkasan serta detail per tanggal.
     async function loadAttendanceReport(month) {
         const target = document.getElementById('attendanceReportList');
         if (!target) return;

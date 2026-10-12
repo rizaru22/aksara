@@ -27,6 +27,11 @@ class TeacherAttendanceController extends Controller
 {
     private const DEFAULT_GPS_ACCURACY_METERS = 40;
 
+    /**
+     * Mengambil batas akurasi GPS yang berlaku untuk seluruh presensi masuk/pulang.
+     * Nilai diutamakan dari pengaturan database agar admin dapat menyesuaikan per sekolah,
+     * lalu fallback ke config/aksara.php untuk lingkungan yang belum mempunyai data setting.
+     */
     private function maxGpsAccuracyMeters(): int
     {
         $configured = Setting::value('attendance_gps_accuracy_meters');
@@ -37,6 +42,10 @@ class TeacherAttendanceController extends Controller
         return max(1, min(100, (int) config('aksara.gps_accuracy.attendance_meters', self::DEFAULT_GPS_ACCURACY_METERS)));
     }
 
+    /**
+     * Batas GPS yang dipakai untuk finalisasi jurnal, agar fitur jurnal dapat punya nilai berbeda
+     * dari absensi harian jika sekolah membutuhkannya.
+     */
     private function journalMaxGpsAccuracyMeters(): int
     {
         $configured = Setting::value('journal_gps_accuracy_meters');
@@ -47,6 +56,11 @@ class TeacherAttendanceController extends Controller
         return max(1, min(100, (int) config('aksara.gps_accuracy.journal_meters', $this->maxGpsAccuracyMeters())));
     }
 
+    /**
+     * Endpoint GET /api/v1/teacher/attendance/today.
+     * Mengembalikan status presensi hari ini, jadwal masuk, status hari libur, serta batas validasi GPS.
+     * Data ini dipakai UI dashboard untuk menentukan apakah tombol absen masuk/pulang aktif.
+     */
     public function today(Request $request)
     {
         $now = now(config('app.timezone'));
@@ -81,6 +95,11 @@ class TeacherAttendanceController extends Controller
         ]);
     }
 
+    /**
+     * Endpoint POST /api/v1/teacher/attendance/location-check.
+     * Fungsi ini adalah preflight verification untuk mengecek GPS dan geofence sebelum upload foto.
+     * Tujuannya untuk memberi feedback cepat ke frontend, apakah lokasi valid, dekat sekolah, atau masuk mode non-strict.
+     */
     public function verifyLocation(Request $request, HaversineService $distance)
     {
         $validated = $request->validate([
@@ -119,6 +138,11 @@ class TeacherAttendanceController extends Controller
         ]);
     }
 
+    /**
+     * Endpoint POST /api/v1/teacher/attendance/check-in.
+     * Menyimpan data absensi masuk beserta foto, liveness, koordinat, dan akurasi GPS.
+     * Proses ini memvalidasi geofence, jadwal, izin, dan riwayat absensi untuk hari yang sama.
+     */
     public function checkIn(Request $request, HaversineService $distance)
     {
         $validated = $request->validate([
@@ -202,6 +226,11 @@ class TeacherAttendanceController extends Controller
         return response()->json(['message' => 'Presensi masuk berhasil dicatat.', 'data' => $attendance], 201);
     }
 
+    /**
+     * Endpoint POST /api/v1/teacher/attendance/check-out.
+     * Menyimpan data absensi pulang dengan validasi jam keluar, alasan saat pulang di luar jadwal,
+     * serta pengecekan geofence dan akurasi GPS yang sama seperti absensi masuk.
+     */
     public function checkOut(Request $request, HaversineService $distance)
     {
         $validated = $request->validate([
@@ -296,6 +325,10 @@ class TeacherAttendanceController extends Controller
         return response()->json(['message' => 'Presensi pulang berhasil dicatat.', 'data' => $attendance]);
     }
 
+    /**
+     * Endpoint GET /api/v1/teacher/attendance/flagged.
+     * Mengambil seluruh presensi yang perlu ditinjau admin karena masuk dalam status pending atau flagged.
+     */
     public function flagged()
     {
         $items = Absensi::query()
@@ -309,6 +342,10 @@ class TeacherAttendanceController extends Controller
         return response()->json($items);
     }
 
+    /**
+     * Endpoint POST /api/v1/teacher/attendance/{absensi}/correction.
+     * Memungkinkan guru mengajukan koreksi untuk presensi yang sebelumnya ditolak oleh admin dan menunggu review.
+     */
     public function submitCorrection(Request $request, Absensi $absensi)
     {
         abort_unless((int) $absensi->user_id === (int) $request->user()->id, 404);
@@ -356,6 +393,10 @@ class TeacherAttendanceController extends Controller
         return response()->json(['message' => 'Pengajuan koreksi terkirim dan menunggu tinjauan admin.', 'data' => $correction], 201);
     }
 
+    /**
+     * Endpoint GET /api/v1/teacher/attendance/corrections.
+     * Menampilkan daftar koreksi presensi yang statusnya masih menunggu persetujuan admin.
+     */
     public function corrections()
     {
         $items = AttendanceCorrection::query()
@@ -367,6 +408,10 @@ class TeacherAttendanceController extends Controller
         return response()->json($items);
     }
 
+    /**
+     * Endpoint POST /api/v1/teacher/attendance/corrections/{attendanceCorrection}/review.
+     * Menetapkan keputusan review pengajuan koreksi presensi dan mengirimkan notifikasi hasil ke guru terkait.
+     */
     public function reviewCorrection(Request $request, AttendanceCorrection $attendanceCorrection)
     {
         $data = $request->validate([
@@ -415,6 +460,10 @@ class TeacherAttendanceController extends Controller
         return response()->json(['message' => 'Tinjauan koreksi tersimpan.', 'data' => $attendanceCorrection->refresh()]);
     }
 
+    /**
+     * Endpoint GET /api/v1/teacher/attendance/corrections/{attendanceCorrection}/evidence.
+     * Mengunduh bukti pendukung yang dilampirkan saat guru mengajukan koreksi presensi.
+     */
     public function correctionEvidence(AttendanceCorrection $attendanceCorrection)
     {
         $path = $attendanceCorrection->evidence_photo;
@@ -423,6 +472,10 @@ class TeacherAttendanceController extends Controller
         return Storage::disk('local')->download($path);
     }
 
+    /**
+     * Endpoint POST /api/v1/teacher/attendance/{absensi}/review.
+     * Menyelesaikan proses review status verifikasi masuk atau pulang oleh admin dan memberi notifikasi bila ditolak.
+     */
     public function review(Request $request, Absensi $absensi)
     {
         $data = $request->validate([
@@ -462,6 +515,10 @@ class TeacherAttendanceController extends Controller
         return response()->json(['message' => 'Tinjauan presensi tersimpan.', 'data' => $absensi->refresh()]);
     }
 
+    /**
+     * Endpoint GET /api/v1/teacher/attendance/{absensi}/photo/{session}.
+     * Menyediakan dokumen foto presensi masuk atau pulang untuk kebutuhan review atau audit admin.
+     */
     public function photo(Request $request, Absensi $absensi, string $session)
     {
         abort_unless(in_array($session, ['masuk', 'pulang'], true), 404);
@@ -504,6 +561,10 @@ class TeacherAttendanceController extends Controller
         return HariLibur::query()->whereDate('tanggal', $date->toDateString())->first();
     }
 
+    /**
+     * Melakukan kalkulasi jarak titik GPS user terhadap titik sekolah.
+     * Hasilnya dipakai untuk menentukan apakah lokasi diterima, ditolak, atau hanya ditandai untuk review.
+     */
     private function geofence(HaversineService $distance, float $latitude, float $longitude): array
     {
         $verified = filter_var(Setting::value('geofence_location_verified', false), FILTER_VALIDATE_BOOLEAN);

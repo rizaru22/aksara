@@ -28,6 +28,11 @@ class AcademicImportController extends Controller
         'schedules' => ['Jadwal_Pelajaran', ['tahun_ajaran', 'semester', 'nip_guru', 'nama_kelas', 'kode_mapel', 'siklus_minggu', 'hari', 'jam_mulai', 'jam_selesai']],
     ];
 
+    /**
+     * Endpoint GET /api/v1/master-data/import/template/{resource}.
+     * Menghasilkan file Excel template sesuai resource yang dipilih, misalnya kelas, siswa, mapel, materi, atau jadwal.
+     * File ini dipakai agar admin bisa menyiapkan data master dengan format yang konsisten sebelum di-import.
+     */
     public function template(Request $request, string $resource, SimpleXlsx $xlsx)
     {
         abort_unless(isset(self::TEMPLATES[$resource]), 404);
@@ -41,6 +46,11 @@ class AcademicImportController extends Controller
         ]);
     }
 
+    /**
+     * Endpoint POST /api/v1/master-data/import/{resource}.
+     * Memvalidasi file Excel, memetakan setiap baris ke struktur data backend, lalu mengeksekusi import dalam transaksi database.
+     * Flow ini menahan semua proses jika ada data duplikat, konflik jadwal, atau format kolom tidak sesuai template.
+     */
     public function import(Request $request, string $resource, SimpleXlsx $xlsx)
     {
         abort_unless(isset(self::TEMPLATES[$resource]), 404);
@@ -80,6 +90,10 @@ class AcademicImportController extends Controller
         }
     }
 
+    /**
+     * Memetakan semua baris Excel dari satu resource ke struktur data yang siap divalidasi sebelum disimpan.
+     * Setiap baris diperiksa satu per satu agar error bisa diidentifikasi dengan nomor baris yang tepat.
+     */
     private function mapRows(string $resource, array $rows, ?int $classId = null): array
     {
         $mapped = [];
@@ -109,12 +123,18 @@ class AcademicImportController extends Controller
         return $mapped;
     }
 
+    /**
+     * Mengubah representasi baris kelas menjadi data model Kelas yang siap disimpan atau divalidasi.
+     */
     private function classRow(array $row): array
     {
         $wali = $this->optionalTeacher($row['wali_kelas_nip'] ?? '');
         return ['nama_kelas' => $row['nama_kelas'] ?? '', 'tingkat' => $row['tingkat'] ?? '', 'jurusan' => $row['jurusan'] ?? '', 'wali_kelas_id' => $wali?->id];
     }
 
+    /**
+     * Mengubah baris siswa menjadi payload yang sesuai schema model Siswa serta mengikat ke kelas tujuan.
+     */
     private function studentRow(array $row, ?int $classId): array
     {
         return ['nisn' => trim($row['nisn'] ?? ''), 'nama' => trim($row['nama'] ?? ''), 'kelas_id' => $classId, 'jenis_kelamin' => strtoupper(trim($row['jenis_kelamin'] ?? ''))];

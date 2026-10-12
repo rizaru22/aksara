@@ -1,3 +1,4 @@
+// Modul presensi guru: dari dashboard ke validasi geofence, GPS, kamera, hingga penyimpanan absensi.
 window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature, setFeatureError, featureModal }) {
     let maxGpsAccuracy = 40;
     const captureModule = window.createAksaraAttendanceCapture();
@@ -105,6 +106,8 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
         });
     }
 
+    // Menunggu lokasi GPS dengan akurasi tertentu, lalu memeriksa apakah titik tersebut masuk geofence sekolah.
+    // Nilai `maxGpsAccuracy` diambil dari endpoint status hari ini agar frontend dan backend tetap sinkron.
     function findPreciseLocation(status, preflight, signal, action = 'check-in') {
         if (!navigator.geolocation) return Promise.reject(new Error('Browser ini tidak menyediakan GPS.'));
         if (signal?.aborted) return Promise.reject(new DOMException('Pencarian lokasi dibatalkan.', 'AbortError'));

@@ -1,11 +1,13 @@
 ﻿(() => {
     const hasDataTables = typeof window.DataTable === 'function';
+    // Menghapus placeholder kosong pada tabel sebelum menambahkan pencarian agar UI tidak menampilkan baris dummy.
     const clearEmptyPlaceholder = (table) => {
         const rows = [...table.tBodies].flatMap((body) => [...body.rows]);
         if (rows.length !== 1 || ![...rows[0].cells].some((cell) => cell.hasAttribute('colspan'))) return;
         rows[0].remove();
     };
 
+    // Menyiapkan pencarian manual pada tabel jika DataTables tidak tersedia atau tidak bisa diaktifkan.
     function enhanceWithFallback(table) {
         const parent = table.closest('.table-responsive') || table;
         const toolbar = document.createElement('div');
@@ -41,6 +43,7 @@
         table.dataset.aksaraSearchFallback = 'true';
     }
 
+    // Menambahkan search/filter pada tabel dengan prioritas DataTables, lalu fallback manual bila perlu.
     function enhance(table) {
         if (!(table instanceof HTMLTableElement)) return;
         if (table.dataset.aksaraSearchFallback === 'true') return;
@@ -83,11 +86,13 @@
         });
     }
 
+    // Menyisir struktur DOM untuk menemukan tabel baru yang belum diproses oleh enhancer.
     function scan(root) {
         if (root instanceof HTMLTableElement) enhance(root);
         root.querySelectorAll?.('table').forEach(enhance);
     }
 
+    // Membersihkan instance DataTables lama saat node DOM dihapus untuk mencegah duplikasi atau memory leak.
     function cleanup(root) {
         if (!hasDataTables) return;
         const tables = [];

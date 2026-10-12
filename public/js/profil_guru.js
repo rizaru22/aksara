@@ -17,6 +17,7 @@
         });
     });
 
+    // Mengambil token login aktif dari storage browser untuk request protected endpoint profile dan password.
     function token() {
         return localStorage.getItem('token') || sessionStorage.getItem('token') || '';
     }
@@ -100,6 +101,7 @@
 
     if (!input || !button || !status) return;
 
+    // Menetapkan foto profil baru pada semua elemen yang menampilkan avatar atau foto utama user.
     function setPhoto(url) {
         const imageUrl = url ? `${url}${url.includes('?') ? '&' : '?'}v=${Date.now()}` : '';
         [['welcomePhotoImage', 'welcomeAvatar'], ['profilePhotoImage', 'profileAvatar']].forEach(([imageId, avatarId]) => {

@@ -1,6 +1,7 @@
 window.createAksaraModeration = function ({ $, api, htmlSafe, setFeature, showToast, token }) {
     let photoUrl = null;
 
+    // Menampilkan list presensi menunggu verifikasi dan pengajuan koreksi guru untuk proses moderasi admin.
     async function openFlagged(page = 1, correctionPage = 1) {
         try {
             const [result, correctionResult] = await Promise.all([

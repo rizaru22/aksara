@@ -11,6 +11,10 @@ use Illuminate\Http\Request;
 
 class AttendanceReportController extends Controller
 {
+    /**
+     * Endpoint GET /api/v1/reports/attendance/mine.
+     * Menghasilkan laporan absensi personal per rentang tanggal agar guru dapat melihat status kehadiran dan izin secara historis.
+     */
     public function mine(Request $request)
     {
         abort_unless($request->user()->can('absen-masuk') || $request->user()->can('absen-pulang'), 403);

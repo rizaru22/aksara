@@ -34,8 +34,10 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
         ] },
     };
 
+    // Mengekstrak nilai nested dari object yang berasal dari API master data dan relasi model.
     function nestedValue(item, path) { return path.split('.').reduce((value, key) => value?.[key], item); }
 
+    // Mengunduh template Excel untuk import data master yang didukung oleh modul akademik.
     async function downloadTemplate(resource) {
         const response = await fetch(window.aksaraApiUrl(`/api/v1/academic/imports/templates/${resource}`), { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' } });
         if (!response.ok) {
@@ -50,6 +52,7 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
         link.click();
         URL.revokeObjectURL(url);
     }
+    // Mengambil daftar referensi untuk dropdown select seperti kelas, guru, dan mata pelajaran.
     async function loadOptions(optionKey) {
         const path = optionKey === 'teachers'
             ? '/api/v1/academic/teachers'
@@ -57,6 +60,7 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
         return window.aksaraFetchAllPages(api, path);
     }
 
+    // Menyiapkan CRUD master data akademik sesuai resource yang dipilih: tahun ajaran, kelas, siswa, mapel, materi, jadwal, atau agenda.
     async function openMaster(resource, current = null) {
         const definition = masterDefinitions[resource];
         const items = await window.aksaraFetchAllPages(api, `/api/v1/academic/${resource}`);

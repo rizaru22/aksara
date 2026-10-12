@@ -12,6 +12,10 @@ use Illuminate\Support\Str;
 
 class PasswordResetController extends Controller
 {
+    /**
+     * Endpoint POST /api/v1/password-reset/request.
+     * Mengirim tautan reset password ke email user jika akun terdaftar dan valid di sistem.
+     */
     public function requestLink(Request $request)
     {
         $request->validate(['email' => ['required', 'email']]);
@@ -20,6 +24,10 @@ class PasswordResetController extends Controller
         return response()->json(['message' => 'Jika alamat terdaftar, tautan reset akan dikirim ke email tersebut.']);
     }
 
+    /**
+     * Endpoint POST /api/v1/password-reset/reset.
+     * Memvalidasi token reset, mengganti password baru, dan me-revoke token lama agar sesi lama tidak berlaku lagi.
+     */
     public function reset(Request $request)
     {
         $data = $request->validate([
@@ -41,6 +49,10 @@ class PasswordResetController extends Controller
         return response()->json(['message' => 'Kata sandi berhasil diubah. Silakan masuk kembali.']);
     }
 
+    /**
+     * Endpoint POST /api/v1/admin/users/{user}/password-reset.
+     * Meminta admin mengirim tautan reset password ke email user tertentu untuk kebutuhan recovery akun.
+     */
     public function adminRequest(Request $request, User $user)
     {
         abort_unless($request->user()->hasRole('admin'), 403);

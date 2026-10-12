@@ -13,7 +13,8 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 {
     /**
-     * Login API Fleksibel (NIP / Kode Guru / Email)
+     * Endpoint POST /api/v1/login.
+     * Melakukan login menggunakan NIP, email, atau identitas unik lain yang terdaftar, lalu mengembalikan token API dan profil user.
      */
     public function login(Request $request)
     {
@@ -49,7 +50,8 @@ class AuthController extends Controller
     }
 
     /**
-     * Mendapatkan profil user yang sedang login
+     * Endpoint GET /api/v1/me.
+     * Mengambil profil saat ini untuk memuat role, permissions, foto, dan status user pada dashboard.
      */
     public function me(Request $request)
     {
@@ -61,7 +63,10 @@ class AuthController extends Controller
         ], 200);
     }
 
-    /** Ganti kata sandi dengan verifikasi kata sandi saat ini. */
+    /**
+     * Endpoint POST /api/v1/change-password.
+     * Mengganti kata sandi login aktif setelah user memasukkan password lama dan konfirmasi password baru.
+     */
     public function changePassword(Request $request)
     {
         $data = $request->validate([
@@ -89,7 +94,8 @@ class AuthController extends Controller
     }
 
     /**
-     * Logout & menghapus token Sanctum aktif
+     * Endpoint POST /api/v1/logout.
+     * Menghapus token aktif agar sesi login tidak bisa dipakai lagi dari browser atau client lain.
      */
     public function logout(Request $request)
     {
@@ -101,7 +107,9 @@ class AuthController extends Controller
         ], 200);
     }
 
-    /** Data profil dan konteks tampilan dashboard pengguna. */
+    /**
+     * Menyusun payload profil yang dipakai oleh frontend untuk menampilkan identitas user, role, dan metadata dashboard.
+     */
     private function profileData(User $user): array
     {
         return [

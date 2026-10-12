@@ -1,6 +1,7 @@
 window.createAksaraAdminDashboard = function ({ $, api, htmlSafe }) {
     let reportClockTimer = null;
 
+    // Memperbarui jam real-time yang tampil di rekap admin untuk menunjukkan status terkini secara live.
     function updateReportClock() {
         const clock = $('adminReportClock');
         if (!clock) return;
@@ -10,15 +11,18 @@ window.createAksaraAdminDashboard = function ({ $, api, htmlSafe }) {
         }).format(new Date());
     }
 
+    // Menampilkan daftar guru dalam kategori tertentu seperti hadir, izin, sakit, atau belum check-in.
     function renderTeacherList(teachers, emptyLabel = 'Tidak ada guru pada daftar ini.') {
         return teachers.length ? `<div class="admin-report-list">${teachers.map((teacher) => `<div class="admin-report-person"><i class="bi bi-person-circle text-secondary me-1"></i>${htmlSafe(teacher.nama)}${teacher.nip ? `<span class="text-secondary"> · ${htmlSafe(teacher.nip)}</span>` : ''}</div>`).join('')}</div>` : `<div class="admin-report-list small text-secondary">${htmlSafe(emptyLabel)}</div>`;
     }
 
+    // Membuat bar chart ringkas untuk rekap presensi guru berdasarkan kategori yang dibutuhkan.
     function renderAdminChartRows(labels, values, colors = []) {
         const maxValue = Math.max(1, ...values);
         return labels.map((label, index) => `<div class="admin-chart-row"><span>${htmlSafe(label)}</span><div class="admin-chart-track"><div class="admin-chart-fill ${colors[index] || ''}" style="width:${Math.max(0, Math.min(100, (values[index] / maxValue) * 100))}%"></div></div><strong class="text-end">${htmlSafe(values[index])}</strong></div>`).join('');
     }
 
+    // Mengambil rekap administratif hari ini dan merender ringkasan ke panel admin live report.
     async function loadAdminLiveReport() {
         const target = $('adminLiveReport');
         if (!target) return;

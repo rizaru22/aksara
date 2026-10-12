@@ -8,6 +8,10 @@ use Minishlink\WebPush\ContentEncoding;
 
 class PushSubscriptionController extends Controller
 {
+    /**
+     * Endpoint GET /api/v1/push/public-key.
+     * Mengembalikan kunci publik VAPID yang dipakai browser untuk membuat subscription push yang aman.
+     */
     public function publicKey()
     {
         $key = config('webpush.vapid.public_key');
@@ -19,6 +23,10 @@ class PushSubscriptionController extends Controller
         return response()->json(['public_key' => $key]);
     }
 
+    /**
+     * Endpoint POST /api/v1/push/subscribe.
+     * Mendaftarkan subscription push browser user agar server dapat mengirim reminder atau notifikasi berbasis event.
+     */
     public function subscribe(Request $request)
     {
         $data = $request->validate([
@@ -37,6 +45,10 @@ class PushSubscriptionController extends Controller
         return response()->json(['message' => 'Pengingat notifikasi berhasil diaktifkan.']);
     }
 
+    /**
+     * Endpoint POST /api/v1/push/unsubscribe.
+     * Menghapus subscription push tertentu agar browser yang sudah tidak dipakai tidak lagi menerima notifikasi.
+     */
     public function unsubscribe(Request $request)
     {
         $data = $request->validate(['endpoint' => ['required', 'url', 'max:500']]);

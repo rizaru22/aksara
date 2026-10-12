@@ -20,6 +20,10 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class DashboardController extends Controller
 {
+    /**
+     * Endpoint GET /api/v1/dashboard/admin/live.
+     * Mengambil status real-time admin tentang kehadiran guru, cuti, sakit, review presensi, dan sesi pembelajaran yang sedang berjalan.
+     */
     public function adminLive(Request $request, CycleScheduleService $cycles, ActiveAcademicYearService $academicYears)
     {
         abort_unless($request->user()->hasRole('admin') || $request->user()->can('view-dashboard-kurikulum'), 403);
@@ -161,6 +165,10 @@ class DashboardController extends Controller
         ]);
     }
 
+    /**
+     * Endpoint GET /api/v1/dashboard/curriculum.
+     * Menyediakan KPI dan ringkasan pembelajaran kurikulum berdasarkan tanggal atau tahun ajaran yang dipilih.
+     */
     public function curriculum(Request $request, CycleScheduleService $cycles, ActiveAcademicYearService $academicYears)
     {
         $filters = $request->validate([
