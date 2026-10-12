@@ -78,7 +78,15 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
                     : field.options;
                 control = `<select class="form-select" name="${field.name}" ${required}><option value="">Pilih…</option>${options.map(([value, label]) => `<option value="${htmlSafe(value)}" ${String(oldValue) === String(value) ? 'selected' : ''}>${htmlSafe(label)}</option>`).join('')}</select>`;
             } else {
-                control = `<input class="form-control" name="${field.name}" type="${field.type || 'text'}" value="${htmlSafe(oldValue)}" ${required} ${field.optional ? '' : ''}>`;
+                const isCoordinate = field.type === 'number' && /lat|long|latitude|longitude/i.test(field.name);
+                const coordinateAttrs = isCoordinate
+                    ? /lat|latitude/i.test(field.name)
+                        ? 'step="any" inputmode="decimal" min="-90" max="90"'
+                        : 'step="any" inputmode="decimal" min="-180" max="180"'
+                    : field.type === 'number'
+                        ? 'step="1" inputmode="numeric"'
+                        : '';
+                control = `<input class="form-control" name="${field.name}" type="${field.type || 'text'}" value="${htmlSafe(oldValue)}" ${required} ${coordinateAttrs}>`;
             }
             return `<div class="col-sm-12"><label class="form-label">${htmlSafe(field.label)}</label>${control}</div>`;
         }).join('');
