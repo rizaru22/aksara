@@ -49,6 +49,32 @@ class LessonJournalTransactionTest extends TestCase
         $this->assertDatabaseCount('presensi_siswas', 0);
     }
 
+    public function test_journal_can_be_updated_after_class_window_when_draft_is_still_open(): void
+    {
+        [$teacher, $schedule, $students] = $this->prepareSession();
+        $this->actingAs($teacher, 'sanctum');
+
+        $draftId = $this->postJson('/api/v1/lesson-journals', [
+            'jadwal_pelajaran_id' => $schedule->id,
+            'materi_pembahasan' => 'Pengenalan basis data relasional dan primary key.',
+            'presensi' => $students->map(fn (Siswa $student) => ['siswa_id' => $student->id, 'status' => 'HADIR'])->all(),
+        ])->assertCreated()->json('data.id');
+
+        $schedule->update([
+            'jam_mulai' => Carbon::now(config('app.timezone'))->copy()->subHours(2)->format('H:i'),
+            'jam_selesai' => Carbon::now(config('app.timezone'))->copy()->subMinutes(5)->format('H:i'),
+        ]);
+
+        $this->postJson('/api/v1/lesson-journals', [
+            'jadwal_pelajaran_id' => $schedule->id,
+            'materi_pembahasan' => 'Pengenalan basis data relasional dan primary key. Perbaikan catatan setelah jam berakhir.',
+            'presensi' => $students->map(fn (Siswa $student) => ['siswa_id' => $student->id, 'status' => 'HADIR'])->all(),
+        ])->assertOk();
+
+        $this->assertDatabaseHas('jurnal_mengajars', ['id' => $draftId, 'status_sesi' => 'berlangsung']);
+        $this->assertDatabaseHas('jurnal_mengajars', ['id' => $draftId, 'materi_pembahasan' => 'Pengenalan basis data relasional dan primary key. Perbaikan catatan setelah jam berakhir.']);
+    }
+
     public function test_journal_can_be_finalized_outside_normal_window_when_emergency_is_declared(): void
     {
         [$teacher, $schedule, $students] = $this->prepareSession();

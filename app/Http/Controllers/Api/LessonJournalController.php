@@ -245,6 +245,17 @@ class LessonJournalController extends Controller
         if ($schedule->siklus_minggu !== null && (int) $schedule->siklus_minggu !== $cycle) {
             throw new ConflictHttpException('Jadwal tidak aktif pada siklus minggu ini.');
         }
+
+        $hasOpenDraft = JurnalMengajar::query()
+            ->where('user_id', $request->user()->id)
+            ->where('jadwal_pelajaran_id', $schedule->id)
+            ->whereDate('tanggal', $now->toDateString())
+            ->where('status_sesi', 'berlangsung')
+            ->exists();
+        if ($hasOpenDraft) {
+            return;
+        }
+
         $start = Carbon::parse($now->toDateString().' '.$schedule->jam_mulai, config('app.timezone'));
         $end = Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
         if ($now->lt($start) || $now->gt($end)) {

@@ -60,10 +60,11 @@ class TeacherScheduleController extends Controller
             $scheduleEndsAt = Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
             $finalizationStartsAt = $scheduleEndsAt->copy()->subMinutes(30);
             if ($finalizationStartsAt->lt($journalStartsAt)) $finalizationStartsAt = $journalStartsAt;
-            $canFillJournal = ! $now->lt($journalStartsAt) && ! $now->gt($scheduleEndsAt);
+            $hasOpenDraft = $schedule->jurnal_hari_ini?->status_sesi === 'berlangsung';
+            $canFillJournal = $hasOpenDraft || (! $now->lt($journalStartsAt) && ! $now->gt($scheduleEndsAt));
             $availabilityMessage = $now->lt($journalStartsAt)
                 ? 'Draf jurnal dapat diisi mulai pukul '.$journalStartsAt->format('H:i').'.'
-                : ($now->gt($scheduleEndsAt) ? 'Waktu pengisian draf berakhir pukul '.$scheduleEndsAt->format('H:i').'.' : null);
+                : ($now->gt($scheduleEndsAt) && ! $hasOpenDraft ? 'Waktu pengisian draf berakhir pukul '.$scheduleEndsAt->format('H:i').'.' : null);
             $canFinalizeJournal = ! $now->lt($finalizationStartsAt) && ! $now->gt($scheduleEndsAt);
             $finalizationMessage = $now->lt($finalizationStartsAt)
                 ? 'Finalisasi dibuka pukul '.$finalizationStartsAt->format('H:i').'.'
