@@ -20,6 +20,13 @@ use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 
 class TeacherAttendanceController extends Controller
 {
+    private const DEFAULT_GPS_ACCURACY_METERS = 40;
+
+    private function maxGpsAccuracyMeters(): int
+    {
+        return max(1, min(100, (int) Setting::value('attendance_gps_accuracy_meters', self::DEFAULT_GPS_ACCURACY_METERS)));
+    }
+
     public function today(Request $request)
     {
         $now = now(config('app.timezone'));
@@ -48,6 +55,7 @@ class TeacherAttendanceController extends Controller
             'check_in_available' => $checkInAvailable,
             'check_in_opens_at' => $checkInStart->format('H:i'),
             'check_in_seconds_until' => max(0, $checkInStart->getTimestamp() - $now->getTimestamp()),
+            'gps_accuracy_limit_meters' => $this->maxGpsAccuracyMeters(),
         ]);
     }
 
@@ -56,7 +64,7 @@ class TeacherAttendanceController extends Controller
         $validated = $request->validate([
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'accuracy' => ['required', 'numeric', 'min:0', 'max:3'],
+            'accuracy' => ['required', 'numeric', 'min:0', 'max:'.$this->maxGpsAccuracyMeters()],
             'action' => ['nullable', 'in:check-in,check-out'],
         ]);
 
@@ -94,7 +102,7 @@ class TeacherAttendanceController extends Controller
         $validated = $request->validate([
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'accuracy' => ['required', 'numeric', 'min:0', 'max:3'],
+            'accuracy' => ['required', 'numeric', 'min:0', 'max:'.$this->maxGpsAccuracyMeters()],
             'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'liveness_type' => ['required', 'in:BLINK'],
         ]);
@@ -176,7 +184,7 @@ class TeacherAttendanceController extends Controller
         $validated = $request->validate([
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'accuracy' => ['required', 'numeric', 'min:0', 'max:3'],
+            'accuracy' => ['required', 'numeric', 'min:0', 'max:'.$this->maxGpsAccuracyMeters()],
             'photo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
             'liveness_type' => ['required', 'in:BLINK'],
             'reason' => ['nullable', 'string', 'max:2000'],

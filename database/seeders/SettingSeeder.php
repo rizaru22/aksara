@@ -81,6 +81,14 @@ class SettingSeeder extends Seeder
                 'label'       => 'Batas Jam Masuk (Terlambat)',
                 'description' => 'Absensi masuk lewat dari jam ini akan tercatat Terlambat',
             ],
+            [
+                'key'         => 'attendance_gps_accuracy_meters',
+                'value'       => '40',
+                'group'       => 'presensi',
+                'type'        => 'number',
+                'label'       => 'Batas Akurasi GPS Presensi (Meter)',
+                'description' => 'Akurasi GPS maksimum yang diterima untuk presensi masuk dan pulang.',
+            ],
 
             // --- IDENTITAS SEKOLAH ---
             [
