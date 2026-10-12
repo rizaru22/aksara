@@ -75,6 +75,27 @@ class LessonJournalTransactionTest extends TestCase
         $this->assertDatabaseHas('jurnal_mengajars', ['id' => $draftId, 'materi_pembahasan' => 'Pengenalan basis data relasional dan primary key. Perbaikan catatan setelah jam berakhir.']);
     }
 
+    public function test_open_draft_remains_finalize_ready_after_schedule_window(): void
+    {
+        [$teacher, $schedule, $students] = $this->prepareSession();
+        $this->actingAs($teacher, 'sanctum');
+
+        $this->postJson('/api/v1/lesson-journals', [
+            'jadwal_pelajaran_id' => $schedule->id,
+            'materi_pembahasan' => 'Pengenalan basis data relasional dan primary key.',
+            'presensi' => $students->map(fn (Siswa $student) => ['siswa_id' => $student->id, 'status' => 'HADIR'])->all(),
+        ])->assertCreated();
+
+        $schedule->update([
+            'jam_mulai' => Carbon::now(config('app.timezone'))->copy()->subHours(2)->format('H:i'),
+            'jam_selesai' => Carbon::now(config('app.timezone'))->copy()->subMinutes(5)->format('H:i'),
+        ]);
+
+        $this->getJson('/api/v1/teacher/schedules/today')
+            ->assertOk()
+            ->assertJsonPath('data.0.can_finalize_journal', true);
+    }
+
     public function test_journal_can_be_finalized_outside_normal_window_when_emergency_is_declared(): void
     {
         [$teacher, $schedule, $students] = $this->prepareSession();

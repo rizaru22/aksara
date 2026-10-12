@@ -65,10 +65,16 @@ class TeacherScheduleController extends Controller
             $availabilityMessage = $now->lt($journalStartsAt)
                 ? 'Draf jurnal dapat diisi mulai pukul '.$journalStartsAt->format('H:i').'.'
                 : ($now->gt($scheduleEndsAt) && ! $hasOpenDraft ? 'Waktu pengisian draf berakhir pukul '.$scheduleEndsAt->format('H:i').'.' : null);
-            $canFinalizeJournal = ! $now->lt($finalizationStartsAt) && ! $now->gt($scheduleEndsAt);
-            $finalizationMessage = $now->lt($finalizationStartsAt)
-                ? 'Finalisasi dibuka pukul '.$finalizationStartsAt->format('H:i').'.'
-                : ($now->gt($scheduleEndsAt) ? 'Finalisasi ditutup pukul '.$scheduleEndsAt->format('H:i').'.' : 'Finalisasi harus dilakukan sebelum jadwal berakhir pukul '.$scheduleEndsAt->format('H:i').'.');
+            $canFinalizeJournal = $hasOpenDraft || (! $now->lt($finalizationStartsAt) && ! $now->gt($scheduleEndsAt));
+            if ($hasOpenDraft) {
+                $finalizationMessage = $now->lt($finalizationStartsAt)
+                    ? 'Draf aktif. Finalisasi dibuka pukul '.$finalizationStartsAt->format('H:i').'.'
+                    : 'Draf aktif. Finalisasi masih dapat dilakukan.';
+            } else {
+                $finalizationMessage = $now->lt($finalizationStartsAt)
+                    ? 'Finalisasi dibuka pukul '.$finalizationStartsAt->format('H:i').'.'
+                    : ($now->gt($scheduleEndsAt) ? 'Finalisasi ditutup pukul '.$scheduleEndsAt->format('H:i').'.' : 'Finalisasi harus dilakukan sebelum jadwal berakhir pukul '.$scheduleEndsAt->format('H:i').'.');
+            }
             $schedule->setAttribute('can_fill_journal', $canFillJournal);
             $schedule->setAttribute('journal_availability_message', $availabilityMessage);
             $schedule->setAttribute('can_finalize_journal', $canFinalizeJournal);
