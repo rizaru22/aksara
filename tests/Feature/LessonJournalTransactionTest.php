@@ -96,6 +96,57 @@ class LessonJournalTransactionTest extends TestCase
             ->assertJsonPath('data.0.can_finalize_journal', true);
     }
 
+    public function test_teacher_can_list_all_journal_history_with_status_filters(): void
+    {
+        [$teacher, $schedule, $students] = $this->prepareSession();
+        $this->actingAs($teacher, 'sanctum');
+
+        $draftDate = Carbon::now(config('app.timezone'))->copy()->subDay();
+        $finalDate = Carbon::now(config('app.timezone'))->copy()->subDays(2);
+
+        $draft = \App\Models\JurnalMengajar::query()->create([
+            'user_id' => $teacher->id,
+            'jadwal_pelajaran_id' => $schedule->id,
+            'materi_pelajaran_id' => null,
+            'tanggal' => $draftDate->toDateString(),
+            'materi_pembahasan' => 'Rencana pembelajaran hari sebelumnya.',
+            'status_sesi' => 'berlangsung',
+        ]);
+
+        $students->each(fn (Siswa $student) => $draft->presensiSiswas()->create([
+            'siswa_id' => $student->id,
+            'status' => 'HADIR',
+        ]));
+
+        $final = \App\Models\JurnalMengajar::query()->create([
+            'user_id' => $teacher->id,
+            'jadwal_pelajaran_id' => $schedule->id,
+            'materi_pelajaran_id' => null,
+            'tanggal' => $finalDate->toDateString(),
+            'materi_pembahasan' => 'Pembelajaran yang sudah diselesaikan.',
+            'status_sesi' => 'selesai',
+            'foto_kegiatan' => 'lesson-journals/final.jpg',
+            'jam_mulai_realisasi' => $finalDate->copy()->setTime(8, 0)->toDateTimeString(),
+            'jam_selesai_realisasi' => $finalDate->copy()->setTime(9, 0)->toDateTimeString(),
+        ]);
+
+        $students->each(fn (Siswa $student) => $final->presensiSiswas()->create([
+            'siswa_id' => $student->id,
+            'status' => 'HADIR',
+        ]));
+
+        $this->getJson('/api/v1/lesson-journals?status=all')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 2)
+            ->assertJsonFragment(['status_sesi' => 'berlangsung'])
+            ->assertJsonFragment(['status_sesi' => 'selesai']);
+
+        $this->getJson('/api/v1/lesson-journals?status=draft')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.0.status_sesi', 'berlangsung');
+    }
+
     public function test_finalization_reports_location_issue_before_time_window_message(): void
     {
         [$teacher, $schedule, $students] = $this->prepareSession();

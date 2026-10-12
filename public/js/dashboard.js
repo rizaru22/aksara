@@ -787,6 +787,297 @@
         }
     }
 
+    // Monitoring E-Jurnal: menampilkan daftar jurnal mengajar berdasarkan tanggal kegiatan pembelajaran.
+    // Admin dan kurikulum dapat memfilter, mencari, serta membuka detail jurnal secara read-only.
+    let jmLastFilters = {};
+    async function openJournalMonitoring(filters = {}) {
+        jmLastFilters = filters;
+        const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD lokal
+        const tanggal = filters.tanggal || today;
+        const status = filters.status || '';
+        const search = filters.search || '';
+
+        const params = new URLSearchParams({ tanggal });
+        if (status) params.set('status', status);
+        if (search) params.set('search', search);
+
+        let result;
+        try {
+            result = await api(`/api/v1/admin/journal-monitoring?${params}`);
+        } catch (error) {
+            setFeature('Monitoring E-Jurnal', `<div class="alert alert-danger">${htmlSafe(error.message)}</div>`);
+            return;
+        }
+
+        const summary = result.summary || {};
+        const journals = result.data || [];
+
+        const statusOptions = [
+            { value: '', label: 'Semua' },
+            { value: 'berlangsung', label: 'Draft' },
+            { value: 'selesai', label: 'Final' },
+        ].map((opt) => `<option value="${opt.value}" ${status === opt.value ? 'selected' : ''}>${htmlSafe(opt.label)}</option>`).join('');
+
+        // Tanggal display
+        const displayDate = new Date(tanggal + 'T12:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+        const filterBar = `<form id="jmFilters" class="card mb-3 admin-form-card">
+            <div class="card-body">
+                <div class="row g-3 admin-form-grid">
+                    <div class="col-sm-12">
+                        <label class="form-label" for="jmTanggal">Tanggal kegiatan</label>
+                        <input class="form-control" id="jmTanggal" type="date" name="tanggal" value="${htmlSafe(tanggal)}">
+                    </div>
+                    <div class="col-sm-12">
+                        <label class="form-label" for="jmStatus">Status jurnal</label>
+                        <select class="form-select" id="jmStatus" name="status">${statusOptions}</select>
+                    </div>
+                    <div class="col-sm-12">
+                        <label class="form-label" for="jmSearch">Pencarian</label>
+                        <input class="form-control" id="jmSearch" type="search" name="search" value="${htmlSafe(search)}" placeholder="Cari nama guru, kelas, atau materi...">
+                    </div>
+                    <div class="col-sm-12 form-actions">
+                        <button class="btn btn-outline-success" type="submit">Terapkan filter</button>
+                    </div>
+                </div>
+            </div>
+        </form>`;
+
+        const statCards = [
+            { label: 'Total jurnal', value: summary.total ?? '—', variant: 'secondary' },
+            { label: 'Sudah final', value: summary.final ?? '—', variant: 'success' },
+            { label: 'Masih draft', value: summary.draft ?? '—', variant: 'warning' },
+            { label: 'Belum lengkap', value: summary.belum_lengkap ?? '—', variant: 'danger' },
+        ].map(({ label, value, variant }) => `<div class="col-sm-12">
+            <div class="card border-${variant}-subtle">
+                <div class="card-body d-flex justify-content-between align-items-center py-3">
+                    <span class="small text-secondary">${htmlSafe(label)}</span>
+                    <span class="fs-4 fw-bold text-${variant}">${htmlSafe(String(value))}</span>
+                </div>
+            </div>
+        </div>`).join('');
+
+        const statusBadge = {
+            berlangsung: '<span class="badge bg-warning text-dark">Draft</span>',
+            selesai: '<span class="badge bg-success">Final</span>',
+            flagged: '<span class="badge bg-secondary">Flagged</span>',
+        };
+
+        const rows = journals.map((item) => {
+            const guruLabel = htmlSafe(item.guru?.nama || 'Guru tidak diketahui');
+            const nipLabel = item.guru?.nip ? `<div class="small text-secondary">${htmlSafe(item.guru.nip)}</div>` : '';
+            const kelasLabel = htmlSafe(item.kelas?.nama_kelas || '—');
+            const mapelLabel = htmlSafe(item.mata_pelajaran?.nama_mapel || '—');
+            const waktu = item.jam_mulai && item.jam_selesai ? `${htmlSafe(item.jam_mulai)}–${htmlSafe(item.jam_selesai)}` : '—';
+            const materi = item.materi_pembahasan
+                ? htmlSafe(String(item.materi_pembahasan).substring(0, 80) + (item.materi_pembahasan.length > 80 ? '…' : ''))
+                : '<span class="text-secondary fst-italic">Belum diisi</span>';
+            const badge = statusBadge[item.status_sesi] || `<span class="badge bg-secondary">${htmlSafe(item.status_label || item.status_sesi)}</span>`;
+            const lengkapBadge = item.lengkap
+                ? `<span class="badge bg-success">Lengkap</span>`
+                : `<span class="badge bg-danger" title="${htmlSafe(item.presensi_count)} / ${htmlSafe(String(item.total_siswa))} siswa">Belum lengkap</span>`;
+
+            return `<tr>
+                <td>
+                    <strong>${guruLabel}</strong>
+                    <span class="text-secondary"> · ${kelasLabel}</span>
+                    ${nipLabel}
+                    <div class="small text-secondary">${mapelLabel}</div>
+                </td>
+                <td class="text-nowrap small">${waktu}</td>
+                <td class="small">${materi}</td>
+                <td>${badge}</td>
+                <td>${lengkapBadge}</td>
+                <td class="text-nowrap">
+                    <button class="btn btn-outline-secondary btn-sm" data-jm-detail="${item.id}">Lihat detail →</button>
+                </td>
+            </tr>`;
+        }).join('');
+
+        const emptyRow = `<tr><td colspan="6" class="text-center text-secondary py-4">Tidak ada jurnal pada tanggal yang dipilih.</td></tr>`;
+
+        const content = `${filterBar}
+            <p class="text-secondary small mb-3">
+                <i class="bi bi-calendar3 me-1"></i>${htmlSafe(displayDate)}
+            </p>
+            <div class="row g-3 mb-3">${statCards}</div>
+            <section class="card">
+                <div class="card-header"><strong>Daftar Jurnal</strong></div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Guru / Kelas</th>
+                                    <th>Waktu</th>
+                                    <th>Materi</th>
+                                    <th>Status</th>
+                                    <th>Kelengkapan</th>
+                                    <th>Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows || emptyRow}</tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer small text-secondary">
+                    Data berdasarkan tanggal kegiatan pembelajaran, bukan tanggal finalisasi. Draft dari hari sebelumnya tetap tampil saat tanggal kegiatan dipilih.
+                </div>
+            </section>`;
+
+        setFeature('Monitoring E-Jurnal', content);
+
+        $('jmFilters')?.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const form = new FormData(event.currentTarget);
+            openJournalMonitoring(Object.fromEntries(form.entries()));
+        });
+
+        document.querySelectorAll('[data-jm-detail]').forEach((btn) => {
+            btn.addEventListener('click', () => openJournalDetail(btn.dataset.jmDetail));
+        });
+    }
+
+    // Panel detail jurnal monitoring — baca-saja, tanpa aksi edit atau finalisasi.
+    async function openJournalDetail(journalId) {
+        let journal;
+        try {
+            const result = await api(`/api/v1/admin/journal-monitoring/${journalId}`);
+            journal = result.data;
+        } catch (error) {
+            setFeature('Detail Jurnal', `<div class="alert alert-danger">${htmlSafe(error.message)}</div>
+                <button class="btn btn-outline-secondary btn-sm" id="jmBack">← Kembali ke daftar</button>`);
+            $('jmBack')?.addEventListener('click', () => openJournalMonitoring(jmLastFilters));
+            return;
+        }
+
+        const statusBadge = {
+            berlangsung: '<span class="badge bg-warning text-dark">Draft</span>',
+            selesai: '<span class="badge bg-success">Final</span>',
+            flagged: '<span class="badge bg-secondary">Flagged</span>',
+        };
+
+        const fmtDt = (val) => val ? new Date(val).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '<span class="text-secondary fst-italic">Belum diisi</span>';
+        const fmtStr = (val) => val ? htmlSafe(val) : '<span class="text-secondary fst-italic">Belum diisi</span>';
+
+        const lengkapBadge = journal.lengkap
+            ? '<span class="badge bg-success">Lengkap</span>'
+            : `<span class="badge bg-danger">Belum lengkap (${journal.presensi_count}/${journal.total_siswa} siswa)</span>`;
+
+        const belumLengkapList = (journal.bagian_belum_lengkap || []).length
+            ? `<ul class="mb-0 small text-danger">${journal.bagian_belum_lengkap.map((item) => `<li>${htmlSafe(item)}</li>`).join('')}</ul>`
+            : '';
+
+        const guruName = htmlSafe(journal.guru?.nama || '—');
+        const guruNip = journal.guru?.nip ? `<span class="text-secondary"> · ${htmlSafe(journal.guru.nip)}</span>` : '';
+        const gpName = journal.guru_pengganti ? htmlSafe(journal.guru_pengganti.nama) : null;
+        const kelasName = htmlSafe(journal.jadwal_pelajaran?.kelas?.nama_kelas || '—');
+        const mapelName = htmlSafe(journal.jadwal_pelajaran?.mata_pelajaran?.nama_mapel || '—');
+        const jadwalWaktu = journal.jam_mulai && journal.jam_selesai
+            ? `${htmlSafe(journal.jam_mulai)}–${htmlSafe(journal.jam_selesai)}`
+            : '—';
+
+        const presensiRows = (journal.presensi_siswas || []).map((p) => {
+            const statusColors = { HADIR: 'success', SAKIT: 'info', IZIN: 'warning', ALPHA: 'danger', CABUT: 'secondary' };
+            const color = statusColors[p.status] || 'secondary';
+            return `<tr>
+                <td>${htmlSafe(p.siswa?.nama || '—')}</td>
+                <td><span class="badge bg-${color}">${htmlSafe(p.status)}</span></td>
+                <td>${htmlSafe(p.keterangan || '—')}</td>
+            </tr>`;
+        }).join('') || `<tr><td colspan="3" class="text-center text-secondary py-3">Belum ada presensi dicatat.</td></tr>`;
+
+        const gpsInfo = journal.jarak_geofence_finalisasi != null
+            ? `${htmlSafe(String(Math.round(journal.jarak_geofence_finalisasi)))} m dari lokasi sekolah`
+            : '<span class="text-secondary fst-italic">Belum diisi</span>';
+
+        const finalisasiWaktu = journal.status_sesi === 'selesai' && journal.jam_selesai_realisasi
+            ? fmtDt(journal.jam_selesai_realisasi)
+            : '<span class="text-secondary fst-italic">Belum difinalisasi</span>';
+
+        const content = `
+            <button class="btn btn-outline-secondary btn-sm mb-3" id="jmBack"><i class="bi bi-arrow-left me-1"></i>Kembali ke daftar</button>
+            <div class="alert alert-info small mb-3">
+                <i class="bi bi-info-circle me-1"></i>Data ini bersifat <strong>read-only</strong>.
+                Guru dapat melanjutkan atau memfinalisasi jurnal melalui fitur E-Jurnal masing-masing.
+            </div>
+            <section class="card mb-3">
+                <div class="card-header"><strong>Identitas Jurnal</strong></div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Guru pengajar</dt>
+                        <dd class="col-sm-8">${guruName}${guruNip}</dd>
+                        ${gpName ? `<dt class="col-sm-4">Guru pengganti</dt><dd class="col-sm-8">${gpName}</dd>` : ''}
+                        <dt class="col-sm-4">Kelas</dt>
+                        <dd class="col-sm-8">${kelasName}</dd>
+                        <dt class="col-sm-4">Mata pelajaran</dt>
+                        <dd class="col-sm-8">${mapelName}</dd>
+                        <dt class="col-sm-4">Tanggal kegiatan</dt>
+                        <dd class="col-sm-8">${fmtStr(journal.tanggal)}</dd>
+                        <dt class="col-sm-4">Waktu jadwal</dt>
+                        <dd class="col-sm-8">${jadwalWaktu}</dd>
+                        <dt class="col-sm-4">Status jurnal</dt>
+                        <dd class="col-sm-8">${statusBadge[journal.status_sesi] || htmlSafe(journal.status_sesi)}</dd>
+                        <dt class="col-sm-4">Kelengkapan</dt>
+                        <dd class="col-sm-8">${lengkapBadge}${belumLengkapList ? `<div class="mt-1">${belumLengkapList}</div>` : ''}</dd>
+                    </dl>
+                </div>
+            </section>
+            <section class="card mb-3">
+                <div class="card-header"><strong>Isi Jurnal</strong></div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Materi pembahasan</dt>
+                        <dd class="col-sm-8">${fmtStr(journal.materi_pembahasan)}</dd>
+                        <dt class="col-sm-4">Catatan kejadian kelas</dt>
+                        <dd class="col-sm-8">${fmtStr(journal.catatan_kejadian_kelas)}</dd>
+                        <dt class="col-sm-4">Foto kegiatan</dt>
+                        <dd class="col-sm-8">${journal.has_foto ? '<span class="badge bg-success">Tersedia</span>' : '<span class="text-secondary fst-italic">Belum diisi</span>'}</dd>
+                        <dt class="col-sm-4">Catatan penutupan</dt>
+                        <dd class="col-sm-8">${fmtStr(journal.catatan_penutupan)}</dd>
+                    </dl>
+                </div>
+            </section>
+            <section class="card mb-3">
+                <div class="card-header"><strong>Waktu Pelaksanaan &amp; GPS</strong></div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Mulai sesi (realisasi)</dt>
+                        <dd class="col-sm-8">${fmtDt(journal.jam_mulai_realisasi)}</dd>
+                        <dt class="col-sm-4">Selesai / Finalisasi</dt>
+                        <dd class="col-sm-8">${finalisasiWaktu}</dd>
+                        <dt class="col-sm-4">Jarak GPS finalisasi</dt>
+                        <dd class="col-sm-8">${gpsInfo}</dd>
+                    </dl>
+                </div>
+            </section>
+            <section class="card mb-3">
+                <div class="card-header"><strong>Presensi Siswa</strong> <span class="badge bg-secondary ms-1">${journal.presensi_count || 0} / ${journal.total_siswa || 0}</span></div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle mb-0">
+                            <thead><tr><th>Nama Siswa</th><th>Status</th><th>Keterangan</th></tr></thead>
+                            <tbody>${presensiRows}</tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+            <section class="card mb-3">
+                <div class="card-header"><strong>Riwayat Waktu</strong></div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Dibuat</dt>
+                        <dd class="col-sm-8">${fmtDt(journal.created_at)}</dd>
+                        <dt class="col-sm-4">Diperbarui</dt>
+                        <dd class="col-sm-8">${fmtDt(journal.updated_at)}</dd>
+                    </dl>
+                </div>
+            </section>`;
+
+        setFeature('Detail Jurnal', content);
+        $('jmBack')?.addEventListener('click', () => openJournalMonitoring(jmLastFilters));
+    }
+
     const userAccess = window.createAksaraUserAccess({ $, api, htmlSafe, setFeature, setFeatureError, showToast, token });
 
     // Form pengaturan sekolah menyatukan konfigurasi geofence, jadwal presensi, dan batas akurasi GPS.
@@ -872,6 +1163,7 @@
             if (module.key === 'discrepancy') return openDiscrepancies();
             if (module.key === 'leave-approvals' || module.key === 'leave-submit') return openLeave(module.key === 'leave-submit');
             if (module.key === 'substitute-approvals') return openSubstituteApprovals();
+            if (module.key === 'journal-monitoring') return openJournalMonitoring();
             if (module.key === 'student-attendance') return openWaliSessions();
             if (module.key === 'settings') return openSettings();
         } catch (error) { setFeature(module.title, `<div class="alert alert-danger mb-0">${htmlSafe(error.message)}</div>`); }
@@ -932,12 +1224,12 @@
         document.body.classList.remove('sidebar-open');
         adminAction(button.dataset.adminAction);
     }));
-    $('checkIn').addEventListener('click', async () => {
+    $('checkIn')?.addEventListener('click', async () => {
         await teacherAttendance.refreshAttendance();
         if (!$('checkIn').disabled) teacherAttendance.attendanceDialog('check-in');
         else showToast($('attendanceState').textContent);
     });
-    $('checkOut').addEventListener('click', async () => {
+    $('checkOut')?.addEventListener('click', async () => {
         await teacherAttendance.refreshAttendance();
         if (!$('checkOut').disabled) teacherAttendance.attendanceDialog('check-out');
         else showToast($('attendanceState').textContent);
@@ -987,6 +1279,7 @@
             add('journal', 'isi-ejurnal', 'bi-journal-text', 'E-Jurnal & Presensi Kelas', 'Isi jurnal dan presensi siswa pada jadwal mengajar yang ditugaskan.');
             add('substitute-approvals', 'view-dashboard-kurikulum', 'bi-person-badge', 'Guru Pengganti', 'Tinjau dan setujui delegasi guru pengganti.');
             add('monitoring', 'view-dashboard-kurikulum', 'bi-bar-chart-line', 'Monitoring Pembelajaran', 'Lihat jumlah jadwal, jurnal, dan presensi hari ini.');
+            add('journal-monitoring', 'view-dashboard-kurikulum', 'bi-journal-check', 'Monitoring E-Jurnal', 'Pantau status jurnal mengajar guru berdasarkan tanggal kegiatan.');
             add('discrepancy', 'view-audit-discrepancy', 'bi-clipboard2-data', 'Audit Discrepancy', 'Tinjau dan tindak lanjuti kasus yang tersedia.');
             add('academic-master', 'kelola-master-data', 'bi-database', 'Master Data Akademik', 'Kelola kelas, siswa, mapel, materi, dan jadwal.');
             add('years', 'kelola-tahun-ajaran', 'bi-calendar3', 'Tahun Ajaran', 'Buat tahun ajaran dan aktifkan melalui sinkronisasi.');
@@ -997,6 +1290,7 @@
             add('journal', 'isi-ejurnal', 'bi-journal-text', 'E-Jurnal & Presensi Kelas', 'Isi jurnal dan presensi siswa pada jadwal mengajar yang ditugaskan.');
             add('substitute-approvals', 'kelola-pengajuan-izin', 'bi-person-badge', 'Guru Pengganti', 'Tinjau dan setujui delegasi guru pengganti.');
             add('monitoring', 'view-dashboard-kurikulum', 'bi-speedometer2', 'Dashboard Eksekutif', 'Lihat jumlah jadwal, jurnal, dan presensi hari ini.');
+            add('journal-monitoring', 'view-dashboard-kurikulum', 'bi-journal-check', 'Monitoring E-Jurnal', 'Pantau status jurnal mengajar guru berdasarkan tanggal kegiatan.');
             add('discrepancy', 'view-audit-discrepancy', 'bi-clipboard2-data', 'Audit Pembelajaran', 'Tinjau dan tindak lanjuti kasus yang tersedia.');
             add('leave-approvals', 'kelola-pengajuan-izin', 'bi-file-earmark-check', 'Persetujuan Perizinan', 'Verifikasi pengajuan cuti dan dinas guru.');
         }
@@ -1004,6 +1298,7 @@
             add('journal', 'isi-ejurnal', 'bi-journal-text', 'E-Jurnal & Presensi Kelas', 'Isi jurnal dan presensi siswa pada jadwal mengajar yang ditugaskan.');
             add('admin-users', 'kelola-master-data', 'bi-person-gear', 'Kelola User & Akses', 'Kelola akun, reset kata sandi, role, dan permission.');
             add('substitute-approvals', 'kelola-master-data', 'bi-person-badge', 'Guru Pengganti', 'Tinjau dan setujui delegasi guru pengganti.');
+            add('journal-monitoring', 'kelola-master-data', 'bi-journal-check', 'Monitoring E-Jurnal', 'Pantau status jurnal mengajar guru berdasarkan tanggal kegiatan.');
             add('flagged', 'review-absensi-flagged', 'bi-shield-check', 'Moderasi Presensi', 'Tinjau foto presensi masuk dan pulang yang belum diverifikasi.');
             add('academic-master', 'kelola-master-data', 'bi-database', 'Master Data Akademik', 'Kelola kelas, siswa, mapel, materi, dan jadwal.');
             add('years', 'kelola-tahun-ajaran', 'bi-calendar3', 'Tahun Ajaran', 'Buat tahun ajaran dan aktivasi tersinkron.');
@@ -1034,6 +1329,9 @@
         }));
         window.addEventListener('aksara:open-substitutes', () => {
             openSubstituteApprovals();
+        });
+        window.addEventListener('aksara:open-journal-monitoring', () => {
+            openJournalMonitoring();
         });
 
         const labels = { guru: 'Dashboard Guru', kurikulum: 'Dashboard Kurikulum', kepsek: 'Dashboard Kepala Sekolah', admin: 'Dashboard Admin / TU' };
@@ -1115,7 +1413,9 @@
             renderRoleModules(user);
             $('loading').hidden = true;
             $('dashboard').hidden = false;
-            teacherAttendance.refreshAttendance();
+            if ($('checkIn') && $('checkOut') && $('attendanceState')) {
+                teacherAttendance.refreshAttendance();
+            }
             notifications.loadHomeAnnouncements();
             if (activeRoleNames.some((item) => ['guru', 'admin', 'kurikulum'].includes(item))) loadHomeSchedules();
             else $('homeScheduleCard').hidden = true;

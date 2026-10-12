@@ -5,6 +5,14 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
     let checkInWindowTimer;
 
     async function refreshAttendance() {
+        const attendanceState = $('attendanceState');
+        const checkInButton = $('checkIn');
+        const checkOutButton = $('checkOut');
+        const correctionActions = $('attendanceCorrectionActions');
+        if (!attendanceState || !checkInButton || !checkOutButton || !correctionActions) {
+            return;
+        }
+
         try {
             const result = await api('/api/v1/teacher/attendance/today');
             maxGpsAccuracy = Number(result.gps_accuracy_limit_meters) || 40;
@@ -58,6 +66,7 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
 
     function renderCorrectionActions(item) {
         const container = $('attendanceCorrectionActions');
+        if (!container) return;
         const sessions = ['masuk', 'pulang'].filter((session) => item[`status_verifikasi_${session}`] === 'REJECTED');
         if (!sessions.length) {
             container.hidden = true;

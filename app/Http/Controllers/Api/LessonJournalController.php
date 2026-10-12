@@ -153,6 +153,124 @@ class LessonJournalController extends Controller
     }
 
     /**
+     * Endpoint GET /api/v1/lesson-journals.
+     * Menampilkan seluruh jurnal milik guru, termasuk draft lama dan final yang sudah diselesaikan,
+     * sehingga guru dapat melanjutkan jurnal berdasarkan tanggal pembelajaran asli, bukan tanggal saat mengisi.
+     */
+    public function index(Request $request)
+    {
+        abort_unless($request->user()->can('isi-ejurnal'), 403);
+
+        $validated = $request->validate([
+            'status' => ['nullable', 'in:all,draft,final,berlangsung,selesai,flagged'],
+            'tanggal' => ['nullable', 'date'],
+            'tanggal_mulai' => ['nullable', 'date'],
+            'tanggal_selesai' => ['nullable', 'date'],
+            'kelas_id' => ['nullable', 'integer', 'exists:kelas,id'],
+            'mata_pelajaran_id' => ['nullable', 'integer', 'exists:mata_pelajarans,id'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $query = JurnalMengajar::query()
+            ->with(['jadwalPelajaran.kelas:id,nama_kelas,tingkat,jurusan', 'jadwalPelajaran.mataPelajaran:id,nama_mapel'])
+            ->withCount('presensiSiswas')
+            ->where(fn ($journalQuery) => $journalQuery
+                ->where('user_id', $request->user()->id)
+                ->orWhere('guru_pengganti_id', $request->user()->id)
+            )
+            ->orderByDesc('tanggal')
+            ->orderByDesc('updated_at');
+
+        $status = $validated['status'] ?? 'all';
+        if ($status !== 'all') {
+            $normalizedStatus = match ($status) {
+                'draft', 'berlangsung' => 'berlangsung',
+                'final', 'selesai' => 'selesai',
+                'flagged' => 'flagged',
+                default => null,
+            };
+
+            if ($normalizedStatus !== null) {
+                $query->where('status_sesi', $normalizedStatus);
+            }
+        }
+
+        if (! empty($validated['tanggal'])) {
+            $query->whereDate('tanggal', $validated['tanggal']);
+        }
+
+        if (! empty($validated['tanggal_mulai'])) {
+            $query->whereDate('tanggal', '>=', $validated['tanggal_mulai']);
+        }
+
+        if (! empty($validated['tanggal_selesai'])) {
+            $query->whereDate('tanggal', '<=', $validated['tanggal_selesai']);
+        }
+
+        if (! empty($validated['kelas_id'])) {
+            $query->whereHas('jadwalPelajaran', fn ($scheduleQuery) => $scheduleQuery->where('kelas_id', $validated['kelas_id']));
+        }
+
+        if (! empty($validated['mata_pelajaran_id'])) {
+            $query->where('materi_pelajaran_id', $validated['mata_pelajaran_id'])
+                ->orWhereHas('jadwalPelajaran', fn ($scheduleQuery) => $scheduleQuery->where('mata_pelajaran_id', $validated['mata_pelajaran_id']));
+        }
+
+        if (! empty($validated['search'])) {
+            $search = trim($validated['search']);
+            $query->where(function ($searchQuery) use ($search): void {
+                $searchQuery->where('materi_pembahasan', 'like', "%{$search}%")
+                    ->orWhereHas('jadwalPelajaran.kelas', fn ($kelasQuery) => $kelasQuery->where('nama_kelas', 'like', "%{$search}%"))
+                    ->orWhereHas('jadwalPelajaran.mataPelajaran', fn ($subjectQuery) => $subjectQuery->where('nama_mapel', 'like', "%{$search}%"));
+            });
+        }
+
+        $perPage = $validated['per_page'] ?? 20;
+        $journals = $query->paginate($perPage);
+
+        $data = $journals->getCollection()->map(function (JurnalMengajar $journal): array {
+            $kelas = $journal->jadwalPelajaran?->kelas;
+            $mataPelajaran = $journal->jadwalPelajaran?->mataPelajaran;
+            $totalSiswa = $kelas ? DB::table('siswas')->where('kelas_id', $kelas->id)->count() : 0;
+            $presensiCount = (int) ($journal->presensi_siswas_count ?? $journal->presensiSiswas->count());
+            $lengkap = $totalSiswa > 0 && $presensiCount === $totalSiswa;
+
+            return [
+                'id' => $journal->id,
+                'tanggal' => $journal->tanggal instanceof \Carbon\Carbon ? $journal->tanggal->toDateString() : (string) $journal->tanggal,
+                'status_sesi' => $journal->status_sesi,
+                'status_label' => $journal->status_sesi === 'berlangsung' ? 'Draft' : ($journal->status_sesi === 'selesai' ? 'Final' : ucfirst($journal->status_sesi)),
+                'materi_pembahasan' => $journal->materi_pembahasan,
+                'catatan_kejadian_kelas' => $journal->catatan_kejadian_kelas,
+                'kelas' => $kelas ? ['id' => $kelas->id, 'nama_kelas' => $kelas->nama_kelas] : null,
+                'mata_pelajaran' => $mataPelajaran ? ['id' => $mataPelajaran->id, 'nama_mapel' => $mataPelajaran->nama_mapel] : null,
+                'presensi_count' => $presensiCount,
+                'total_siswa' => $totalSiswa,
+                'lengkap' => $lengkap,
+                'foto_kegiatan' => $journal->foto_kegiatan,
+                'jam_mulai_realisasi' => $journal->jam_mulai_realisasi,
+                'jam_selesai_realisasi' => $journal->jam_selesai_realisasi,
+                'updated_at' => $journal->updated_at?->toIso8601String(),
+                'created_at' => $journal->created_at?->toIso8601String(),
+            ];
+        })->all();
+
+        $journals->setCollection(collect($data));
+
+        return response()->json([
+            'data' => $data,
+            'meta' => [
+                'total' => $journals->total(),
+                'per_page' => $journals->perPage(),
+                'current_page' => $journals->currentPage(),
+                'last_page' => $journals->lastPage(),
+                'status' => $status,
+            ],
+        ]);
+    }
+
+    /**
      * Endpoint GET /api/v1/lesson-journals/{jurnalMengajar}.
      * Menampilkan draf jurnal yang sudah tersimpan agar UI dapat melanjutkan pengisian tanpa mengulang input.
      */
