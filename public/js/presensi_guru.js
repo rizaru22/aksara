@@ -140,10 +140,14 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
                     if (preflight) {
                         status.textContent = 'Akurasi GPS tercapai. Memeriksa jarak ke area sekolah…';
                         const check = await api('/api/v1/teacher/attendance/location-check', { method: 'POST', body: location });
-                        if (!check.within) {
+                        if (!check.accepted) {
                             const distance = Math.round(check.distance_meters);
                             finish(reject, new Error(`Lokasi berada di luar area sekolah (${distance} m dari titik sekolah, batas ${check.radius_meters} m).`));
                             return;
+                        }
+                        if (!check.within) {
+                            const distance = Math.round(check.distance_meters);
+                            status.textContent = `Lokasi di luar area sekolah (${distance} m dari titik sekolah, batas ${check.radius_meters} m), tetapi mode non-strict aktif. Presensi akan ditandai untuk review admin.`;
                         }
                     }
                     finish(resolve, location);

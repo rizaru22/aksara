@@ -115,7 +115,8 @@ class TeacherAttendanceController extends Controller
 
         $now = now(config('app.timezone'));
         $geo = $this->geofence($distance, (float) $validated['latitude'], (float) $validated['longitude']);
-        if (! $geo['within']) {
+        $strict = filter_var(Setting::value('is_geofence_strict', false), FILTER_VALIDATE_BOOLEAN);
+        if (! $geo['within'] && $strict) {
             throw ValidationException::withMessages(['location' => 'Anda berada di luar radius geofence sekolah.']);
         }
 
@@ -164,7 +165,7 @@ class TeacherAttendanceController extends Controller
                     'distance_masuk' => $geo['distance'],
                     'gps_accuracy_masuk' => $validated['accuracy'],
                     'liveness_type_masuk' => $validated['liveness_type'],
-                    'status_verifikasi_masuk' => 'PENDING',
+                    'status_verifikasi_masuk' => $geo['within'] ? 'PENDING' : 'FLAGGED',
                     'keterlambatan_menit' => $lateMinutes,
                 ])->save();
                 $record->livenessLogs()->create([
@@ -198,7 +199,8 @@ class TeacherAttendanceController extends Controller
 
         $now = now(config('app.timezone'));
         $geo = $this->geofence($distance, (float) $validated['latitude'], (float) $validated['longitude']);
-        if (! $geo['within']) {
+        $strict = filter_var(Setting::value('is_geofence_strict', false), FILTER_VALIDATE_BOOLEAN);
+        if (! $geo['within'] && $strict) {
             throw ValidationException::withMessages(['location' => 'Anda berada di luar radius geofence sekolah.']);
         }
 
@@ -258,7 +260,7 @@ class TeacherAttendanceController extends Controller
                     'distance_pulang' => $geo['distance'],
                     'gps_accuracy_pulang' => $validated['accuracy'],
                     'liveness_type_pulang' => $validated['liveness_type'],
-                    'status_verifikasi_pulang' => 'PENDING',
+                    'status_verifikasi_pulang' => $geo['within'] ? 'PENDING' : 'FLAGGED',
                     'status_waktu_pulang' => $checkoutStatus,
                     'alasan_pulang_awal' => $validated['reason'] ?? null,
                 ])->save();

@@ -18,7 +18,13 @@ class TeacherAttendanceTest extends TestCase
         $user = $this->userWith('kurikulum', ['absen-masuk', 'absen-pulang']);
         $this->setGeofence();
         $this->actingAs($user, 'sanctum');
-        $payload = ['latitude' => 0, 'longitude' => 0];
+        $payload = [
+            'latitude' => 0,
+            'longitude' => 0,
+            'accuracy' => 5,
+            'photo' => \Illuminate\Http\UploadedFile::fake()->image('checkin.jpg', 1200, 800),
+            'liveness_type' => 'BLINK',
+        ];
 
         $this->postJson('/api/v1/teacher/attendance/check-in', $payload)->assertCreated();
         $this->assertDatabaseCount('absensis', 1);
@@ -35,7 +41,7 @@ class TeacherAttendanceTest extends TestCase
         $admin = $this->userWith('admin', ['review-absensi-flagged']);
         $this->setGeofence(strict: false);
 
-        $this->actingAs($teacher, 'sanctum')->postJson('/api/v1/teacher/attendance/check-in', ['latitude' => 1, 'longitude' => 1])->assertCreated();
+        $this->actingAs($teacher, 'sanctum')->postJson('/api/v1/teacher/attendance/check-in', $this->attendanceCheckInPayload(['latitude' => 1, 'longitude' => 1]))->assertCreated();
         $this->assertDatabaseHas('absensis', ['user_id' => $teacher->id, 'status_verifikasi_masuk' => 'FLAGGED']);
 
         $attendance = \App\Models\Absensi::query()->firstOrFail();
@@ -51,7 +57,7 @@ class TeacherAttendanceTest extends TestCase
         $user = $this->userWith('guru', ['absen-masuk']);
         $this->setGeofence(strict: true);
 
-        $this->actingAs($user, 'sanctum')->postJson('/api/v1/teacher/attendance/check-in', ['latitude' => 1, 'longitude' => 1])->assertUnprocessable();
+        $this->actingAs($user, 'sanctum')->postJson('/api/v1/teacher/attendance/check-in', $this->attendanceCheckInPayload(['latitude' => 1, 'longitude' => 1]))->assertUnprocessable();
         $this->assertDatabaseCount('absensis', 0);
     }
 
@@ -60,7 +66,7 @@ class TeacherAttendanceTest extends TestCase
         $user = $this->userWith('guru', ['absen-masuk']);
 
         $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/teacher/attendance/check-in', ['latitude' => 0, 'longitude' => 0])
+            ->postJson('/api/v1/teacher/attendance/check-in', $this->attendanceCheckInPayload(['latitude' => 0, 'longitude' => 0]))
             ->assertStatus(503);
         $this->assertDatabaseCount('absensis', 0);
     }
@@ -72,6 +78,17 @@ class TeacherAttendanceTest extends TestCase
         ] as [$key, $value]) {
             Setting::query()->create(['key' => $key, 'value' => $value, 'group' => 'test', 'type' => 'string', 'label' => $key]);
         }
+    }
+
+    private function attendanceCheckInPayload(array $overrides = []): array
+    {
+        return array_merge([
+            'latitude' => 0,
+            'longitude' => 0,
+            'accuracy' => 5,
+            'photo' => \Illuminate\Http\UploadedFile::fake()->image('attendance.jpg', 1200, 800),
+            'liveness_type' => 'BLINK',
+        ], $overrides);
     }
 
     private function userWith(string $roleName, array $permissionNames): User

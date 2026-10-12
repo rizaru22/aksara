@@ -145,6 +145,8 @@ class LessonJournalController extends Controller
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
             'accuracy' => ['required', 'numeric', 'min:0', 'max:3'],
+            'darurat' => ['nullable', 'boolean'],
+            'catatan_penutupan' => ['nullable', 'string', 'max:2000'],
         ]);
         if ($jurnalMengajar->status_sesi !== 'berlangsung') {
             throw new ConflictHttpException('Hanya draf jurnal yang dapat difinalisasi.');
@@ -152,7 +154,8 @@ class LessonJournalController extends Controller
         $now = now(config('app.timezone'));
         $schedule = $jurnalMengajar->jadwalPelajaran()->firstOrFail();
         $this->authorizeSchedule($request, $schedule, $now, $cycles);
-        $this->authorizeFinalizationWindow($schedule, $now);
+        $isEmergency = filter_var($data['darurat'] ?? false, FILTER_VALIDATE_BOOLEAN) || filled($data['catatan_penutupan'] ?? null);
+        $this->authorizeFinalizationWindow($schedule, $now, $isEmergency);
         $distanceMeters = $this->verifyFinalizationLocation($data, $distance);
 
         $expectedIds = DB::table('siswas')->where('kelas_id', $schedule->kelas_id)->pluck('id')->map(fn ($id) => (int) $id)->sort()->values();
@@ -176,6 +179,7 @@ class LessonJournalController extends Controller
                     'jarak_geofence_finalisasi' => $distanceMeters,
                     'jam_selesai_realisasi' => $now,
                     'status_sesi' => 'selesai',
+                    'catatan_penutupan' => $data['catatan_penutupan'] ?? null,
                 ])->save();
 
                 return $journal->load(['jadwalPelajaran.kelas', 'jadwalPelajaran.mataPelajaran', 'presensiSiswas.siswa']);
@@ -185,7 +189,11 @@ class LessonJournalController extends Controller
             throw $exception;
         }
 
-        return response()->json(['message' => 'Jurnal dan presensi siswa berhasil difinalisasi.', 'data' => $journal]);
+        $message = ($data['darurat'] ?? false) || filled($data['catatan_penutupan'] ?? null)
+            ? 'Jurnal dan presensi siswa berhasil difinalisasi dengan catatan darurat.'
+            : 'Jurnal dan presensi siswa berhasil difinalisasi.';
+
+        return response()->json(['message' => $message, 'data' => $journal]);
     }
 
     public function updateStudentAttendance(Request $request, PresensiSiswa $presensiSiswa)
@@ -244,15 +252,19 @@ class LessonJournalController extends Controller
         }
     }
 
-    private function authorizeFinalizationWindow(JadwalPelajaran $schedule, Carbon $now): void
+    private function authorizeFinalizationWindow(JadwalPelajaran $schedule, Carbon $now, bool $isEmergency = false): void
     {
         $sessionStart = Carbon::parse($now->toDateString().' '.$schedule->jam_mulai, config('app.timezone'));
         $sessionEnd = Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
         $windowStart = $sessionEnd->copy()->subMinutes(30);
         if ($windowStart->lt($sessionStart)) $windowStart = $sessionStart;
 
-        if ($now->lt($windowStart) || $now->gt($sessionEnd)) {
+        if (! $isEmergency && ($now->lt($windowStart) || $now->gt($sessionEnd))) {
             throw new ConflictHttpException('Finalisasi jurnal dibuka pukul '.$windowStart->format('H:i').' dan ditutup pukul '.$sessionEnd->format('H:i').'.');
+        }
+
+        if ($isEmergency && $now->gt($sessionEnd)) {
+            return;
         }
     }
 

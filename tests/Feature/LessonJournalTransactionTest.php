@@ -20,7 +20,7 @@ class LessonJournalTransactionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_journal_and_complete_student_attendance_are_created_together(): void
+    public function test_journal_and_complete_student_attendance_are_created_as_draft(): void
     {
         [$teacher, $schedule, $students] = $this->prepareSession();
         $this->actingAs($teacher, 'sanctum');
@@ -33,7 +33,7 @@ class LessonJournalTransactionTest extends TestCase
 
         $this->assertDatabaseCount('jurnal_mengajars', 1);
         $this->assertDatabaseCount('presensi_siswas', 2);
-        $this->assertDatabaseHas('jurnal_mengajars', ['jadwal_pelajaran_id' => $schedule->id, 'status_sesi' => 'selesai']);
+        $this->assertDatabaseHas('jurnal_mengajars', ['jadwal_pelajaran_id' => $schedule->id, 'status_sesi' => 'berlangsung']);
     }
 
     public function test_incomplete_or_cross_class_roster_is_rejected_without_partial_records(): void
@@ -47,6 +47,39 @@ class LessonJournalTransactionTest extends TestCase
 
         $this->assertDatabaseCount('jurnal_mengajars', 0);
         $this->assertDatabaseCount('presensi_siswas', 0);
+    }
+
+    public function test_journal_can_be_finalized_outside_normal_window_when_emergency_is_declared(): void
+    {
+        [$teacher, $schedule, $students] = $this->prepareSession();
+        $now = Carbon::now(config('app.timezone'));
+        $schedule->update([
+            'jam_mulai' => $now->copy()->subMinutes(15)->format('H:i'),
+            'jam_selesai' => $now->copy()->addMinutes(40)->format('H:i'),
+        ]);
+
+        Setting::query()->updateOrCreate(['key' => 'geofence_location_verified'], ['value' => '1', 'group' => 'school', 'type' => 'boolean', 'label' => 'Lokasi sekolah diverifikasi']);
+        Setting::query()->updateOrCreate(['key' => 'geofence_latitude'], ['value' => '0.00000000', 'group' => 'school', 'type' => 'decimal', 'label' => 'Lintang sekolah']);
+        Setting::query()->updateOrCreate(['key' => 'geofence_longitude'], ['value' => '0.00000000', 'group' => 'school', 'type' => 'decimal', 'label' => 'Bujur sekolah']);
+        Setting::query()->updateOrCreate(['key' => 'geofence_radius_meters'], ['value' => '100', 'group' => 'school', 'type' => 'integer', 'label' => 'Radius geofence']);
+
+        $this->actingAs($teacher, 'sanctum');
+        $draftId = $this->postJson('/api/v1/lesson-journals', [
+            'jadwal_pelajaran_id' => $schedule->id,
+            'materi_pembahasan' => 'Pengenalan basis data relasional dan primary key.',
+            'presensi' => $students->map(fn (Siswa $student) => ['siswa_id' => $student->id, 'status' => 'HADIR'])->all(),
+        ])->assertCreated()->json('data.id');
+
+        $this->postJson('/api/v1/lesson-journals/'.$draftId.'/finalize', [
+            'foto_kegiatan' => \Illuminate\Http\UploadedFile::fake()->image('journal.jpg', 1200, 800),
+            'latitude' => 0.0001,
+            'longitude' => 0.0001,
+            'accuracy' => 1,
+            'darurat' => true,
+            'catatan_penutupan' => 'Guru harus meninggalkan kelas karena bencana alam lokal.',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('jurnal_mengajars', ['id' => $draftId, 'status_sesi' => 'selesai']);
     }
 
     private function prepareSession(): array
