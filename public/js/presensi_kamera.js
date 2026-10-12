@@ -13,8 +13,8 @@ window.createAksaraAttendanceCapture = function () {
                     baseOptions: { modelAssetPath: modelUrl, delegate: 'CPU' },
                     runningMode: 'VIDEO',
                     numFaces: 2,
-                    minFaceDetectionConfidence: 0.65,
-                    minFacePresenceConfidence: 0.65,
+                    minFaceDetectionConfidence: 0.55,
+                    minFacePresenceConfidence: 0.55,
                     minTrackingConfidence: 0.6,
                 });
             })().catch((error) => {
@@ -83,7 +83,7 @@ window.createAksaraAttendanceCapture = function () {
 
         const challenge = 'BLINK';
         let blinkOpened = false;
-        let blinkClosed = false;
+        let blinkClosedFrames = 0;
         let challengePassed = false;
         let clearFrames = 0;
         let lastTimestamp = -1;
@@ -167,8 +167,8 @@ window.createAksaraAttendanceCapture = function () {
                     const centerX = (box.minX + box.maxX) / 2;
                     const centerY = (box.minY + box.maxY) / 2;
                     const corners = [[box.minX, box.minY], [box.minX, box.maxY], [box.maxX, box.minY], [box.maxX, box.maxY]];
-                    const fitsCircle = Math.max(...corners.map(([x, y]) => Math.hypot(x - 0.5, y - 0.5))) <= 0.36;
-                    const aligned = fitsCircle && centerX > 0.31 && centerX < 0.69 && centerY > 0.26 && centerY < 0.74 && width > 0.22 && width < 0.72 && height > 0.22 && height < 0.76;
+                    const fitsCircle = Math.max(...corners.map(([x, y]) => Math.hypot(x - 0.5, y - 0.5))) <= 0.4;
+                    const aligned = fitsCircle && centerX > 0.27 && centerX < 0.73 && centerY > 0.23 && centerY < 0.77 && width > 0.18 && width < 0.76 && height > 0.18 && height < 0.8;
                     if (!aligned) {
                         guide.classList.remove('is-ready');
                         clearFrames = 0;
@@ -194,10 +194,11 @@ window.createAksaraAttendanceCapture = function () {
                         const left = eyeRatio(points, [33, 133], 159, 145, 158, 153);
                         const right = eyeRatio(points, [362, 263], 386, 374, 387, 373);
                         const ratio = (left + right) / 2;
-                        if (ratio > 0.19) blinkOpened = true;
-                        if (blinkOpened && ratio < 0.14) blinkClosed = true;
-                        if (blinkOpened && blinkClosed && ratio > 0.19) challengePassed = true;
-                        status.textContent = challengePassed ? 'Liveness terdeteksi. Tahan wajah tetap di dalam lingkaran…' : 'Kedipkan mata satu kali untuk verifikasi liveness.';
+                        if (ratio > 0.18) blinkOpened = true;
+                        if (blinkOpened && ratio < 0.18) blinkClosedFrames++;
+                        else blinkClosedFrames = 0;
+                        if (blinkClosedFrames >= 2) challengePassed = true;
+                        status.textContent = challengePassed ? 'Kedipan terdeteksi. Tahan wajah sebentar…' : 'Kedipkan mata satu kali.';
                     } else {
                         clearFrames++;
                         status.textContent = clearFrames >= 8 ? 'Liveness berhasil. Mengambil foto…' : 'Liveness terdeteksi. Tahan wajah tetap di dalam lingkaran…';
