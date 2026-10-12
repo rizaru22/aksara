@@ -276,7 +276,7 @@
         const module = dashboardModules.find((item) => item.key === action);
         if (action === 'home') return renderAdminHome();
         if (action === 'reports') return adminReports.open();
-        if (action === 'student-attendance-report') return adminReports.open('student-monthly');
+        if (action === 'student-attendance-report') return adminReports.open('student-monthly', { dedicatedStudent: true });
         if (action === 'substitute-approvals') return openSubstituteApprovals();
         if (['classes', 'students', 'subjects', 'materials', 'schedules'].includes(action)) return academicData.openMaster(action);
         if (module) return openModule(module);
@@ -1264,7 +1264,7 @@
             if (module.key === 'substitute-approvals') return openSubstituteApprovals();
             if (module.key === 'journal-monitoring') return openJournalMonitoring();
             if (module.key === 'student-attendance') return openWaliSessions();
-            if (module.key === 'student-attendance-report') return adminReports.open('student-monthly');
+            if (module.key === 'student-attendance-report') return adminReports.open('student-monthly', { dedicatedStudent: true });
             if (module.key === 'settings') return openSettings();
         } catch (error) { setFeature(module.title, `<div class="alert alert-danger mb-0">${htmlSafe(error.message)}</div>`); }
     }
