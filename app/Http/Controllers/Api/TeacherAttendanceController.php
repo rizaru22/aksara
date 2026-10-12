@@ -158,7 +158,7 @@ class TeacherAttendanceController extends Controller
                     'distance_masuk' => $geo['distance'],
                     'gps_accuracy_masuk' => $validated['accuracy'],
                     'liveness_type_masuk' => $validated['liveness_type'],
-                    'status_verifikasi_masuk' => $geo['within'] ? 'VERIFIED' : 'FLAGGED',
+                    'status_verifikasi_masuk' => 'UNVERIFIED',
                     'keterlambatan_menit' => $lateMinutes,
                 ])->save();
                 $record->livenessLogs()->create([
@@ -252,7 +252,7 @@ class TeacherAttendanceController extends Controller
                     'distance_pulang' => $geo['distance'],
                     'gps_accuracy_pulang' => $validated['accuracy'],
                     'liveness_type_pulang' => $validated['liveness_type'],
-                    'status_verifikasi_pulang' => 'VERIFIED',
+                    'status_verifikasi_pulang' => 'UNVERIFIED',
                     'status_waktu_pulang' => $checkoutStatus,
                     'alasan_pulang_awal' => $validated['reason'] ?? null,
                 ])->save();
@@ -276,7 +276,9 @@ class TeacherAttendanceController extends Controller
     {
         $items = Absensi::query()
             ->with('user:id,nama,nip,email')
-            ->where(fn ($query) => $query->where('status_verifikasi_masuk', 'FLAGGED')->orWhere('status_verifikasi_pulang', 'FLAGGED'))
+            ->where(fn ($query) => $query
+                ->whereIn('status_verifikasi_masuk', ['UNVERIFIED', 'FLAGGED'])
+                ->orWhereIn('status_verifikasi_pulang', ['UNVERIFIED', 'FLAGGED']))
             ->latest('tanggal')
             ->paginate(20);
 
@@ -292,8 +294,8 @@ class TeacherAttendanceController extends Controller
         ]);
 
         $column = $data['session'] === 'masuk' ? 'status_verifikasi_masuk' : 'status_verifikasi_pulang';
-        if ($absensi->{$column} !== 'FLAGGED') {
-            throw ValidationException::withMessages(['decision' => 'Hanya presensi berstatus FLAGGED yang dapat ditinjau.']);
+        if (! in_array($absensi->{$column}, ['UNVERIFIED', 'FLAGGED'], true)) {
+            throw ValidationException::withMessages(['decision' => 'Presensi ini sudah ditinjau atau tidak menunggu verifikasi.']);
         }
 
         $absensi->forceFill([

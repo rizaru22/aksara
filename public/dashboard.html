@@ -15,7 +15,7 @@
 
 
 
-    <link rel="stylesheet" href="css/dashboard.css?v=20261012-attendance-fullscreen">
+    <link rel="stylesheet" href="css/dashboard.css?v=20261012-schedule-action-contrast">
     <link rel="stylesheet" href="css/dashboard-admin.css?v=20261011-datatables-pagination">
 </head>
 <body>
@@ -31,7 +31,7 @@
         <div id="loadError" class="error" hidden></div>
         <div id="dashboard" hidden>
             <section class="page active" id="page-home">
-                <div class="welcome"><div class="welcome-copy"><div class="eyebrow" id="greeting">Selamat pagi,</div><h1 id="userName">Pengguna</h1></div><div class="avatar-wrap"><div class="avatar" id="welcomeAvatar"><i class="bi bi-person-fill" aria-hidden="true"></i><img id="welcomePhotoImage" alt="Foto profil guru" hidden></div></div></div>
+                <div class="welcome"><div class="welcome-copy"><div class="eyebrow" id="greeting">Selamat pagi,</div><h1 id="userName">Pengguna</h1></div><div class="avatar-wrap"><div class="avatar" id="welcomeAvatar"><i class="bi bi-person-fill" aria-hidden="true"></i><img id="welcomePhotoImage" alt="Foto profil guru" loading="lazy" decoding="async" fetchpriority="low" hidden></div></div></div>
                 <div class="row g-3 mb-3"><div class="col-sm-12"><section class="card"><div class="card-body"><h2 class="card-heading"><span class="heading-icon"><i class="bi bi-clock-history"></i></span><span class="card-heading-copy"><span>Presensi Harian</span></span></h2><p class="attendance-state" id="attendanceState">Memuat status hari ini</p><div class="row g-3 action-card"><div class="col-sm-6 col-md-6 col-xl-6"><button class="btn btn-success w-100" id="checkIn"><i class="bi bi-box-arrow-in-right"></i> Absen Masuk</button></div><div class="col-sm-6 col-md-6 col-xl-6"><button class="btn btn-primary w-100" id="checkOut"><i class="bi bi-box-arrow-right"></i> Absen Pulang</button></div></div></div></section></div></div>
                 <section class="row g-3" id="homeScheduleCard" hidden><div class="col-sm-12"><article class="card"><div class="card-body"><h2 class="card-heading"><span class="heading-icon"><i class="bi bi-calendar-week"></i></span>Jadwal Mengajar Hari Ini<button class="btn btn-sm btn-outline-success ms-auto" id="refreshSchedule">Muat ulang</button></h2><p class="card-description" id="scheduleCaption">Per kelas sesuai jadwal aktif</p><div class="schedule" id="homeScheduleList"></div></div></article></div></section>
                 <section class="row g-3 mb-3" id="teacherLeaveCard" hidden><div class="col-sm-12"><article class="card"><div class="card-body"><h2 class="card-heading"><span class="heading-icon"><i class="bi bi-calendar2-check"></i></span><span>Pengajuan Izin, Cuti & Dinas Luar</span></h2><p class="card-description">Ajukan permohonan atau pantau keputusan admin.</p><div class="leave-actions"><button type="button" class="btn btn-outline-success" id="openLeavePageButton"><i class="bi bi-box-arrow-up-right"></i> Buka halaman perizinan</button></div><p class="form-text mt-2 mb-0">Pengajuan dinas luar berstatus menunggu sampai disetujui. Pengajuan izin, cuti, dan sakit juga tidak dapat diajukan dua kali pada tanggal yang bertumpang tindih.</p></div></article></div></section>
@@ -64,7 +64,7 @@
                 <div id="reportsContent" aria-live="polite"></div>
             </section>
             <section class="page" id="page-profile">
-                <article class="card profile-card"><div class="avatar" id="profileAvatar"><i class="bi bi-person-fill"></i><img id="profilePhotoImage" alt="Foto profil" hidden></div><h2 id="profileName">Pengguna</h2><p id="profileRole">Pengguna AKSARA</p><input class="visually-hidden" id="profilePhotoInput" type="file" accept="image/jpeg,image/png,image/webp"><button class="btn btn-outline-success mt-3" type="button" id="changeProfilePhoto"><i class="bi bi-camera"></i> Unggah / Ganti Foto</button><div class="small text-secondary mt-2" id="profilePhotoStatus">JPG, PNG, atau WebP · Maksimal 5 MB</div><div class="profile-meta"><div class="profile-row"><span>Email</span><strong id="profileEmail">—</strong></div><div class="profile-row"><span>NIP</span><strong id="profileNip">—</strong></div></div><button class="logout" id="btnLogout"><i class="bi bi-box-arrow-right"></i> Keluar</button></article>
+                <article class="card profile-card"><div class="avatar" id="profileAvatar"><i class="bi bi-person-fill"></i><img id="profilePhotoImage" alt="Foto profil" loading="lazy" decoding="async" fetchpriority="low" hidden></div><h2 id="profileName">Pengguna</h2><p id="profileRole">Pengguna AKSARA</p><input class="visually-hidden" id="profilePhotoInput" type="file" accept="image/jpeg,image/png,image/webp"><button class="btn btn-outline-success mt-3" type="button" id="changeProfilePhoto"><i class="bi bi-camera"></i> Unggah / Ganti Foto</button><div class="small text-secondary mt-2" id="profilePhotoStatus">JPG, PNG, atau WebP · Maksimal 5 MB</div><div class="profile-meta"><div class="profile-row"><span>Email</span><strong id="profileEmail">—</strong></div><div class="profile-row"><span>NIP</span><strong id="profileNip">—</strong></div></div><button class="logout" id="btnLogout"><i class="bi bi-box-arrow-right"></i> Keluar</button></article>
                 <article class="card profile-password-card text-center">
                     <h2 class="card-heading justify-content-center"><span class="heading-icon"><i class="bi bi-shield-lock"></i></span>Keamanan akun</h2>
                     <p class="text-secondary small">Perbarui kata sandi untuk menjaga keamanan akun Anda.</p>
@@ -117,7 +117,7 @@
 <script src="js/dashboard_admin.js?v=20261011-sunday-off" defer></script>
 <script src="js/admin_reports.js?v=20261011-report-print-pdf" defer></script>
 <script src="js/kelola_user_akses.js?v=20261011-multi-role" defer></script>
-<script src="js/moderasi_presensi.js?v=20261010-attendance-schedule" defer></script>
+<script src="js/moderasi_presensi.js?v=20261012-manual-review" defer></script>
 <script src="js/presensi_kamera.js?v=20261012-blink-faster" defer></script>
 <script src="js/presensi_guru.js?v=20261012-attendance-gps-setting" defer></script>
 <script src="js/data_akademik.js?v=20261012-schedule-time-format" defer></script>
@@ -125,6 +125,6 @@
 <script src="js/tahun_ajaran.js" defer></script>
     <script src="js/push-notifications.js?v=20261011-multi-role" defer></script>
       <script src="js/jurnal_bukti.js?v=20261012-two-stage-journal" defer></script>
-      <script src="js/dashboard.js?v=20261012-gps-accuracy-setting" defer></script>
+      <script src="js/dashboard.js?v=20261012-manual-review" defer></script>
 </body>
 </html>

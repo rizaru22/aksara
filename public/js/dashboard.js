@@ -559,7 +559,7 @@
             ['Tahun ajaran', data.tahun_ajaran], ['Semester / siklus', `${data.semester} · ${data.siklus_minggu}`],
             ['Jadwal pada hari ini', data.scheduled_sessions], ['Jurnal tercatat', data.journal_records],
             ['Guru terjadwal', data.scheduled_teachers], ['Guru dengan presensi terverifikasi', data.present_scheduled_teachers],
-            ['Presensi flagged', data.flagged_attendances], ['Agenda override KBM', data.school_agenda_overrides],
+            ['Presensi menunggu verifikasi', data.flagged_attendances], ['Agenda override KBM', data.school_agenda_overrides],
         ];
         setFeature('Monitoring Pembelajaran', `<form id="monitoringFilters" class="card mb-3 admin-form-card"><div class="card-body"><div class="row g-3 admin-form-grid"><div class="col-sm-12"><label class="form-label">Tanggal</label><input class="form-control" type="date" name="date" value="${htmlSafe(data.date)}"></div><div class="col-sm-12"><label class="form-label">Tahun ajaran</label><select class="form-select" name="tahun_ajaran_id"><option value="">Tahun aktif</option>${data.available_years.map((year) => `<option value="${year.id}" ${String(year.id) === String(filters.tahun_ajaran_id || '') ? 'selected' : ''}>${htmlSafe(year.tahun_ajaran)}${year.is_active ? ' (aktif)' : ''}</option>`).join('')}</select></div><div class="col-sm-12"><label class="form-label">Semester</label><select class="form-select" name="semester"><option value="">Default aktif</option><option ${String(filters.semester || '') === 'Ganjil' ? 'selected' : ''}>Ganjil</option><option ${String(filters.semester || '') === 'Genap' ? 'selected' : ''}>Genap</option></select></div><div class="col-sm-12 form-actions"><button class="btn btn-outline-success">Terapkan filter</button></div></div></div></form><div class="alert alert-info">Angka di bawah adalah hitungan sumber untuk tanggal ${htmlSafe(data.date)}. Persentase KPI menunggu rumus resmi.</div><div class="row g-3">${rows.map(([label, value]) => `<div class="col-sm-12"><div class="card"><div class="card-body d-flex justify-content-between"><span>${htmlSafe(label)}</span><strong>${htmlSafe(value)}</strong></div></div></div>`).join('')}</div>`);
         $('monitoringFilters').addEventListener('submit', (event) => { event.preventDefault(); const form = new FormData(event.currentTarget); openMonitoring(Object.fromEntries(form.entries())); });
@@ -670,7 +670,7 @@
         if (is('admin')) {
             add('journal', 'isi-ejurnal', 'bi-journal-text', 'E-Jurnal & Presensi Kelas', 'Isi jurnal dan presensi siswa pada jadwal mengajar yang ditugaskan.');
             add('admin-users', 'kelola-master-data', 'bi-person-gear', 'Kelola User & Akses', 'Kelola akun, reset kata sandi, role, dan permission.');
-            add('flagged', 'review-absensi-flagged', 'bi-shield-check', 'Moderasi Presensi', 'Tinjau presensi masuk/pulang yang berstatus FLAGGED.');
+            add('flagged', 'review-absensi-flagged', 'bi-shield-check', 'Moderasi Presensi', 'Tinjau foto presensi masuk dan pulang yang belum diverifikasi.');
             add('academic-master', 'kelola-master-data', 'bi-database', 'Master Data Akademik', 'Kelola kelas, siswa, mapel, materi, dan jadwal.');
             add('years', 'kelola-tahun-ajaran', 'bi-calendar3', 'Tahun Ajaran', 'Buat tahun ajaran dan aktivasi tersinkron.');
             add('agendas', 'kelola-agenda-sekolah', 'bi-calendar-event', 'Agenda Sekolah', 'Kelola agenda sekolah dan override KBM.');

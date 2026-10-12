@@ -196,7 +196,9 @@ class DashboardController extends Controller
         $journals = JurnalMengajar::query()->whereDate('tanggal', $date->toDateString())
             ->whereIn('jadwal_pelajaran_id', $scheduleIds)->where('status_sesi', 'selesai')->count();
         $flagged = Absensi::query()->whereDate('tanggal', $date->toDateString())
-            ->where(fn ($query) => $query->where('status_verifikasi_masuk', 'FLAGGED')->orWhere('status_verifikasi_pulang', 'FLAGGED'))->count();
+            ->where(fn ($query) => $query
+                ->whereIn('status_verifikasi_masuk', ['UNVERIFIED', 'FLAGGED'])
+                ->orWhereIn('status_verifikasi_pulang', ['UNVERIFIED', 'FLAGGED']))->count();
 
         return response()->json([
             'data' => [
