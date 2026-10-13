@@ -333,7 +333,7 @@
         }
     }
 
-    async function openTeacherJournalHistory() {
+    async function openTeacherJournalHistory(target = null) {
         try {
             const response = await api('/api/v1/lesson-journals?per_page=20');
             const journals = response.data || [];
@@ -353,8 +353,7 @@
                 </tr>`;
             }).join('') || '<tr><td colspan="7" class="text-center text-secondary py-4">Belum ada jurnal yang diampu oleh guru ini.</td></tr>';
 
-            setFeature('Jurnal Mengajar', `
-                <div class="card">
+            const content=`<div class="card">
                     <div class="card-header"><strong>Riwayat jurnal yang diampu</strong></div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -367,14 +366,37 @@
                         </div>
                     </div>
                 </div>
-            `);
+            `;
 
-            document.querySelectorAll('[data-teacher-journal]').forEach((button) => {
-                button.addEventListener('click', () => openTeacherJournalDetail(button.dataset.teacherJournal));
-            });
+            if (target) {
+                target.innerHTML = content;
+            } else {
+                setFeature('Riwayat Jurnal Mengajar', content);
+            }
+
+            const journalButtons=target
+                ? target.querySelectorAll('[data-teacher-journal]')
+                : document.querySelectorAll('[data-teacher-journal]');   
+                
+            journalButtons.forEach((button)=>
+            button.addEventListener('click', () => {
+                openTeacherJournalDetail(button.dataset.teacherJournal);
+            }));
+        
         } catch (error) {
-            setFeature('Jurnal Mengajar', `<div class="alert alert-danger mb-0">${htmlSafe(error.message)}</div>`);
+            const message=`
+                <div class="alert alert-danger mb-0">
+                ${htmlSafe(error.message)}
+                </div>
+            `;
+            if (target) {
+                target.innerHTML = message;
+            } else {
+                setFeature('Jurnal Mengajar', message);
+            }
         }
+           
+        
     }
 
     window.openTeacherJournalHistory = openTeacherJournalHistory;

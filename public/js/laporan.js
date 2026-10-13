@@ -96,41 +96,94 @@
         }
     }
 
+    function renderAttendancePage(target){
+        // HTML halaman Laporan Presensi akan dipindahkan ke sini.
+        target.innerHTML = `
+                <article class="card"><div class="card-body">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                        <div><h2 class="h5 mb-1">Laporan Presensi Harian</h2><p class="small text-secondary mb-0">Keterangan hari libur disertakan otomatis pada tanggal terkait.</p></div>
+                            <form id="attendanceReportFilter" class="d-flex gap-2">
+                                <label class="visually-hidden" for="attendanceReportMonth">Bulan laporan</label>
+                                <input class="form-control" id="attendanceReportMonth" type="month" value="${currentMonth()}" required>
+                                <button class="btn btn-outline-primary" type="submit">Tampilkan</button>
+                            </form>
+                        </div>
+                        <div id="attendanceReportList" aria-live="polite"></div>
+                    </div>
+                </article>`;
+
+        document.getElementById('attendanceReportFilter')?.addEventListener('submit', (event) => {
+            event.preventDefault();
+            loadAttendanceReport(document.getElementById('attendanceReportMonth').value);
+        });
+
+        loadAttendanceReport(document.getElementById('attendanceReportMonth').value);
+
+    }
+
+    
+    function renderReportMenu(target){
+        // Tampilan menu utama Laporan akan dibuat di sini.
+        target.innerHTML = `
+        <div class="row g-3">
+            <div class="col-12 col-md-6">
+                <button type="button"
+                    class="card h-100 w-100 text-start border-0 shadow-sm"
+                    id="openAttendanceReport">
+                    <div class="card-body p-4">
+                        <i class="bi bi-calendar-check fs-1 text-teal"></i>
+                        <h2 class="h5 mt-3 mb-2">Laporan Presensi</h2>
+                        <p class="text-secondary mb-0">
+                            Lihat rekap presensi harian berdasarkan bulan.
+                        </p>
+                        <span class="d-inline-block mt-3 text-teal fw-semibold">
+                            Lihat laporan
+                            <i class="bi bi-arrow-right"></i>
+                        </span>
+                    </div>
+                </button>
+            </div>
+
+            <div class="col-12 col-md-6">
+                <button type="button"
+                    class="card h-100 w-100 text-start border-0 shadow-sm"
+                    id="openJournalReport">
+                    <div class="card-body p-4">
+                        <i class="bi bi-journal-text fs-1 text-teal"></i>
+                        <h2 class="h5 mt-3 mb-2">Jurnal Mengajar</h2>
+                        <p class="text-secondary mb-0">
+                            Lihat riwayat jurnal dan jurnal yang masih berupa draf.
+                        </p>
+                        <span class="d-inline-block mt-3 text-teal fw-semibold">
+                            Lihat jurnal
+                            <i class="bi bi-arrow-right"></i>
+                        </span>
+                    </div>
+                </button>
+            </div>
+        </div>
+    `;
+
+        document.getElementById('openAttendanceReport')
+        ?.addEventListener('click',()=>{
+            renderAttendancePage(target);
+
+        });
+
+        document.getElementById('openJournalReport')
+        ?.addEventListener('click',()=>{
+            openTeacherJournalHistory(target);
+
+        });
+
+    }
+
     window.addEventListener('aksara:page-changed', (event) => {
         if (event.detail?.page !== 'reports') return;
         const target = document.getElementById('reportsContent');
         if (!target) return;
 
-        if (!rendered) {
-            target.innerHTML = `
-                <article class="card"><div class="card-body">
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><div><h2 class="h5 mb-1">Laporan Presensi Harian</h2><p class="small text-secondary mb-0">Keterangan hari libur disertakan otomatis pada tanggal terkait.</p></div>
-                    <form id="attendanceReportFilter" class="d-flex gap-2"><label class="visually-hidden" for="attendanceReportMonth">Bulan laporan</label><input class="form-control" id="attendanceReportMonth" type="month" value="${currentMonth()}" required><button class="btn btn-outline-primary" type="submit">Tampilkan</button></form></div>
-                    <div id="attendanceReportList" aria-live="polite"></div>
-                </div></article>
-                <div class="report-grid mt-3 ">
-                    <div class="report-tile" id="journalHistoryTile" role="button" tabindex="0"><i class="bi bi-journal-bookmark"></i><strong>Jurnal Mengajar</strong><span>Rekap kegiatan mengajar</span></div>
-                </div>`;
-            const journalHistoryTile = document.getElementById('journalHistoryTile');
-            journalHistoryTile?.addEventListener('click', () => {
-                if (typeof window.openTeacherJournalHistory === 'function') {
-                    window.openTeacherJournalHistory();
-                    return;
-                }
-                window.alert('Fungsi riwayat jurnal belum tersedia.');
-            });
-            journalHistoryTile?.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    journalHistoryTile.click();
-                }
-            });
-            document.getElementById('attendanceReportFilter')?.addEventListener('submit', (submitEvent) => {
-                submitEvent.preventDefault();
-                loadAttendanceReport(document.getElementById('attendanceReportMonth').value);
-            });
-            rendered = true;
-        }
-        loadAttendanceReport(document.getElementById('attendanceReportMonth').value);
+        renderReportMenu(target);
+      
     });
 })();

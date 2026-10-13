@@ -195,3 +195,15 @@ body.kepsek-dashboard .module-card .btn { min-height: 42px; padding: 7px 12px; f
     .leave-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
     .leave-actions .btn { width: 100%; min-height: 64px; padding: 14px 20px; font-size: clamp(1rem, 1.5vw, 1.2rem); }
 }
+
+.text-teal{
+    color: var(--teal) !important;
+}
+
+.text-deep-teal{
+    color: var(--deep-teal) !important;
+}
+
+.text-deep-teal-2{
+    color: var(--deep-teal-2) !important;
+}
