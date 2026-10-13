@@ -135,6 +135,10 @@ class TeacherAttendanceController extends Controller
             'distance_meters' => $geo['distance'],
             'radius_meters' => $geo['radius'],
             'accuracy_meters' => (float) $validated['accuracy'],
+            'accepted' => $geo['accepted'],
+            'strict_mode' => filter_var(Setting::value('is_geofence_strict', false), FILTER_VALIDATE_BOOLEAN),
+            // 'gps_accuracy_limit_meters' => $this->maxGpsAccuracyMeters(),
+            // 'journal_gps_accuracy_limit_meters' => $this->journalMaxGpsAccuracyMeters(),
         ]);
     }
 
