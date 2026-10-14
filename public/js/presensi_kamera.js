@@ -147,16 +147,28 @@ window.createAksaraAttendanceCapture = function () {
             previewContext.translate(width, 0);
             previewContext.scale(-1, 1);
 
+            
+            const scale = Math.max(
+                width / crop.width,
+                height / crop.height
+            );
+
+            const drawWidth = crop.width * scale;
+            const drawHeight = crop.height * scale;
+
+            const offsetX = (width - drawWidth) / 2;
+            const offsetY = (height - drawHeight) / 2;
+
             previewContext.drawImage(
                 video,
                 crop.x,
                 crop.y,
                 crop.width,
                 crop.height,
-                0,
-                0,
-                width,
-                height
+                offsetX,
+                offsetY,
+                drawWidth,
+                drawHeight
             );
 
             previewContext.restore();
