@@ -38,6 +38,7 @@ window.createAksaraAttendanceCapture = function () {
 
     // Menentukan area crop yang paling terlihat dari video saat object-fit menggunakan cover agar landmark tetap konsisten.
    
+    
     function getVisibleCrop(video, frame, zoom = 1) {
         const width = video.videoWidth;
         const height = video.videoHeight;
@@ -48,34 +49,38 @@ window.createAksaraAttendanceCapture = function () {
                 : 9 / 16;
 
         const sourceRatio = width / height;
-
-        let cropWidth = width;
-        let cropHeight = height;
-
-        if (sourceRatio > frameRatio) {
-            cropWidth = height * frameRatio;
-        } else {
-            cropHeight = width / frameRatio;
-        }
-
-        // Zoom > 1 mempersempit area sumber (memperbesar wajah).
-        // Zoom < 1 memperluas area sumber (memperkecil wajah).
         const safeZoom = Math.max(0.1, Number(zoom) || 1);
 
-        cropWidth = Math.min(width, cropWidth / safeZoom);
-        cropHeight = Math.min(height, cropHeight / safeZoom);
+        let cropWidth;
+        let cropHeight;
 
-        // Area crop selalu berpusat di tengah kamera.
-        const x = (width - cropWidth) / 2;
-        const y = (height - cropHeight) / 2;
+        if (safeZoom < 1) {
+            // Zoom out: gunakan seluruh sumber video.
+            cropWidth = width;
+            cropHeight = height;
+        } else {
+            // Zoom normal/in: hitung crop sesuai rasio frame.
+            cropWidth = width;
+            cropHeight = height;
+
+            if (sourceRatio > frameRatio) {
+                cropWidth = height * frameRatio;
+            } else {
+                cropHeight = width / frameRatio;
+            }
+
+            cropWidth /= safeZoom;
+            cropHeight /= safeZoom;
+        }
 
         return {
-            x,
-            y,
+            x: (width - cropWidth) / 2,
+            y: (height - cropHeight) / 2,
             width: cropWidth,
             height: cropHeight,
         };
     }
+
 
 
     // Mengaktifkan alur pengambilan foto dengan liveness blink: buka kamera, deteksi wajah, tunggu kedipan mata, lalu ambil foto.
