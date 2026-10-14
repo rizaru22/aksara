@@ -123,10 +123,15 @@ window.createAksaraAttendanceCapture = function () {
             value: 1,
         };
 
-        const zoomSlider = document.getElementById('attendanceZoomLevel');
-        const zoomOutButton = document.getElementById('attendanceZoomOut');
-        const zoomInButton = document.getElementById('attendanceZoomIn');
-        const zoomValueLabel = document.getElementById('attendanceZoomValue');
+        
+        const cameraContainer = video.closest('.attendance-camera');
+        const zoomControls = cameraContainer?.querySelector('.attendance-zoom-controls');
+
+        const zoomSlider = zoomControls?.querySelector('#attendanceZoomLevel');
+        const zoomOutButton = zoomControls?.querySelector('#attendanceZoomOut');
+        const zoomInButton = zoomControls?.querySelector('#attendanceZoomIn');
+        const zoomValueLabel = zoomControls?.querySelector('#attendanceZoomValue');
+
 
         const updateZoom = (value) => {
             zoomConfig.value = Math.min(
