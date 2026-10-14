@@ -205,7 +205,28 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
         setFeature('Absen Masuk · Verifikasi Lokasi dan Wajah', `
             <div class="attendance-long-help alert alert-info small">Aplikasi mencari GPS dengan akurasi maksimal ${maxGpsAccuracy} meter dan memeriksa area sekolah. Setelah lolos, ikuti arahan kamera dan kedipkan mata satu kali.</div>
             <div class="attendance-capture-status alert alert-secondary mb-3" id="attendanceCaptureStatus" role="status" aria-live="polite">Menyiapkan pencarian lokasi…</div>
-            <div class="attendance-camera" id="attendanceCamera" hidden><div class="attendance-camera-frame"><video id="attendanceCameraVideo" autoplay muted playsinline></video><div class="attendance-face-guide" id="attendanceFaceGuide" aria-hidden="true"><span></span></div></div><p class="small text-secondary mt-2 mb-0">Pastikan wajah terang, tidak membelakangi jendela/cahaya, dan berada di dalam lingkaran.</p></div>
+            <div class="attendance-camera" id="attendanceCamera" hidden>
+                <div class="attendance-camera-frame">
+                    <video id="attendanceCameraVideo" autoplay muted playsinline></video>
+                    <div class="attendance-face-guide" id="attendanceFaceGuide" aria-hidden="true"><span></span>
+                    </div>
+                </div>
+                    
+                <div class="attendance-zoom-controls" id="attendanceZoomControls">
+                        <button type="button" class="attendance-zoom-button" id="attendanceZoomOut" aria-label="Perkecil tampilan wajah"
+                        ><i class="bi bi-dash-circle"></i></button>
+
+                        <div class="attendance-zoom-slider">
+                            <input type="range" id="attendanceZoomLevel" min="0.75" max="1.5" step="0.05" value="1" aria-label="Tingkat zoom kamera" > <span id="attendanceZoomValue">1,0×</span>
+                        </div>
+
+                        <button type="button" class="attendance-zoom-button" id="attendanceZoomIn" aria-label="Perbesar tampilan wajah">
+                            <i class="bi bi-plus-circle"></i>
+                        </button>
+                    </div>
+
+                    <p class="small text-secondary mt-2 mb-0">Pastikan wajah terang, tidak membelakangi jendela/cahaya, dan berada di dalam lingkaran.</p>
+                </div>
             <button type="button" class="btn btn-outline-secondary w-100 mt-3" id="cancelAttendanceCapture">Batal</button>`);
 
         const status = $('attendanceCaptureStatus');
@@ -240,7 +261,34 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
             <div class="attendance-long-help alert alert-info small">Cari GPS dengan akurasi maksimal ${maxGpsAccuracy} meter. Setelah lolos, ikuti arahan kamera dan kedipkan mata satu kali. Jika absen di luar jadwal, isi alasan yang diminta.</div>
             <div class="attendance-checkout-reason mb-3"><label class="form-label" for="earlyReason">Alasan di luar jadwal (isi bila diminta)</label><textarea class="form-control" id="earlyReason" rows="2" maxlength="2000" placeholder="Contoh: tugas sekolah / keperluan mendesak"></textarea></div>
             <div class="attendance-capture-status alert alert-secondary mb-3" id="attendanceCaptureStatus" role="status" aria-live="polite">Menyiapkan pencarian lokasi…</div>
-            <div class="attendance-camera" id="attendanceCamera" hidden><div class="attendance-camera-frame"><video id="attendanceCameraVideo" autoplay muted playsinline></video><div class="attendance-face-guide" id="attendanceFaceGuide" aria-hidden="true"><span></span></div></div><p class="small text-secondary mt-2 mb-0">Pastikan wajah terang, tidak membelakangi jendela/cahaya, dan berada di dalam lingkaran.</p></div>
+            <div class="attendance-camera" id="attendanceCamera" hidden>
+                <div class="attendance-camera-frame">
+                    <video id="attendanceCameraVideo" autoplay muted playsinline></video>
+                    <div class="attendance-face-guide" id="attendanceFaceGuide" aria-hidden="true">
+                        <span></span>
+                    </div>
+                </div>
+                
+                    <div class="attendance-zoom-controls" id="attendanceZoomControls">
+                        <button type="button"                        class="attendance-zoom-button"                           id="attendanceZoomOut"                           aria-label="Perkecil tampilan wajah"><i class="bi bi-dash-circle"></i></button>
+
+                        <div class="attendance-zoom-slider">
+                            <input type="range" id="attendanceZoomLevel" min="0.75" max="1.5" step="0.05" value="1"                              aria-label="Tingkat zoom kamera">
+                            <span id="attendanceZoomValue">1,0×</span>
+                        </div>
+
+                        <button
+                            type="button"
+                            class="attendance-zoom-button"
+                            id="attendanceZoomIn"
+                            aria-label="Perbesar tampilan wajah"
+                        >
+                            <i class="bi bi-plus-circle"></i>
+                        </button>
+                    </div>
+
+                <p class="small text-secondary mt-2 mb-0">Pastikan wajah terang, tidak membelakangi jendela/cahaya, dan berada di dalam lingkaran.</p>
+            </div>
             <button type="button" class="btn btn-outline-secondary w-100 mt-3" id="cancelAttendanceCapture">Batal</button>`);
 
         const status = $('attendanceCaptureStatus');

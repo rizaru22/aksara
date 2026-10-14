@@ -37,23 +37,46 @@ window.createAksaraAttendanceCapture = function () {
     }
 
     // Menentukan area crop yang paling terlihat dari video saat object-fit menggunakan cover agar landmark tetap konsisten.
-    function getVisibleCrop(video, frame) {
+   
+    function getVisibleCrop(video, frame, zoom = 1) {
         const width = video.videoWidth;
         const height = video.videoHeight;
-        const frameRatio = frame.clientWidth && frame.clientHeight
-            ? frame.clientWidth / frame.clientHeight
-            : 9 / 16;
+
+        const frameRatio =
+            frame.clientWidth && frame.clientHeight
+                ? frame.clientWidth / frame.clientHeight
+                : 9 / 16;
+
         const sourceRatio = width / height;
-        let x = 0; let y = 0; let cropWidth = width; let cropHeight = height;
+
+        let cropWidth = width;
+        let cropHeight = height;
+
         if (sourceRatio > frameRatio) {
             cropWidth = height * frameRatio;
-            x = (width - cropWidth) / 2;
         } else {
             cropHeight = width / frameRatio;
-            y = (height - cropHeight) / 2;
         }
-        return { x, y, width: cropWidth, height: cropHeight };
+
+        // Zoom > 1 mempersempit area sumber (memperbesar wajah).
+        // Zoom < 1 memperluas area sumber (memperkecil wajah).
+        const safeZoom = Math.max(0.1, Number(zoom) || 1);
+
+        cropWidth = Math.min(width, cropWidth / safeZoom);
+        cropHeight = Math.min(height, cropHeight / safeZoom);
+
+        // Area crop selalu berpusat di tengah kamera.
+        const x = (width - cropWidth) / 2;
+        const y = (height - cropHeight) / 2;
+
+        return {
+            x,
+            y,
+            width: cropWidth,
+            height: cropHeight,
+        };
     }
+
 
     // Mengaktifkan alur pengambilan foto dengan liveness blink: buka kamera, deteksi wajah, tunggu kedipan mata, lalu ambil foto.
     async function capture(video, guide, status, signal) {
@@ -92,16 +115,76 @@ window.createAksaraAttendanceCapture = function () {
         let abortHandler;
         const frame = video.parentElement;
 
+        
+        const zoomConfig = {
+            min: 0.75,
+            max: 1.5,
+            step: 0.05,
+            value: 1,
+        };
+
+        const zoomSlider = document.getElementById('attendanceZoomLevel');
+        const zoomOutButton = document.getElementById('attendanceZoomOut');
+        const zoomInButton = document.getElementById('attendanceZoomIn');
+        const zoomValueLabel = document.getElementById('attendanceZoomValue');
+
+        const updateZoom = (value) => {
+            zoomConfig.value = Math.min(
+                zoomConfig.max,
+                Math.max(zoomConfig.min, Number(value))
+            );
+
+            if (zoomSlider) {
+                zoomSlider.value = String(zoomConfig.value);
+            }
+
+            if (zoomValueLabel) {
+                zoomValueLabel.textContent =
+                    `${zoomConfig.value.toFixed(2).replace('.', ',')}×`;
+            }
+
+            if (zoomOutButton) {
+                zoomOutButton.disabled = zoomConfig.value <= zoomConfig.min;
+            }
+
+            if (zoomInButton) {
+                zoomInButton.disabled = zoomConfig.value >= zoomConfig.max;
+            }
+        };
+
+        updateZoom(zoomSlider?.value ?? 1);
+
+        const onZoomSliderChange = () => updateZoom(zoomSlider.value);
+        const onZoomOutClick = () =>
+            updateZoom(zoomConfig.value - zoomConfig.step);
+        const onZoomInClick = () =>
+            updateZoom(zoomConfig.value + zoomConfig.step);
+
+        zoomSlider?.addEventListener('input', onZoomSliderChange);
+        zoomOutButton?.addEventListener('click', onZoomOutClick);
+        zoomInButton?.addEventListener('click', onZoomInClick);
+
+
+      
         const stop = () => {
+            if (cancelled) return;
+
             cancelled = true;
             cancelAnimationFrame(frameId);
             stream?.getTracks().forEach((track) => track.stop());
             video.srcObject = null;
+
+            zoomSlider?.removeEventListener('input', onZoomSliderChange);
+            zoomOutButton?.removeEventListener('click', onZoomOutClick);
+            zoomInButton?.removeEventListener('click', onZoomInClick);
+
+            updateZoom(1);
         };
+
 
         return new Promise((resolve, reject) => {
             const takePhoto = () => {
-                const crop = getVisibleCrop(video, frame);
+                const crop = getVisibleCrop(video, frame, zoomConfig.value);
                 const scale = Math.min(1, 1600 / Math.max(crop.width, crop.height));
                 const canvas = document.createElement('canvas');
                 canvas.width = Math.round(crop.width * scale);
@@ -138,7 +221,7 @@ window.createAksaraAttendanceCapture = function () {
                     }
 
                     // Cocokkan hitungan dengan area video yang benar-benar terlihat setelah object-fit: cover.
-                    const crop = getVisibleCrop(video, frame);
+                    const crop = getVisibleCrop(video, frame,zoomConfig.value);
                     const frameRect = frame.getBoundingClientRect();
                     const guideRect = guide.getBoundingClientRect();
                     const centerX = guideRect.left + guideRect.width / 2 - frameRect.left;

@@ -207,3 +207,53 @@ body.kepsek-dashboard .module-card .btn { min-height: 42px; padding: 7px 12px; f
 .text-deep-teal-2{
     color: var(--deep-teal-2) !important;
 }
+
+
+/* Kontrol zoom kamera presensi */
+.attendance-zoom-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    width: 100%;
+    max-width: 280px;
+    margin: 10px auto 4px;
+}
+
+.attendance-zoom-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--teal);
+    font-size: 1.35rem;
+}
+
+.attendance-zoom-button:disabled {
+    opacity: 0.4;
+}
+
+.attendance-zoom-slider {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+}
+
+.attendance-zoom-slider input {
+    width: 100%;
+    accent-color: var(--teal);
+}
+
+.attendance-zoom-slider span {
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
