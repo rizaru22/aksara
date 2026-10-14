@@ -313,3 +313,28 @@ body.kepsek-dashboard .module-card .btn { min-height: 42px; padding: 7px 12px; f
     text-align: center;
 }
 
+
+.attendance-camera-preview {
+    display: none;
+}
+
+#featureModal .attendance-camera-active .attendance-camera-preview {
+    display: block;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+    pointer-events: none;
+    z-index: 1;
+}
+
+#featureModal .attendance-camera-active .attendance-face-guide {
+    z-index: 2;
+}
+
+/* Video tetap menjadi sumber kamera, bukan preview yang terlihat. */
+#featureModal .attendance-camera-active .attendance-camera-frame video {
+    display: none;
+}
+

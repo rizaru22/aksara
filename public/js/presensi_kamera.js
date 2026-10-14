@@ -114,6 +114,53 @@ window.createAksaraAttendanceCapture = function () {
         let frameId;
         let abortHandler;
         const frame = video.parentElement;
+        
+        const previewCanvas = frame.querySelector('.attendance-camera-preview');
+        const previewContext = previewCanvas?.getContext('2d');
+
+        const renderPreview = () => {
+            if (
+                !previewCanvas ||
+                !previewContext ||
+                video.videoWidth === 0 ||
+                video.videoHeight === 0
+            ) {
+                return;
+            }
+
+            const width = frame.clientWidth;
+            const height = frame.clientHeight;
+
+            if (!width || !height) return;
+
+            // Sesuaikan resolusi canvas dengan ukuran frame.
+            if (previewCanvas.width !== width || previewCanvas.height !== height) {
+                previewCanvas.width = width;
+                previewCanvas.height = height;
+            }
+
+            const crop = getVisibleCrop(video, frame, zoomConfig.value);
+
+            // Pertahankan tampilan selfie seperti preview sebelumnya.
+            previewContext.save();
+            previewContext.clearRect(0, 0, width, height);
+            previewContext.translate(width, 0);
+            previewContext.scale(-1, 1);
+
+            previewContext.drawImage(
+                video,
+                crop.x,
+                crop.y,
+                crop.width,
+                crop.height,
+                0,
+                0,
+                width,
+                height
+            );
+
+            previewContext.restore();
+        };
 
         
         const zoomConfig = {
@@ -213,6 +260,7 @@ window.createAksaraAttendanceCapture = function () {
                 lastInference = performance.now();
 
                 try {
+                    renderPreview();
                     const result = landmarker.detectForVideo(video, lastInference);
                     const points = result.faceLandmarks?.[0];
                     if (!points) {

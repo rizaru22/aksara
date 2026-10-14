@@ -208,6 +208,7 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
             <div class="attendance-camera" id="attendanceCamera" hidden>
                 <div class="attendance-camera-frame">
                     <video id="attendanceCameraVideo" autoplay muted playsinline></video>
+                        <canvas id="attendanceCameraPreview" class="attendance-camera-preview" aria-hidden="true"></canvas>
                     <div class="attendance-face-guide" id="attendanceFaceGuide" aria-hidden="true"><span></span>
                     </div>
                 </div>
@@ -264,6 +265,7 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
             <div class="attendance-camera" id="attendanceCamera" hidden>
                 <div class="attendance-camera-frame">
                     <video id="attendanceCameraVideo" autoplay muted playsinline></video>
+                    <canvas id="attendanceCameraPreview" class="attendance-camera-preview" aria-hidden="true"></canvas>
                     <div class="attendance-face-guide" id="attendanceFaceGuide" aria-hidden="true">
                         <span></span>
                     </div>
