@@ -26,6 +26,10 @@ window.createAksaraAttendanceCapture = function () {
         }
         return landmarkerPromise;
     }
+    
+    async function prepare() {
+        await getLandmarker();
+    }
 
     // Menghitung jarak Euclidean antara dua titik landmark untuk kebutuhan deteksi mata dan overlay face guide.
     const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -357,5 +361,5 @@ window.createAksaraAttendanceCapture = function () {
         });
     }
 
-    return { capture };
+    return { capture, prepare };
 };

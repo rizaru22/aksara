@@ -238,7 +238,14 @@ window.createAksaraTeacherAttendance = function ({ $, api, showToast, setFeature
         $('featureModal').addEventListener('hidden.bs.modal', cancelCapture, { once: true });
         cancel.addEventListener('click', () => featureModal.hide());
         try {
-            const location = await findPreciseLocation(status, true, controller.signal);
+            const [location] = await Promise.all([
+                findPreciseLocation(
+                status, 
+                true, 
+                controller.signal),
+                captureModule.prepare()
+            ]);
+            
             if (controller.signal.aborted) return;
             $('featureModal').querySelector('.modal-content').classList.add('attendance-camera-active');
             camera.hidden = false;
