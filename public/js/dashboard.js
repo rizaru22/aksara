@@ -1235,6 +1235,8 @@
             }
             const formData = new FormData(event.currentTarget);
             const form = Object.fromEntries([...formData.entries()].filter(([key]) => !key.startsWith('attendance_')));
+            form.attendance_gps_accuracy_meters = formData.get('attendance_gps_accuracy_meters');
+            form.journal_gps_accuracy_meters = formData.get('journal_gps_accuracy_meters');
             form.attendance_schedule = attendanceSchedule.map((schedule) => ({
                 hari: schedule.hari,
                 jam_masuk_mulai: formData.get(`attendance_jam_masuk_mulai[${schedule.hari}]`) || null,
