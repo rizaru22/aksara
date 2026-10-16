@@ -143,7 +143,7 @@
         border-radius: 12px;
 }
     #featureModal .attendance-camera-active .attendance-face-guide { 
-        width: min(96vw, 68vh); max-width: 520px; }
+        width: min(86vw, 60vh); max-width: 520px; }
     #featureModal .attendance-camera-active #cancelAttendanceCapture { 
         flex: 0 0 auto; 
         min-height: 44px; 
