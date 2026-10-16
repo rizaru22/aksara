@@ -95,8 +95,8 @@ window.createAksaraAttendanceCapture = function () {
                 audio: false,
                 video: { 
                     facingMode: { ideal: 'user' }, 
-                    width: { ideal: 480 }, 
-                    height: { ideal: 640 }, 
+                    width: { ideal: 720 }, 
+                    height: { ideal: 1280 }, 
                     frameRate: { ideal: 24, max: 30 } 
                 },
             });
