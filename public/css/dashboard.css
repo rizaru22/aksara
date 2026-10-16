@@ -96,7 +96,14 @@
 .schedule-item.current .btn:disabled { border-color: #cde7e3; background: #e8f4f2; color: #355b59; opacity: 1; cursor: not-allowed; }
 
 /* Kamera presensi: frame wajah berbentuk lingkaran dan siap digunakan pada ponsel. */
-.attendance-camera{max-width:380px;margin:0 auto}.attendance-camera-frame{position:relative;width:min(100%,300px);aspect-ratio:9/16;margin:0 auto;background:#07151b;border-radius:18px;overflow:hidden}.attendance-camera-frame video{display:block;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}.attendance-face-guide{position:absolute;inset:50% auto auto 50%;width:72%;aspect-ratio:1;border:4px solid #fff;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 999px #03131b45;transition:border-color .2s,box-shadow .2s}.attendance-face-guide::after{content:"";position:absolute;inset:-8px;border:1px dashed #ffffffb8;border-radius:50%}.attendance-face-guide.is-ready{border-color:#21d39a;box-shadow:0 0 0 999px #03131b35,0 0 18px #21d39a}.attendance-capture-status{font-weight:600}.attendance-capture-status.alert{min-height:54px}
+.attendance-camera{max-width:380px;margin:0 auto}
+.attendance-camera-frame{position:relative;width:min(100%,300px);aspect-ratio:1/1;margin:0 auto;background:#07151b;border-radius:50%;overflow:hidden}
+.attendance-camera-frame video{display:block;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.attendance-face-guide{position:absolute;inset:50% auto auto 50%;width:72%;aspect-ratio:1;border:4px solid #fff;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 999px #03131b45;transition:border-color .2s,box-shadow .2s}
+.attendance-face-guide::after{content:"";position:absolute;inset:-8px;border:1px dashed #ffffffb8;border-radius:50%}
+.attendance-face-guide.is-ready{border-color:#21d39a;box-shadow:0 0 0 999px #03131b35,0 0 18px #21d39a}
+.attendance-capture-status{font-weight:600}
+.attendance-capture-status.alert{min-height:54px}
 
 /* Sembunyikan penjelasan panjang dan gunakan ruang layar untuk kamera setelah GPS lolos. */
 #featureModal .attendance-camera-active .attendance-long-help { display: none; }
