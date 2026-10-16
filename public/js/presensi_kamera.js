@@ -93,7 +93,12 @@ window.createAksaraAttendanceCapture = function () {
             status.textContent = 'Membuka kamera depan…';
             stream = await navigator.mediaDevices.getUserMedia({
                 audio: false,
-                video: { facingMode: { ideal: 'user' }, width: { ideal: 720 }, height: { ideal: 1280 }, frameRate: { ideal: 24, max: 30 } },
+                video: { 
+                    facingMode: { ideal: 'user' }, 
+                    width: { ideal: 480 }, 
+                    height: { ideal: 640 }, 
+                    frameRate: { ideal: 24, max: 30 } 
+                },
             });
             if (signal?.aborted) throw new DOMException('Pengambilan dibatalkan.', 'AbortError');
             video.srcObject = stream;
