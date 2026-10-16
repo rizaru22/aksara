@@ -125,18 +125,28 @@
     #featureModal .attendance-camera-active .modal-body { display: flex; flex-direction: column; gap: .5rem; padding: .5rem .65rem max(.65rem, env(safe-area-inset-bottom)); overflow: hidden; }
     #featureModal .attendance-camera-active .attendance-camera > p { display: none; }
     #featureModal .attendance-camera-active .attendance-capture-status { flex: 0 0 auto; min-height: 0; margin: 0; padding: .55rem .7rem; font-size: .9rem; }
-    #featureModal .attendance-camera-active .attendance-camera { display: flex; flex: 1 1 auto; flex-direction: column; width: 100%; max-width: none; min-height: 0; margin: 0; }
+    #featureModal .attendance-camera-active .attendance-camera { display: flex; 
+        flex: 0 0 auto; 
+        flex-direction: column; 
+        width: 100%; 
+        max-width: none; 
+        min-height: 0; margin: 0; 
+    }
    #featureModal .attendance-camera-active .attendance-camera-frame {
         flex: 0 0 auto;
         width: 100%;
-        height: clamp(320px, 50vh, 520px);
+        height: clamp(280px, 42vh, 440px);
         min-height: 0;
         aspect-ratio: auto;
         border-radius: 12px;
 }
     #featureModal .attendance-camera-active .attendance-face-guide { 
         width: min(96vw, 68vh); max-width: 520px; }
-    #featureModal .attendance-camera-active #cancelAttendanceCapture { flex: 0 0 auto; min-height: 48px; margin: 0 !important; }
+    #featureModal .attendance-camera-active #cancelAttendanceCapture { 
+        flex: 0 0 auto; 
+        min-height: 44px; 
+        margin: 0 !important; 
+    }
 }
 
 /* Non-home pages sit below the overlapping hero instead of behind its lower edge. */
@@ -295,7 +305,7 @@ body.kepsek-dashboard .module-card .btn { min-height: 42px; padding: 7px 12px; f
     gap: 12px;
     width: 100%;
     max-width: 300px;
-    margin: 8px auto;
+    margin: 4px auto 6px;
 }
 
 #featureModal .attendance-camera-active .attendance-zoom-button {
