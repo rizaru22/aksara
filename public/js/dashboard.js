@@ -97,6 +97,10 @@
 
     // Menampilkan modal fitur dengan layout yang bisa berubah antara mode user biasa dan mode admin.
     function setFeature(title, content) {
+        $('featureModal')
+        .querySelector('.modal-content')
+        .classList.remove('attendance-camera-active');
+        
         if (document.body.classList.contains('admin-mode')) {
             setAdminPanel(title, content);
             return;
