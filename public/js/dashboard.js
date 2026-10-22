@@ -420,8 +420,73 @@
             <div class="mb-3"><label class="form-label" for="journalMaterial">ID materi pelajaran (opsional)</label><input class="form-control" id="journalMaterial" name="materi_pelajaran_id" type="number" min="1" value="${htmlSafe(draft?.materi_pelajaran_id || '')}"><div class="form-text">Materi harus berasal dari mata pelajaran pada jadwal.</div></div>
             <div class="mb-3"><label class="form-label" for="journalSummary">Materi pembahasan</label><textarea class="form-control" id="journalSummary" name="materi_pembahasan" rows="3" required>${htmlSafe(draft?.materi_pembahasan || '')}</textarea></div>
             <div class="mb-3"><label class="form-label" for="journalNotes">Catatan kejadian kelas (opsional)</label><textarea class="form-control" id="journalNotes" name="catatan_kejadian_kelas" rows="2">${htmlSafe(draft?.catatan_kejadian_kelas || '')}</textarea></div>
-            <h3 class="h6">Presensi siswa (${students.length})</h3>
-            <div class="table-responsive"><table class="table table-sm"><thead><tr><th>Siswa</th><th>Status</th></tr></thead><tbody>${students.map((student, index) => { const existing = draftAttendance.get(Number(student.id)); return `<tr><td>${htmlSafe(student.nama)}<input type="hidden" name="sid-${index}" value="${student.id}"></td><td><select class="form-select form-select-sm" name="status-${index}">${['HADIR', 'SAKIT', 'IZIN', 'ALPHA', 'CABUT'].map((status) => `<option value="${status}" ${status === (existing?.status || 'HADIR') ? 'selected' : ''}>${status}</option>`).join('')}</select><input class="form-control form-control-sm mt-1" name="note-${index}" value="${htmlSafe(existing?.keterangan || '')}" placeholder="Keterangan (opsional)"></td></tr>`; }).join('')}</tbody></table></div>
+            
+<div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+    <h3 class="h6 mb-0">Presensi siswa (${students.length})</h3>
+    <small class="text-secondary">10 siswa per halaman</small>
+</div>
+
+<div class="mb-3">
+    <label class="form-label small" for="journalStudentSearch">Cari siswa</label>
+    <input
+        class="form-control form-control-sm"
+        id="journalStudentSearch"
+        type="search"
+        placeholder="Ketik nama siswa..."
+        autocomplete="off"
+    >
+</div>
+
+<div class="table-responsive">
+    <table class="table table-sm align-middle">
+        <thead>
+            <tr>
+                <th scope="col">Siswa</th>
+                <th scope="col">Status dan keterangan</th>
+            </tr>
+        </thead>
+        <tbody id="journalStudentRows">
+            ${students.map((student, index) => {
+                const existing = draftAttendance.get(Number(student.id));
+                return `<tr
+                    data-student-row
+                    data-student-name="${htmlSafe(student.nama.toLowerCase())}"
+                >
+                    <td>
+                        ${htmlSafe(student.nama)}
+                        <input type="hidden" name="sid-${index}" value="${htmlSafe(student.id)}">
+                    </td>
+                    <td>
+                        <select class="form-select form-select-sm" name="status-${index}">
+                            ${['HADIR', 'SAKIT', 'IZIN', 'ALPHA', 'CABUT'].map((status) =>
+                                `<option value="${status}" ${status === (existing?.status || 'HADIR') ? 'selected' : ''}>${status}</option>`
+                            ).join('')}
+                        </select>
+                        <input
+                            class="form-control form-control-sm mt-1"
+                            name="note-${index}"
+                            value="${htmlSafe(existing?.keterangan || '')}"
+                            placeholder="Keterangan (opsional)"
+                        >
+                    </td>
+                </tr>`;
+            }).join('')}
+        </tbody>
+    </table>
+</div>
+
+<div class="d-flex align-items-center justify-content-between gap-2 mt-2 mb-3">
+    <small class="text-secondary" id="journalStudentPageInfo" aria-live="polite"></small>
+    <div class="btn-group btn-group-sm" role="group" aria-label="Navigasi halaman siswa">
+        <button class="btn btn-outline-secondary" type="button" id="journalStudentPrev">
+            Sebelumnya
+        </button>
+        <button class="btn btn-outline-secondary" type="button" id="journalStudentNext">
+            Berikutnya
+        </button>
+    </div>
+</div>
+
             <button class="btn btn-outline-primary w-100" type="submit" name="journalAction" value="draft">Simpan draf jurnal & presensi</button>
             <div class="border rounded p-3 mt-3 ${canFinalize ? '' : 'd-none'}" id="journalFinalizePanel">
                 <h3 class="h6">Tahap 2 · Finalisasi jurnal</h3>
@@ -435,6 +500,69 @@
             ${canFinalize ? '' : `<div class="alert alert-secondary small mt-3 mb-0">${htmlSafe(schedule?.journal_finalization_message || 'Finalisasi tersedia pada 30 menit terakhir sebelum jadwal berakhir.')}</div>`}
         </form>`);
         const journalForm = $('journalForm');
+        
+const studentSearch = $('journalStudentSearch');
+const studentRows = Array.from(
+    journalForm.querySelectorAll('[data-student-row]')
+);
+const studentPageInfo = $('journalStudentPageInfo');
+const studentPrev = $('journalStudentPrev');
+const studentNext = $('journalStudentNext');
+
+const studentsPerPage = 10;
+let studentPage = 1;
+
+function renderStudentPage() {
+    const keyword = studentSearch.value.trim().toLocaleLowerCase('id');
+
+    const filteredRows = studentRows.filter((row) =>
+        row.dataset.studentName.includes(keyword)
+    );
+
+    const totalPages = Math.max(
+        1,
+        Math.ceil(filteredRows.length / studentsPerPage)
+    );
+
+    studentPage = Math.min(studentPage, totalPages);
+
+    const start = (studentPage - 1) * studentsPerPage;
+    const visibleRows = filteredRows.slice(
+        start,
+        start + studentsPerPage
+    );
+
+    // Sembunyikan baris, jangan hapus input dari formulir.
+    studentRows.forEach((row) => row.classList.add('d-none'));
+    visibleRows.forEach((row) => row.classList.remove('d-none'));
+
+    studentPageInfo.textContent = filteredRows.length
+        ? `Menampilkan ${start + 1}–${start + visibleRows.length} dari ${filteredRows.length} siswa`
+        : 'Tidak ada siswa yang cocok dengan pencarian.';
+
+    studentPrev.disabled = studentPage <= 1;
+    studentNext.disabled = studentPage >= totalPages;
+}
+
+studentSearch.addEventListener('input', () => {
+    studentPage = 1;
+    renderStudentPage();
+});
+
+studentPrev.addEventListener('click', () => {
+    if (studentPage > 1) {
+        studentPage--;
+        renderStudentPage();
+    }
+});
+
+studentNext.addEventListener('click', () => {
+    studentPage++;
+    renderStudentPage();
+});
+
+renderStudentPage();
+
         const camera = $('journalCamera');
         let photoBlob = null;
         let photoUrl = null;
