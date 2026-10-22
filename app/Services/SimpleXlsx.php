@@ -33,7 +33,7 @@ class SimpleXlsx
         $textColumns = '';
         foreach (array_values($headers) as $index => $header) {
             if (str_contains(strtolower((string) $header), 'nip') || str_contains(strtolower((string) $header), 'nisn') || str_contains(strtolower((string) $header), 'kode')) {
-                $textColumns .= '<col min="'.($index + 1).'" max="'.($index + 1).'" style="1"/>';
+                $textColumns .= '<col min="'.($index + 1).'" max="'.($index + 1).'" width="18" customWidth="1" style="1"/>';
             }
         }
         $zip->addFromString('xl/worksheets/sheet1.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>'.$textColumns.'</cols><sheetData><row r="1">'.$cells.'</row></sheetData></worksheet>');
