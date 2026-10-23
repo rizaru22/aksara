@@ -1203,9 +1203,7 @@ renderStudentPage();
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover table-striped align-middle mb-0">
-                            <thead>
-                                <tr>
-                                    
+                            <thead>                        
                                     <tr>
                                         <th>Tanggal</th>
                                         <th>Guru / Kelas</th>
@@ -1214,8 +1212,6 @@ renderStudentPage();
                                         <th>Status</th>
                                         <th>Aksi</th>
                                     </tr>
-
-                                </tr>
                             </thead>
                             <tbody>${rows || emptyRow}</tbody>
                         </table>
