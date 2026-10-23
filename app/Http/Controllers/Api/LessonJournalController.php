@@ -214,8 +214,10 @@ class LessonJournalController extends Controller
         }
 
         if (! empty($validated['mata_pelajaran_id'])) {
-            $query->where('materi_pelajaran_id', $validated['mata_pelajaran_id'])
-                ->orWhereHas('jadwalPelajaran', fn ($scheduleQuery) => $scheduleQuery->where('mata_pelajaran_id', $validated['mata_pelajaran_id']));
+            $query->where(function ($subjectQuery) use ($validated): void {
+                $subjectQuery->where('materi_pelajaran_id', $validated['mata_pelajaran_id'])
+                    ->orWhereHas('jadwalPelajaran', fn ($scheduleQuery) => $scheduleQuery->where('mata_pelajaran_id', $validated['mata_pelajaran_id']));
+            });
         }
 
         if (! empty($validated['search'])) {
@@ -330,6 +332,15 @@ class LessonJournalController extends Controller
         }
 
         $schedule = $jurnalMengajar->jadwalPelajaran()->firstOrFail();
+        if ($isLateFinalization) {
+            $sessionDate = $jurnalMengajar->tanggal instanceof \\Carbon\\Carbon
+                ? $jurnalMengajar->tanggal->toDateString()
+                : (string) $jurnalMengajar->tanggal;
+            $sessionEnd = Carbon::parse($sessionDate.' '.$schedule->jam_selesai, config('app.timezone'));
+            if ($now->lessThanOrEqualTo($sessionEnd)) {
+                throw new ConflictHttpException('Finalisasi susulan hanya tersedia setelah waktu pembelajaran berakhir.');
+            }
+        }
         if (! $isLateFinalization) {
             $this->authorizeSchedule($request, $schedule, $now, $cycles);
         }
