@@ -128,8 +128,8 @@
         if (!visible) return '';
         if (schedule.kbm_ditangguhkan) return `<span class="badge text-bg-warning">KBM ditangguhkan</span>`;
         const journal = schedule.jurnal_hari_ini;
-        if (journal?.status_sesi === 'selesai') return `<span class="badge text-bg-success">Jurnal selesai</span>`;
-        if (journal?.status_sesi === 'berlangsung') {
+        if (journal?.status_sesi === 'final') return `<span class="badge text-bg-success">Jurnal selesai</span>`;
+        if (journal?.status_sesi === 'draft') {
             if (schedule.can_finalize_journal) return `<button class="btn btn-sm btn-success" data-journal="${schedule.id}">Selesaikan jurnal</button>`;
             if (schedule.can_fill_journal) return `<span class="text-end"><button class="btn btn-sm btn-outline-primary" data-journal="${schedule.id}">Lanjutkan draf</button><small class="d-block text-secondary mt-1">${htmlSafe(schedule.journal_finalization_message)}</small></span>`;
             return `<span class="text-end"><button class="btn btn-sm btn-outline-secondary" disabled>Draf belum selesai</button><small class="d-block text-secondary mt-1">${htmlSafe(schedule.journal_finalization_message || 'Draf belum difinalisasi.')}</small></span>`;
@@ -151,7 +151,7 @@
         const holidayNote = meta.hari_libur ? `<div class="alert alert-info mb-0">${htmlSafe(meta.hari_libur.nama)} · ${htmlSafe(holidayLabel)}. Tidak ada sesi mengajar hari ini.</div>` : '';
         const list = rows.length ? `<div class="list-group">${rows.map((schedule) => {
             const isOwner = Number(schedule.user_id) === Number(activeUser?.id);
-            const isFinished = schedule.jurnal_hari_ini?.status_sesi === 'selesai';
+            const isFinished = schedule.jurnal_hari_ini?.status_sesi === 'final';
             let substituteAction = '';
             if (isOwner && !isFinished && !schedule.substitute_active) {
                 if (schedule.substitute_status === 'PENDING') {
@@ -203,7 +203,7 @@
                 const hasJournalPermission = activeRoleNames.includes('guru') || (Array.isArray(activeUser?.permissions) && activeUser.permissions.includes('isi-ejurnal')) || dashboardModules.some((module) => module.key === 'journal');
                 const action = renderJournalAction(schedule, hasJournalPermission);
                 const isOwner = Number(schedule.user_id) === Number(activeUser?.id);
-                const isFinished = journal?.status_sesi === 'selesai';
+                const isFinished = journal?.status_sesi === 'final';
                 let subAction = '';
                 if (isOwner && !isFinished && !schedule.substitute_active) {
                     if (schedule.substitute_status === 'PENDING') {
@@ -297,7 +297,7 @@
                 const keterangan = row.keterangan || '—';
                 return `<tr><td>${htmlSafe(studentName)}</td><td><span class="badge text-bg-light border">${htmlSafe(status)}</span></td><td>${htmlSafe(keterangan)}</td></tr>`;
             }).join('') || '<tr><td colspan="3" class="text-center text-secondary py-3">Belum ada data presensi siswa untuk jurnal ini.</td></tr>';
-            const statusText = journal.status_sesi === 'selesai' ? 'Final' : (journal.status_sesi === 'berlangsung' ? 'Draft' : (journal.status_sesi || '—'));
+            const statusText = ({ draft: 'Draft', final: 'Final', finalisasi_susulan: 'Finalisasi Susulan', kedaluwarsa: 'Kedaluwarsa' })[journal.status_sesi] || journal.status_sesi || '—';
             const materi = journal.materi_pembahasan || '<span class="text-secondary fst-italic">Belum diisi</span>';
             const catatan = journal.catatan_kejadian_kelas || '<span class="text-secondary fst-italic">Belum diisi</span>';
             setFeature('Detail Jurnal Mengajar', `
@@ -308,7 +308,7 @@
                                 <div class="small text-secondary">Tanggal kegiatan</div>
                                 <strong>${htmlSafe(journal.tanggal || '—')}</strong>
                             </div>
-                            <span class="badge ${journal.status_sesi === 'selesai' ? 'bg-success' : 'bg-warning text-dark'}">${htmlSafe(statusText)}</span>
+                            <span class="badge ${({ draft: 'bg-warning text-dark', final: 'bg-success', finalisasi_susulan: 'bg-info text-dark', kedaluwarsa: 'bg-danger' })[journal.status_sesi] || 'bg-secondary'}">${htmlSafe(statusText)}</span>
                         </div>
                         <dl class="row mb-0">
                             <dt class="col-sm-4">Kelas</dt><dd class="col-sm-8">${htmlSafe(journal.jadwal_pelajaran?.kelas?.nama_kelas || '—')}</dd>
@@ -344,7 +344,7 @@
             const rows = journals.map((journal) => {
                 const kelas = journal.kelas?.nama_kelas || '—';
                 const mapel = journal.mata_pelajaran?.nama_mapel || '—';
-                const status = journal.status_sesi === 'selesai' ? '<span class="badge bg-success">Final</span>' : '<span class="badge bg-warning text-dark">Draft</span>';
+                const status = ({ draft: '<span class="badge bg-warning text-dark">Draft</span>', final: '<span class="badge bg-success">Final</span>', finalisasi_susulan: '<span class="badge bg-info text-dark">Finalisasi Susulan</span>', kedaluwarsa: '<span class="badge bg-danger">Kedaluwarsa</span>' })[journal.status_sesi] || '<span class="badge bg-secondary">—</span>';
                 const lengkap = journal.lengkap ? '<span class="badge bg-success">Lengkap</span>' : '<span class="badge bg-danger">Belum lengkap</span>';
                 return `<tr>
                     <td>${htmlSafe(journal.tanggal || '—')}</td>
@@ -353,7 +353,10 @@
                     <td>${htmlSafe(journal.materi_pembahasan || '—')}</td>
                     <td>${status}</td>
                     <td>${lengkap}</td>
-                    <td><button class="btn btn-outline-secondary btn-sm" data-teacher-journal="${journal.id}">Lihat detail</button></td>
+                    <td class="text-nowrap">
+                        <button class="btn btn-outline-secondary btn-sm" data-teacher-journal="${journal.id}">Lihat detail</button>
+                        ${journal.status_sesi === 'draft' ? `<button class="btn btn-outline-primary btn-sm mt-1" data-teacher-late-finalize="${journal.id}">Finalisasi susulan</button>` : ''}
+                    </td>
                 </tr>`;
             }).join('') || '<tr><td colspan="7" class="text-center text-secondary py-4">Belum ada jurnal yang diampu oleh guru ini.</td></tr>';
 
@@ -385,6 +388,24 @@
             journalButtons.forEach((button)=>
             button.addEventListener('click', () => {
                 openTeacherJournalDetail(button.dataset.teacherJournal);
+            }));
+
+            const lateFinalizeButtons = target
+                ? target.querySelectorAll('[data-teacher-late-finalize]')
+                : document.querySelectorAll('[data-teacher-late-finalize]');
+            lateFinalizeButtons.forEach((button) => button.addEventListener('click', async () => {
+                if (!window.confirm('Finalisasi jurnal ini sebagai Finalisasi Susulan? Foto dan GPS baru tidak diperlukan, tetapi data presensi harus lengkap, waktu pembelajaran sudah berakhir, dan batas 48 jam belum lewat.')) return;
+                button.disabled = true;
+                const payload = new FormData();
+                payload.append('finalisasi_susulan', '1');
+                try {
+                    const result = await api(`/api/v1/lesson-journals/${button.dataset.teacherLateFinalize}/finalize`, { method: 'POST', body: payload });
+                    showToast(result.message || 'Jurnal berhasil difinalisasi susulan.');
+                    await openTeacherJournalHistory(target);
+                } catch (error) {
+                    showToast(error.message || 'Finalisasi susulan gagal.');
+                    button.disabled = false;
+                }
             }));
         
         } catch (error) {
@@ -1067,8 +1088,10 @@ renderStudentPage();
 
         const statusOptions = [
             { value: '', label: 'Semua' },
-            { value: 'berlangsung', label: 'Draft' },
-            { value: 'selesai', label: 'Final' },
+            { value: 'draft', label: 'Draft' },
+            { value: 'final', label: 'Final' },
+            { value: 'finalisasi_susulan', label: 'Finalisasi Susulan' },
+            { value: 'kedaluwarsa', label: 'Kedaluwarsa' },
         ].map((opt) => `<option value="${opt.value}" ${status === opt.value ? 'selected' : ''}>${htmlSafe(opt.label)}</option>`).join('');
 
         // Tanggal display
@@ -1091,6 +1114,7 @@ renderStudentPage();
                     </div>
                     <div class="col-sm-12 form-actions">
                         <button class="btn btn-outline-success" type="submit">Terapkan filter</button>
+                        <button class="btn btn-outline-danger ms-2" type="button" id="jmExpireDrafts">Tandai draft kedaluwarsa</button>
                     </div>
                 </div>
             </div>
@@ -1100,7 +1124,9 @@ renderStudentPage();
             { label: 'Total jurnal', value: summary.total ?? '—', variant: 'secondary' },
             { label: 'Sudah final', value: summary.final ?? '—', variant: 'success' },
             { label: 'Masih draft', value: summary.draft ?? '—', variant: 'warning' },
-            { label: 'Belum lengkap', value: summary.belum_lengkap ?? '—', variant: 'danger' },
+            { label: 'Finalisasi susulan', value: summary.finalisasi_susulan ?? '—', variant: 'info' },
+            { label: 'Kedaluwarsa', value: summary.kedaluwarsa ?? '—', variant: 'danger' },
+            { label: 'Belum lengkap', value: summary.belum_lengkap ?? '—', variant: 'secondary' },
         ].map(({ label, value, variant }) => `<div class="col-sm-12">
             <div class="card border-${variant}-subtle">
                 <div class="card-body d-flex justify-content-between align-items-center py-3">
@@ -1111,9 +1137,10 @@ renderStudentPage();
         </div>`).join('');
 
         const statusBadge = {
-            berlangsung: '<span class="badge bg-warning text-dark">Draft</span>',
-            selesai: '<span class="badge bg-success">Final</span>',
-            flagged: '<span class="badge bg-secondary">Flagged</span>',
+            draft: '<span class="badge bg-warning text-dark">Draft</span>',
+            final: '<span class="badge bg-success">Final</span>',
+            finalisasi_susulan: '<span class="badge bg-info text-dark">Finalisasi Susulan</span>',
+            kedaluwarsa: '<span class="badge bg-danger">Kedaluwarsa</span>',
         };
 
         const rows = journals.map((item) => {
@@ -1180,6 +1207,21 @@ renderStudentPage();
 
         setFeature('Monitoring E-Jurnal', content);
 
+        $('jmExpireDrafts')?.addEventListener('click', async (event) => {
+            const button = event.currentTarget;
+            if (!window.confirm('Tandai semua draft yang telah melewati 48 jam sebagai Kedaluwarsa? Tindakan ini tidak dapat dibatalkan melalui tombol ini.')) return;
+            button.disabled = true;
+            try {
+                const response = await api('/api/v1/admin/journal-monitoring/expire-drafts', { method: 'POST' });
+                showToast(response.message || 'Proses kedaluwarsa selesai.');
+                await openJournalMonitoring(jmLastFilters);
+            } catch (error) {
+                showToast(error.message || 'Gagal memproses draft kedaluwarsa.');
+            } finally {
+                button.disabled = false;
+            }
+        });
+
         $('jmFilters')?.addEventListener('submit', (event) => {
             event.preventDefault();
             const form = new FormData(event.currentTarget);
@@ -1205,9 +1247,10 @@ renderStudentPage();
         }
 
         const statusBadge = {
-            berlangsung: '<span class="badge bg-warning text-dark">Draft</span>',
-            selesai: '<span class="badge bg-success">Final</span>',
-            flagged: '<span class="badge bg-secondary">Flagged</span>',
+            draft: '<span class="badge bg-warning text-dark">Draft</span>',
+            final: '<span class="badge bg-success">Final</span>',
+            finalisasi_susulan: '<span class="badge bg-info text-dark">Finalisasi Susulan</span>',
+            kedaluwarsa: '<span class="badge bg-danger">Kedaluwarsa</span>',
         };
 
         const fmtDt = (val) => val ? new Date(val).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '<span class="text-secondary fst-italic">Belum diisi</span>';
@@ -1244,7 +1287,7 @@ renderStudentPage();
             ? `${htmlSafe(String(Math.round(journal.jarak_geofence_finalisasi)))} m dari lokasi sekolah`
             : '<span class="text-secondary fst-italic">Belum diisi</span>';
 
-        const finalisasiWaktu = journal.status_sesi === 'selesai' && journal.jam_selesai_realisasi
+        const finalisasiWaktu = journal.status_sesi === 'final' && journal.jam_selesai_realisasi
             ? fmtDt(journal.jam_selesai_realisasi)
             : '<span class="text-secondary fst-italic">Belum difinalisasi</span>';
 
