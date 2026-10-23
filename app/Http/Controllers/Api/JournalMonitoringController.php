@@ -184,6 +184,36 @@ class JournalMonitoringController extends Controller
     }
 
     /**
+     * POST /api/v1/admin/journal-monitoring/expire-drafts
+     * Menandai draft yang sudah melewati 48 jam sebagai kedaluwarsa.
+     * Admin hanya menjalankan proses; Admin tidak memfinalisasi jurnal guru.
+     */
+    public function expireDrafts(Request $request): JsonResponse
+    {
+        abort_unless(
+            $request->user()->hasRole('admin')
+                || $request->user()->can('kelola-master-data')
+                || $request->user()->can('view-dashboard-kurikulum'),
+            403
+        );
+
+        $now = Carbon::now(config('app.timezone'));
+        $expiredCount = JurnalMengajar::query()
+            ->where('status_sesi', 'draft')
+            ->where('created_at', '<=', $now->copy()->subHours(48))
+            ->update([
+                'status_sesi' => 'kedaluwarsa',
+                'updated_at' => $now,
+            ]);
+
+        return response()->json([
+            'message' => 'Proses kedaluwarsa draft selesai.',
+            'expired_count' => $expiredCount,
+            'checked_at' => $now->toIso8601String(),
+        ]);
+    }
+
+    /**
      * GET /api/v1/admin/journal-monitoring/{jurnalMengajar}
      *
      * Detail satu jurnal mengajar beserta presensi siswa dan analisis kelengkapan.
