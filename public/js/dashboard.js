@@ -308,7 +308,7 @@
                                 <div class="small text-secondary">Tanggal kegiatan</div>
                                 <strong>${htmlSafe(journal.tanggal || '—')}</strong>
                             </div>
-                            <span class="badge ${journal.status_sesi === 'final' ? 'bg-success' : 'bg-warning text-dark'}">${htmlSafe(statusText)}</span>
+                            <span class="badge ${({ draft: 'bg-warning text-dark', final: 'bg-success', finalisasi_susulan: 'bg-info text-dark', kedaluwarsa: 'bg-danger' })[journal.status_sesi] || 'bg-secondary'}">${htmlSafe(statusText)}</span>
                         </div>
                         <dl class="row mb-0">
                             <dt class="col-sm-4">Kelas</dt><dd class="col-sm-8">${htmlSafe(journal.jadwal_pelajaran?.kelas?.nama_kelas || '—')}</dd>
