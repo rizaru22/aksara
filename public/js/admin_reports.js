@@ -130,7 +130,9 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
                 const dt = new window.DataTable(targetTable);
                 dt.destroy();
             }
-            const printableTable = results?.querySelector('table')?.cloneNode(true);
+            const reportTables = [...(results?.querySelectorAll('table') || [])];
+            const tableIndex = period === 'daily' || period === 'weekly' ? 1 : 0;
+            const printableTable = reportTables[tableIndex]?.cloneNode(true);
             if (printableTable) {
                 printableTable.querySelectorAll('*').forEach((node) => {
                     ['id', 'data-dt-order', 'data-dt-length', 'aria-controls', 'aria-label', 'tabindex', 'role'].forEach((attr) => node.removeAttribute(attr));
