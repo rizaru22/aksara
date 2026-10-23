@@ -281,7 +281,7 @@
     function renderAdminHome() {
         const quickLinks = [
             { key: 'reports', icon: 'bi-clipboard-data', label: 'Laporan Presensi Guru', text: 'Rekap presensi masuk, pulang, izin, sakit, dan dinas luar.' },
-            { key: 'class-attendance-report', icon: 'bi-calendar2-check', label: 'Laporan Kehadiran Guru di Kelas', text: 'Cetak laporan harian per kelas dan rekap mingguan beserta persentase pengisian jurnal.' },
+            { key: 'class-attendance-report', icon: 'bi-calendar2-check', label: 'Laporan Jurnal Mengajar', text: 'Cetak laporan harian per kelas dan rekap mingguan beserta persentase pengisian jurnal.' },
             ...dashboardModules.filter((module) => ['flagged', 'journal-monitoring', 'monitoring', 'substitute-approvals', 'leave-approvals', 'discrepancy', 'student-attendance-report'].includes(module.key)).map((module) => ({ key: module.key, icon: module.icon, label: module.title, text: module.description, module })),
             { key: 'classes', icon: 'bi-building', label: 'Kelola Kelas', text: 'Data kelas, tingkat, jurusan, dan wali kelas.' },
             { key: 'students', icon: 'bi-people', label: 'Kelola Siswa', text: 'Data siswa dan penempatan kelas.' },

@@ -115,7 +115,7 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
     function reportHeadingForPrint() {
         const label = document.getElementById('adminReportPeriodLabel')?.textContent || 'Laporan';
         const isClassReport = Boolean(window.aksaraDedicatedClassReport);
-        if (isClassReport) return period === 'weekly' ? 'Laporan Kehadiran Guru di Kelas Mingguan' : 'Laporan Kehadiran Guru di Kelas Harian';
+        if (isClassReport) return period === 'weekly' ? 'Laporan Jurnal Mengajar Mingguan' : 'Laporan Jurnal Mengajar Harian';
         if (period === 'weekly') return 'Laporan Presensi Guru Mingguan';
         if (period === 'monthly') return 'Laporan Presensi Guru Bulanan';
         if (period === 'student-monthly') return 'Laporan Presensi Siswa Bulanan';
@@ -128,7 +128,7 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
         const dedicatedClass = Boolean(options.dedicatedClass);
         window.aksaraDedicatedClassReport = dedicatedClass;
         period = initialPeriod;
-        const initialTitle = dedicatedClass ? 'Laporan Kehadiran Guru di Kelas' : (initialPeriod === 'student-monthly' ? 'Laporan Presensi Siswa' : 'Laporan Presensi Guru');
+        const initialTitle = dedicatedClass ? 'Laporan Jurnal Mengajar' : (initialPeriod === 'student-monthly' ? 'Laporan Presensi Siswa' : 'Laporan Presensi Guru');
         const initialHeading = dedicatedClass ? 'Laporan Harian per Kelas' : (initialPeriod === 'student-monthly' ? 'Laporan Presensi Siswa' : 'Laporan Harian');
         const tabButtons = dedicatedStudent
             ? '<button type="button" class="btn btn-success" data-report-period="student-monthly">Presensi Siswa</button>'
