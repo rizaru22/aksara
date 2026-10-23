@@ -1157,6 +1157,13 @@ renderStudentPage();
             const guruLabel = htmlSafe(item.guru?.nama || 'Guru tidak diketahui');
             const nipLabel = item.guru?.nip ? `<div class="small text-secondary">${htmlSafe(item.guru.nip)}</div>` : '';
             const kelasLabel = htmlSafe(item.kelas?.nama_kelas || '—');
+            const tanggalLabel = item.tanggal
+    ?                       new Date(`${item.tanggal}T12:00:00`).toLocaleDateString('id-ID', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                        })
+                        : '—';
             const mapelLabel = htmlSafe(item.mata_pelajaran?.nama_mapel || '—');
             const waktu = item.jam_mulai && item.jam_selesai ? `${htmlSafe(item.jam_mulai)}–${htmlSafe(item.jam_selesai)}` : '—';
             const materi = item.materi_pembahasan
@@ -1167,21 +1174,21 @@ renderStudentPage();
                 ? `<span class="badge bg-success">Lengkap</span>`
                 : `<span class="badge bg-danger" title="${htmlSafe(item.presensi_count)} / ${htmlSafe(String(item.total_siswa))} siswa">Belum lengkap</span>`;
 
-            return `<tr>
-                <td>
-                    <strong>${guruLabel}</strong>
-                    <span class="text-secondary"> · ${kelasLabel}</span>
-                    ${nipLabel}
-                    <div class="small text-secondary">${mapelLabel}</div>
-                </td>
-                <td class="text-nowrap small">${waktu}</td>
-                <td class="small">${materi}</td>
-                <td>${badge}</td>
-                <td>${lengkapBadge}</td>
-                <td class="text-nowrap">
-                    <button class="btn btn-outline-secondary btn-sm" data-jm-detail="${item.id}">Lihat detail →</button>
-                </td>
-            </tr>`;
+        return `<tr>
+            <td class="text-nowrap">${htmlSafe(tanggalLabel)}</td>
+            <td>
+                <strong>${guruLabel}</strong>
+                <span class="text-secondary"> · ${kelasLabel}</span>
+                ${nipLabel}
+                <div class="small text-secondary">${mapelLabel}</div>
+            </td>
+            <td class="text-nowrap small">${waktu}</td>
+            <td class="small">${materi}</td>
+            <td>${badge}</td>
+            <td class="text-nowrap">
+                <button class="btn btn-outline-secondary btn-sm" data-jm-detail="${item.id}">Lihat detail →</button>
+            </td>
+        </tr>`;
         }).join('');
 
         const emptyRow = `<tr><td colspan="6" class="text-center text-secondary py-4">Tidak ada jurnal pada tanggal yang dipilih.</td></tr>`;
@@ -1198,12 +1205,16 @@ renderStudentPage();
                         <table class="table table-hover table-striped align-middle mb-0">
                             <thead>
                                 <tr>
-                                    <th>Guru / Kelas</th>
-                                    <th>Waktu</th>
-                                    <th>Materi</th>
-                                    <th>Status</th>
-                                    <th>Kelengkapan</th>
-                                    <th>Aksi</th>
+                                    
+                                    <tr>
+                                        <th>Tanggal</th>
+                                        <th>Guru / Kelas</th>
+                                        <th>Waktu</th>
+                                        <th>Materi</th>
+                                        <th>Status</th>
+                                        <th>Aksi</th>
+                                    </tr>
+
                                 </tr>
                             </thead>
                             <tbody>${rows || emptyRow}</tbody>
