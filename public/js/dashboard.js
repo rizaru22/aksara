@@ -281,6 +281,7 @@
     function renderAdminHome() {
         const quickLinks = [
             { key: 'reports', icon: 'bi-clipboard-data', label: 'Laporan Harian, Mingguan & Bulanan', text: 'Rekap kehadiran guru dan jurnal mengajar berdasarkan periode.' },
+            { key: 'class-attendance-report', icon: 'bi-calendar2-check', label: 'Laporan Kehadiran Guru di Kelas', text: 'Cetak laporan harian per kelas dan rekap mingguan beserta persentase pengisian jurnal.' },
             ...dashboardModules.filter((module) => ['flagged', 'journal-monitoring', 'monitoring', 'substitute-approvals', 'leave-approvals', 'discrepancy', 'student-attendance-report'].includes(module.key)).map((module) => ({ key: module.key, icon: module.icon, label: module.title, text: module.description, module })),
             { key: 'classes', icon: 'bi-building', label: 'Kelola Kelas', text: 'Data kelas, tingkat, jurusan, dan wali kelas.' },
             { key: 'students', icon: 'bi-people', label: 'Kelola Siswa', text: 'Data siswa dan penempatan kelas.' },
@@ -305,6 +306,7 @@
         const module = dashboardModules.find((item) => item.key === action);
         if (action === 'home') return renderAdminHome();
         if (action === 'reports') return adminReports.open();
+        if (action === 'class-attendance-report') return adminReports.open('daily');
         if (action === 'student-attendance-report') return adminReports.open('student-monthly', { dedicatedStudent: true });
         if (action === 'substitute-approvals') return openSubstituteApprovals();
         if (['classes', 'students', 'subjects', 'materials', 'schedules'].includes(action)) return academicData.openMaster(action);
