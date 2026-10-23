@@ -24,13 +24,14 @@ window.createAksaraModeration = function ({ $, api, htmlSafe, setFeature, showTo
                 const sessions = ['masuk', 'pulang'].filter((session) => waitingStatuses.includes(item[`status_verifikasi_${session}`]));
                 return sessions.map((session) => {
                     const label = session === 'masuk' ? 'Masuk' : 'Pulang';
+                    const sessionBadgeClass = session === 'masuk' ? 'text-bg-primary' : 'text-bg-info';
                     const status = item[`status_verifikasi_${session}`];
                     const time = item[`jam_${session}`] || '—';
                     const noteId = `review-note-${item.id}-${session}`;
                     return `<tr>
                         <td>${htmlSafe(item.user?.nama || 'Nama tidak tersedia')}${item.user?.nip ? `<div class="small text-secondary">NIP ${htmlSafe(item.user.nip)}</div>` : ''}</td>
                         <td>${htmlSafe(item.tanggal || '—')}</td>
-                        <td>${label}</td>
+                        <td><span class="badge ${sessionBadgeClass}">${label}</span></td>
                         <td>${htmlSafe(time)}</td>
                         <td><span class="badge text-bg-warning">${htmlSafe(status)}</span></td>
                         <td>${item[`foto_${session}`] ? `<button class="btn btn-outline-primary btn-sm" type="button" data-attendance-photo="${item.id}" data-photo-session="${session}"><i class="bi bi-image"></i> Foto</button>` : '<span class="small text-secondary">Tidak tersedia</span>'}</td>
