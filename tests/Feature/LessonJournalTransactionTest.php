@@ -288,6 +288,39 @@ class LessonJournalTransactionTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_bulk_expire_drafts_older_than_48_hours(): void
+    {
+        [$teacher, $schedule] = $this->prepareSession();
+        $now = Carbon::now(config('app.timezone'));
+        $journal = \App\Models\JurnalMengajar::query()->create([
+            'user_id' => $teacher->id,
+            'jadwal_pelajaran_id' => $schedule->id,
+            'tanggal' => $now->toDateString(),
+            'materi_pembahasan' => 'Draf untuk pengujian kedaluwarsa massal.',
+            'status_sesi' => 'draft',
+        ]);
+        $journal->created_at = $now->copy()->subHours(49);
+        $journal->save();
+
+        $admin = User::query()->create([
+            'nama' => 'Admin Kedaluwarsa',
+            'email' => 'admin.expiry@test.local',
+            'password' => 'test-password-123',
+        ]);
+        $adminRole = Role::query()->firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->assignRole($adminRole);
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/v1/admin/journal-monitoring/expire-drafts')
+            ->assertOk()
+            ->assertJsonPath('expired_count', 1);
+
+        $this->assertDatabaseHas('jurnal_mengajars', [
+            'id' => $journal->id,
+            'status_sesi' => 'kedaluwarsa',
+        ]);
+    }
+
     public function test_admin_journal_detail_exposes_student_attendance_alias_used_by_ui(): void
     {
         [$teacher, $schedule, $students] = $this->prepareSession();
