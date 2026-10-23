@@ -79,7 +79,12 @@ jobs:
           DB_USERNAME: root
           DB_PASSWORD: aksara-test
         run: |
-          php -r '$pdo = new PDO("mysql:host=127.0.0.1;dbname=aksara_test", "root", "aksara-test"); $pdo->exec("CREATE TABLE jurnal_mengajars (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, status_sesi ENUM(\\'berlangsung\\', \\'selesai\\', \\'flagged\\') NOT NULL DEFAULT \\'berlangsung\\', created_at TIMESTAMP NULL, updated_at TIMESTAMP NULL)"); $pdo->exec("INSERT INTO jurnal_mengajars (status_sesi) VALUES (\\'berlangsung\\'), (\\'selesai\\'), (\\'flagged\\')");'
+          php <<'PHP'
+          <?php
+          $pdo = new PDO('mysql:host=127.0.0.1;dbname=aksara_test', 'root', 'aksara-test');
+          $pdo->exec("CREATE TABLE jurnal_mengajars (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, status_sesi ENUM('berlangsung', 'selesai', 'flagged') NOT NULL DEFAULT 'berlangsung', created_at TIMESTAMP NULL, updated_at TIMESTAMP NULL)");
+          $pdo->exec("INSERT INTO jurnal_mengajars (status_sesi) VALUES ('berlangsung'), ('selesai'), ('flagged')");
+          PHP
 
       - name: Run E-Jurnal status migration on MariaDB 10.6
         env:
@@ -100,4 +105,14 @@ jobs:
           DB_USERNAME: root
           DB_PASSWORD: aksara-test
         run: |
-          php -r '$app = require "bootstrap/app.php"; $app->make(Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap(); $statuses = Illuminate\\Support\\Facades\\DB::table("jurnal_mengajars")->orderBy("id")->pluck("status_sesi")->all(); if ($statuses !== ["draft", "final", "draft"]) { fwrite(STDERR, json_encode($statuses)); exit(1); } echo "Legacy statuses normalized correctly\\n";'
+          php <<'PHP'
+          <?php
+          $app = require 'bootstrap/app.php';
+          $app->make(Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap();
+          $statuses = Illuminate\\Support\\Facades\\DB::table('jurnal_mengajars')->orderBy('id')->pluck('status_sesi')->all();
+          if ($statuses !== ['draft', 'final', 'draft']) {
+              fwrite(STDERR, json_encode($statuses));
+              exit(1);
+          }
+          echo "Legacy statuses normalized correctly\\n";
+          PHP
