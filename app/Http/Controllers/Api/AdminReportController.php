@@ -46,6 +46,7 @@ class AdminReportController extends Controller
         };
 
         $response['school_name'] = Setting::value('school_name', 'Nama Sekolah');
+        $response['signatories'] = $this->reportSignatories();
 
         return response()->json(['data' => $response]);
     }
@@ -65,8 +66,23 @@ class AdminReportController extends Controller
 
         $data = $this->studentMonthly($filters['month'], $filters['class_id'] ?? null);
         $data['school_name'] = Setting::value('school_name', 'Nama Sekolah');
+        $data['signatories'] = $this->reportSignatories();
 
         return response()->json(['data' => $data]);
+    }
+
+    /**
+     * Mengambil nama dan NIP penandatangan laporan berdasarkan role pengguna.
+     */
+    private function reportSignatories(): array
+    {
+        $principal = User::role('kepsek')->first();
+        $curriculum = User::role('kurikulum')->first();
+
+        return [
+            'principal' => ['name' => $principal?->nama ?? 'Nama Kepala Sekolah', 'nip' => $principal?->nip ?? ''],
+            'curriculum' => ['name' => $curriculum?->nama ?? 'Nama Waka Kurikulum', 'nip' => $curriculum?->nip ?? ''],
+        ];
     }
 
     /**
