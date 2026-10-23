@@ -353,7 +353,10 @@
                     <td>${htmlSafe(journal.materi_pembahasan || '—')}</td>
                     <td>${status}</td>
                     <td>${lengkap}</td>
-                    <td><button class="btn btn-outline-secondary btn-sm" data-teacher-journal="${journal.id}">Lihat detail</button></td>
+                    <td class="text-nowrap">
+                        <button class="btn btn-outline-secondary btn-sm" data-teacher-journal="${journal.id}">Lihat detail</button>
+                        ${journal.status_sesi === 'draft' ? `<button class="btn btn-outline-primary btn-sm mt-1" data-teacher-late-finalize="${journal.id}">Finalisasi susulan</button>` : ''}
+                    </td>
                 </tr>`;
             }).join('') || '<tr><td colspan="7" class="text-center text-secondary py-4">Belum ada jurnal yang diampu oleh guru ini.</td></tr>';
 
@@ -385,6 +388,24 @@
             journalButtons.forEach((button)=>
             button.addEventListener('click', () => {
                 openTeacherJournalDetail(button.dataset.teacherJournal);
+            }));
+
+            const lateFinalizeButtons = target
+                ? target.querySelectorAll('[data-teacher-late-finalize]')
+                : document.querySelectorAll('[data-teacher-late-finalize]');
+            lateFinalizeButtons.forEach((button) => button.addEventListener('click', async () => {
+                if (!window.confirm('Finalisasi jurnal ini sebagai Finalisasi Susulan? Foto dan GPS baru tidak diperlukan, tetapi data presensi harus lengkap, waktu pembelajaran sudah berakhir, dan batas 48 jam belum lewat.')) return;
+                button.disabled = true;
+                const payload = new FormData();
+                payload.append('finalisasi_susulan', '1');
+                try {
+                    const result = await api(`/api/v1/lesson-journals/${button.dataset.teacherLateFinalize}/finalize`, { method: 'POST', body: payload });
+                    showToast(result.message || 'Jurnal berhasil difinalisasi susulan.');
+                    await openTeacherJournalHistory(target);
+                } catch (error) {
+                    showToast(error.message || 'Finalisasi susulan gagal.');
+                    button.disabled = false;
+                }
             }));
         
         } catch (error) {
