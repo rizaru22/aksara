@@ -217,6 +217,77 @@ class LessonJournalTransactionTest extends TestCase
         $this->assertDatabaseHas('jurnal_mengajars', ['id' => $draftId, 'status_sesi' => 'final']);
     }
 
+    public function test_teacher_can_finalize_late_without_new_photo_or_gps_within_48_hours(): void
+    {
+        [$teacher, $schedule, $students] = $this->prepareSession();
+        $now = Carbon::now(config('app.timezone'));
+        $schedule->update([
+            'jam_mulai' => $now->copy()->subHours(2)->format('H:i'),
+            'jam_selesai' => $now->copy()->subMinutes(5)->format('H:i'),
+        ]);
+
+        $journal = \\App\\Models\\JurnalMengajar::query()->create([
+            'user_id' => $teacher->id,
+            'jadwal_pelajaran_id' => $schedule->id,
+            'tanggal' => $now->toDateString(),
+            'materi_pembahasan' => 'Materi pembelajaran yang belum difinalisasi.',
+            'status_sesi' => 'draft',
+        ]);
+        $journal->created_at = $now->copy()->subHour();
+        $journal->save();
+        $students->each(fn (Siswa $student) => $journal->presensiSiswas()->create([
+            'siswa_id' => $student->id,
+            'status' => 'HADIR',
+        ]));
+
+        $this->actingAs($teacher, 'sanctum')
+            ->postJson('/api/v1/lesson-journals/'.$journal->id.'/finalize', [
+                'finalisasi_susulan' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status_sesi', 'finalisasi_susulan');
+
+        $this->assertDatabaseHas('jurnal_mengajars', [
+            'id' => $journal->id,
+            'status_sesi' => 'finalisasi_susulan',
+            'foto_kegiatan' => null,
+            'lat_finalisasi' => null,
+            'long_finalisasi' => null,
+        ]);
+    }
+
+    public function test_draft_older_than_48_hours_becomes_expired_and_cannot_be_finalized(): void
+    {
+        [$teacher, $schedule, $students] = $this->prepareSession();
+        $now = Carbon::now(config('app.timezone'));
+        $schedule->update(['jam_selesai' => $now->copy()->subMinutes(5)->format('H:i')]);
+
+        $journal = \\App\\Models\\JurnalMengajar::query()->create([
+            'user_id' => $teacher->id,
+            'jadwal_pelajaran_id' => $schedule->id,
+            'tanggal' => $now->toDateString(),
+            'materi_pembahasan' => 'Draf yang telah kedaluwarsa.',
+            'status_sesi' => 'draft',
+        ]);
+        $journal->created_at = $now->copy()->subHours(49);
+        $journal->save();
+        $students->each(fn (Siswa $student) => $journal->presensiSiswas()->create([
+            'siswa_id' => $student->id,
+            'status' => 'HADIR',
+        ]));
+
+        $this->actingAs($teacher, 'sanctum')
+            ->postJson('/api/v1/lesson-journals/'.$journal->id.'/finalize', [
+                'finalisasi_susulan' => true,
+            ])
+            ->assertStatus(409);
+
+        $this->assertDatabaseHas('jurnal_mengajars', [
+            'id' => $journal->id,
+            'status_sesi' => 'kedaluwarsa',
+        ]);
+    }
+
     public function test_admin_journal_detail_exposes_student_attendance_alias_used_by_ui(): void
     {
         [$teacher, $schedule, $students] = $this->prepareSession();
