@@ -226,7 +226,7 @@ class LessonJournalTransactionTest extends TestCase
             'jam_selesai' => $now->copy()->subMinutes(5)->format('H:i'),
         ]);
 
-        $journal = \\App\\Models\\JurnalMengajar::query()->create([
+        $journal = \App\Models\JurnalMengajar::query()->create([
             'user_id' => $teacher->id,
             'jadwal_pelajaran_id' => $schedule->id,
             'tanggal' => $now->toDateString(),
@@ -262,7 +262,7 @@ class LessonJournalTransactionTest extends TestCase
         $now = Carbon::now(config('app.timezone'));
         $schedule->update(['jam_selesai' => $now->copy()->subMinutes(5)->format('H:i')]);
 
-        $journal = \\App\\Models\\JurnalMengajar::query()->create([
+        $journal = \App\Models\JurnalMengajar::query()->create([
             'user_id' => $teacher->id,
             'jadwal_pelajaran_id' => $schedule->id,
             'tanggal' => $now->toDateString(),
