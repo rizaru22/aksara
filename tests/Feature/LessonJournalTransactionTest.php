@@ -33,7 +33,7 @@ class LessonJournalTransactionTest extends TestCase
 
         $this->assertDatabaseCount('jurnal_mengajars', 1);
         $this->assertDatabaseCount('presensi_siswas', 2);
-        $this->assertDatabaseHas('jurnal_mengajars', ['jadwal_pelajaran_id' => $schedule->id, 'status_sesi' => 'berlangsung']);
+        $this->assertDatabaseHas('jurnal_mengajars', ['jadwal_pelajaran_id' => $schedule->id, 'status_sesi' => 'draft']);
     }
 
     public function test_incomplete_or_cross_class_roster_is_rejected_without_partial_records(): void
@@ -71,7 +71,7 @@ class LessonJournalTransactionTest extends TestCase
             'presensi' => $students->map(fn (Siswa $student) => ['siswa_id' => $student->id, 'status' => 'HADIR'])->all(),
         ])->assertOk();
 
-        $this->assertDatabaseHas('jurnal_mengajars', ['id' => $draftId, 'status_sesi' => 'berlangsung']);
+        $this->assertDatabaseHas('jurnal_mengajars', ['id' => $draftId, 'status_sesi' => 'draft']);
         $this->assertDatabaseHas('jurnal_mengajars', ['id' => $draftId, 'materi_pembahasan' => 'Pengenalan basis data relasional dan primary key. Perbaikan catatan setelah jam berakhir.']);
     }
 
@@ -110,7 +110,7 @@ class LessonJournalTransactionTest extends TestCase
             'materi_pelajaran_id' => null,
             'tanggal' => $draftDate->toDateString(),
             'materi_pembahasan' => 'Rencana pembelajaran hari sebelumnya.',
-            'status_sesi' => 'berlangsung',
+            'status_sesi' => 'draft',
         ]);
 
         $students->each(fn (Siswa $student) => $draft->presensiSiswas()->create([
@@ -124,7 +124,7 @@ class LessonJournalTransactionTest extends TestCase
             'materi_pelajaran_id' => null,
             'tanggal' => $finalDate->toDateString(),
             'materi_pembahasan' => 'Pembelajaran yang sudah diselesaikan.',
-            'status_sesi' => 'selesai',
+            'status_sesi' => 'final',
             'foto_kegiatan' => 'lesson-journals/final.jpg',
             'jam_mulai_realisasi' => $finalDate->copy()->setTime(8, 0)->toDateTimeString(),
             'jam_selesai_realisasi' => $finalDate->copy()->setTime(9, 0)->toDateTimeString(),
@@ -138,13 +138,13 @@ class LessonJournalTransactionTest extends TestCase
         $this->getJson('/api/v1/lesson-journals?status=all')
             ->assertOk()
             ->assertJsonPath('meta.total', 2)
-            ->assertJsonFragment(['status_sesi' => 'berlangsung'])
-            ->assertJsonFragment(['status_sesi' => 'selesai']);
+            ->assertJsonFragment(['status_sesi' => 'draft'])
+            ->assertJsonFragment(['status_sesi' => 'final']);
 
         $this->getJson('/api/v1/lesson-journals?status=draft')
             ->assertOk()
             ->assertJsonPath('meta.total', 1)
-            ->assertJsonPath('data.0.status_sesi', 'berlangsung');
+            ->assertJsonPath('data.0.status_sesi', 'draft');
     }
 
     public function test_finalization_reports_location_issue_before_time_window_message(): void
@@ -214,7 +214,111 @@ class LessonJournalTransactionTest extends TestCase
             'catatan_penutupan' => 'Guru harus meninggalkan kelas karena bencana alam lokal.',
         ])->assertOk();
 
-        $this->assertDatabaseHas('jurnal_mengajars', ['id' => $draftId, 'status_sesi' => 'selesai']);
+        $this->assertDatabaseHas('jurnal_mengajars', ['id' => $draftId, 'status_sesi' => 'final']);
+    }
+
+    public function test_teacher_can_finalize_late_without_new_photo_or_gps_within_48_hours(): void
+    {
+        [$teacher, $schedule, $students] = $this->prepareSession();
+        $now = Carbon::now(config('app.timezone'));
+        $schedule->update([
+            'jam_mulai' => $now->copy()->subHours(2)->format('H:i'),
+            'jam_selesai' => $now->copy()->subMinutes(5)->format('H:i'),
+        ]);
+
+        $journal = \App\Models\JurnalMengajar::query()->create([
+            'user_id' => $teacher->id,
+            'jadwal_pelajaran_id' => $schedule->id,
+            'tanggal' => $now->toDateString(),
+            'materi_pembahasan' => 'Materi pembelajaran yang belum difinalisasi.',
+            'status_sesi' => 'draft',
+        ]);
+        $journal->created_at = $now->copy()->subHour();
+        $journal->save();
+        $students->each(fn (Siswa $student) => $journal->presensiSiswas()->create([
+            'siswa_id' => $student->id,
+            'status' => 'HADIR',
+        ]));
+
+        $this->actingAs($teacher, 'sanctum')
+            ->postJson('/api/v1/lesson-journals/'.$journal->id.'/finalize', [
+                'finalisasi_susulan' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status_sesi', 'finalisasi_susulan');
+
+        $this->assertDatabaseHas('jurnal_mengajars', [
+            'id' => $journal->id,
+            'status_sesi' => 'finalisasi_susulan',
+            'foto_kegiatan' => null,
+            'lat_finalisasi' => null,
+            'long_finalisasi' => null,
+        ]);
+    }
+
+    public function test_draft_older_than_48_hours_becomes_expired_and_cannot_be_finalized(): void
+    {
+        [$teacher, $schedule, $students] = $this->prepareSession();
+        $now = Carbon::now(config('app.timezone'));
+        $schedule->update(['jam_selesai' => $now->copy()->subMinutes(5)->format('H:i')]);
+
+        $journal = \App\Models\JurnalMengajar::query()->create([
+            'user_id' => $teacher->id,
+            'jadwal_pelajaran_id' => $schedule->id,
+            'tanggal' => $now->toDateString(),
+            'materi_pembahasan' => 'Draf yang telah kedaluwarsa.',
+            'status_sesi' => 'draft',
+        ]);
+        $journal->created_at = $now->copy()->subHours(49);
+        $journal->save();
+        $students->each(fn (Siswa $student) => $journal->presensiSiswas()->create([
+            'siswa_id' => $student->id,
+            'status' => 'HADIR',
+        ]));
+
+        $this->actingAs($teacher, 'sanctum')
+            ->postJson('/api/v1/lesson-journals/'.$journal->id.'/finalize', [
+                'finalisasi_susulan' => true,
+            ])
+            ->assertStatus(409);
+
+        $this->assertDatabaseHas('jurnal_mengajars', [
+            'id' => $journal->id,
+            'status_sesi' => 'kedaluwarsa',
+        ]);
+    }
+
+    public function test_admin_can_bulk_expire_drafts_older_than_48_hours(): void
+    {
+        [$teacher, $schedule] = $this->prepareSession();
+        $now = Carbon::now(config('app.timezone'));
+        $journal = \App\Models\JurnalMengajar::query()->create([
+            'user_id' => $teacher->id,
+            'jadwal_pelajaran_id' => $schedule->id,
+            'tanggal' => $now->toDateString(),
+            'materi_pembahasan' => 'Draf untuk pengujian kedaluwarsa massal.',
+            'status_sesi' => 'draft',
+        ]);
+        $journal->created_at = $now->copy()->subHours(49);
+        $journal->save();
+
+        $admin = User::query()->create([
+            'nama' => 'Admin Kedaluwarsa',
+            'email' => 'admin.expiry@test.local',
+            'password' => 'test-password-123',
+        ]);
+        $adminRole = Role::query()->firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
+        $admin->assignRole($adminRole);
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/v1/admin/journal-monitoring/expire-drafts')
+            ->assertOk()
+            ->assertJsonPath('expired_count', 1);
+
+        $this->assertDatabaseHas('jurnal_mengajars', [
+            'id' => $journal->id,
+            'status_sesi' => 'kedaluwarsa',
+        ]);
     }
 
     public function test_admin_journal_detail_exposes_student_attendance_alias_used_by_ui(): void
@@ -228,7 +332,7 @@ class LessonJournalTransactionTest extends TestCase
             'materi_pelajaran_id' => null,
             'tanggal' => Carbon::now(config('app.timezone'))->toDateString(),
             'materi_pembahasan' => 'Materi monitoring admin',
-            'status_sesi' => 'selesai',
+            'status_sesi' => 'final',
         ]);
 
         $students->each(fn (Siswa $student) => $journal->presensiSiswas()->create([
@@ -266,7 +370,7 @@ class LessonJournalTransactionTest extends TestCase
             'materi_pelajaran_id' => null,
             'tanggal' => $firstDate->toDateString(),
             'materi_pembahasan' => 'Pertemuan 1',
-            'status_sesi' => 'selesai',
+            'status_sesi' => 'final',
         ]);
 
         $firstJournal->presensiSiswas()->create(['siswa_id' => $students[0]->id, 'status' => 'HADIR', 'keterangan' => 'hadir']);
@@ -278,7 +382,7 @@ class LessonJournalTransactionTest extends TestCase
             'materi_pelajaran_id' => null,
             'tanggal' => $firstDate->copy()->addDay()->toDateString(),
             'materi_pembahasan' => 'Pertemuan 2',
-            'status_sesi' => 'selesai',
+            'status_sesi' => 'final',
         ]);
 
         $secondJournal->presensiSiswas()->create(['siswa_id' => $students[0]->id, 'status' => 'HADIR', 'keterangan' => 'hadir']);

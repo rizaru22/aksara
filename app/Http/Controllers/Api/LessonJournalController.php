@@ -80,6 +80,15 @@ class LessonJournalController extends Controller
         $schedule = JadwalPelajaran::query()->with('kelas')->findOrFail($data['jadwal_pelajaran_id']);
         $this->authorizeSchedule($request, $schedule, $now, $cycles);
         $activeSubstitute = $this->activeSubstituteForSchedule($schedule, $now);
+        $existingDraft = JurnalMengajar::query()
+            ->where('jadwal_pelajaran_id', $schedule->id)
+            ->whereDate('tanggal', $now->toDateString())
+            ->where('status_sesi', JurnalMengajar::STATUS_DRAFT)
+            ->first();
+        if ($existingDraft && $now->greaterThan($existingDraft->created_at->copy()->addHours(48))) {
+            $existingDraft->update(['status_sesi' => JurnalMengajar::STATUS_KEDALUWARSA]);
+            throw new ConflictHttpException('Batas perubahan dan finalisasi 48 jam telah lewat. Jurnal sudah kedaluwarsa.');
+        }
         if ($request->hasFile('foto_kegiatan')) {
             throw ValidationException::withMessages(['foto_kegiatan' => 'Foto diambil saat finalisasi jurnal pada 30 menit terakhir pelajaran.']);
         }
@@ -214,8 +223,10 @@ class LessonJournalController extends Controller
         }
 
         if (! empty($validated['mata_pelajaran_id'])) {
-            $query->where('materi_pelajaran_id', $validated['mata_pelajaran_id'])
-                ->orWhereHas('jadwalPelajaran', fn ($scheduleQuery) => $scheduleQuery->where('mata_pelajaran_id', $validated['mata_pelajaran_id']));
+            $query->where(function ($subjectQuery) use ($validated): void {
+                $subjectQuery->where('materi_pelajaran_id', $validated['mata_pelajaran_id'])
+                    ->orWhereHas('jadwalPelajaran', fn ($scheduleQuery) => $scheduleQuery->where('mata_pelajaran_id', $validated['mata_pelajaran_id']));
+            });
         }
 
         if (! empty($validated['search'])) {
@@ -330,6 +341,15 @@ class LessonJournalController extends Controller
         }
 
         $schedule = $jurnalMengajar->jadwalPelajaran()->firstOrFail();
+        if ($isLateFinalization) {
+            $sessionDate = $jurnalMengajar->tanggal instanceof \Carbon\Carbon
+                ? $jurnalMengajar->tanggal->toDateString()
+                : (string) $jurnalMengajar->tanggal;
+            $sessionEnd = Carbon::parse($sessionDate.' '.$schedule->jam_selesai, config('app.timezone'));
+            if ($now->lessThanOrEqualTo($sessionEnd)) {
+                throw new ConflictHttpException('Finalisasi susulan hanya tersedia setelah waktu pembelajaran berakhir.');
+            }
+        }
         if (! $isLateFinalization) {
             $this->authorizeSchedule($request, $schedule, $now, $cycles);
         }
@@ -380,9 +400,19 @@ class LessonJournalController extends Controller
 
                 return $journal->load(['jadwalPelajaran.kelas', 'jadwalPelajaran.mataPelajaran', 'presensiSiswas.siswa']);
             });
-        } catch (\\Throwable $exception) {
+        } catch (\Throwable $exception) {
             if ($photoPath) {
                 Storage::disk('local')->delete($photoPath);
+            }
+            // Persist expiry if the deadline passed while the transaction was running.
+            if (now(config('app.timezone'))->greaterThan($deadline)) {
+                DB::table('jurnal_mengajars')
+                    ->where('id', $jurnalMengajar->id)
+                    ->where('status_sesi', JurnalMengajar::STATUS_DRAFT)
+                    ->update([
+                        'status_sesi' => JurnalMengajar::STATUS_KEDALUWARSA,
+                        'updated_at' => now(config('app.timezone')),
+                    ]);
             }
             throw $exception;
         }
@@ -409,6 +439,10 @@ class LessonJournalController extends Controller
         $isAdmin = $user->hasRole('admin');
         $isWali = DB::table('kelas')->where('id', $class)->where('wali_kelas_id', $user->id)->exists();
         abort_unless($isAdmin || $isWali, 403, 'Koreksi hanya dapat dilakukan Admin atau wali kelas terkait.');
+
+        if ($journal->status_sesi !== JurnalMengajar::STATUS_DRAFT) {
+            throw new ConflictHttpException('Presensi hanya dapat dikoreksi selama jurnal masih berstatus Draft.');
+        }
 
         $data = $request->validate([
             'status' => ['required', 'in:HADIR,SAKIT,IZIN,ALPHA,CABUT'],
