@@ -316,12 +316,12 @@
             const result = await api(`/api/v1/lesson-journals/${journalId}`);
             const journal = result.data || {};
             const attendance = Array.isArray(journal.presensi_siswas) ? journal.presensi_siswas : (Array.isArray(journal.presensi) ? journal.presensi : []);
-            const rows = attendance.map((row) => {
+            const rows = attendance.map((row, index) => {
                 const studentName = row.siswa?.nama || row.nama || '—';
                 const status = row.status || '—';
                 const keterangan = row.keterangan || '—';
-                return `<tr><td>${htmlSafe(studentName)}</td><td><span class="badge text-bg-light border">${htmlSafe(status)}</span></td><td>${htmlSafe(keterangan)}</td></tr>`;
-            }).join('') || '<tr><td colspan="3" class="text-center text-secondary py-3">Belum ada data presensi siswa untuk jurnal ini.</td></tr>';
+                return `<tr><td>${index + 1}</td><td>${htmlSafe(studentName)}</td><td><span class="badge text-bg-light border">${htmlSafe(status)}</span></td><td>${htmlSafe(keterangan)}</td></tr>`;
+            }).join('') || '<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada data presensi siswa untuk jurnal ini.</td></tr>';
             const statusText = ({ draft: 'Draft', final: 'Final', finalisasi_susulan: 'Finalisasi Susulan', kedaluwarsa: 'Kedaluwarsa' })[journal.status_sesi] || journal.status_sesi || '—';
             const materi = journal.materi_pembahasan || '<span class="text-secondary fst-italic">Belum diisi</span>';
             const catatan = journal.catatan_kejadian_kelas || '<span class="text-secondary fst-italic">Belum diisi</span>';
@@ -350,7 +350,7 @@
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-sm align-middle mb-0">
-                                <thead><tr><th>Nama Siswa</th><th>Status</th><th>Keterangan</th></tr></thead>
+                                <thead><tr><th>No.</th><th>Nama Siswa</th><th>Status</th><th>Keterangan</th></tr></thead>
                                 <tbody>${rows}</tbody>
                             </table>
                         </div>
@@ -1337,11 +1337,12 @@ renderStudentPage();
             const statusColors = { HADIR: 'success', SAKIT: 'info', IZIN: 'warning', ALPHA: 'danger', CABUT: 'secondary' };
             const color = statusColors[p.status] || 'secondary';
             return `<tr>
+                <td>${index + 1}</td>
                 <td>${htmlSafe(p.siswa?.nama || '—')}</td>
                 <td><span class="badge bg-${color}">${htmlSafe(p.status)}</span></td>
                 <td>${htmlSafe(p.keterangan || '—')}</td>
             </tr>`;
-        }).join('') || `<tr><td colspan="3" class="text-center text-secondary py-3">Belum ada presensi dicatat.</td></tr>`;
+        }).join('') || `<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada presensi dicatat.</td></tr>`;
 
         const gpsInfo = journal.jarak_geofence_finalisasi != null
             ? `${htmlSafe(String(Math.round(journal.jarak_geofence_finalisasi)))} m dari lokasi sekolah`
@@ -1412,7 +1413,7 @@ renderStudentPage();
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-sm table-hover align-middle mb-0">
-                            <thead><tr><th>Nama Siswa</th><th>Status</th><th>Keterangan</th></tr></thead>
+                            <thead><tr><th>No.</th><th>Nama Siswa</th><th>Status</th><th>Keterangan</th></tr></thead>
                             <tbody>${presensiRows}</tbody>
                         </table>
                     </div>
