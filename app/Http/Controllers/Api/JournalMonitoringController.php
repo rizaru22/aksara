@@ -195,7 +195,7 @@ class JournalMonitoringController extends Controller
         $now = Carbon::now(config('app.timezone'));
         $expiredCount = JurnalMengajar::query()
             ->where('status_sesi', 'draft')
-            ->where('created_at', '<=', $now->copy()->subHours(48))
+            ->where('created_at', '<', $now->copy()->subHours(48))
             ->update([
                 'status_sesi' => 'kedaluwarsa',
                 'updated_at' => $now,
