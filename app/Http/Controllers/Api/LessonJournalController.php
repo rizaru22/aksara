@@ -404,6 +404,16 @@ class LessonJournalController extends Controller
             if ($photoPath) {
                 Storage::disk('local')->delete($photoPath);
             }
+            // Persist expiry if the deadline passed while the transaction was running.
+            if (now(config('app.timezone'))->greaterThan($deadline)) {
+                DB::table('jurnal_mengajars')
+                    ->where('id', $jurnalMengajar->id)
+                    ->where('status_sesi', JurnalMengajar::STATUS_DRAFT)
+                    ->update([
+                        'status_sesi' => JurnalMengajar::STATUS_KEDALUWARSA,
+                        'updated_at' => now(config('app.timezone')),
+                    ]);
+            }
             throw $exception;
         }
 
