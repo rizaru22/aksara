@@ -281,12 +281,13 @@
     function renderAdminHome() {
         const quickLinks = [
             { key: 'reports', icon: 'bi-clipboard-data', label: 'Laporan Harian, Mingguan & Bulanan', text: 'Rekap kehadiran guru dan jurnal mengajar berdasarkan periode.' },
-            { key: 'student-attendance-report', icon: 'bi-people-fill', label: 'Laporan Presensi Siswa', text: 'Rekap kehadiran siswa per bulan dan kelas.' },
+            ...dashboardModules.filter((module) => ['flagged', 'journal-monitoring', 'monitoring', 'substitute-approvals', 'leave-approvals', 'discrepancy', 'student-attendance-report'].includes(module.key)).map((module) => ({ key: module.key, icon: module.icon, label: module.title, text: module.description, module })),
             { key: 'classes', icon: 'bi-building', label: 'Kelola Kelas', text: 'Data kelas, tingkat, jurusan, dan wali kelas.' },
             { key: 'students', icon: 'bi-people', label: 'Kelola Siswa', text: 'Data siswa dan penempatan kelas.' },
+            { key: 'subjects', icon: 'bi-book', label: 'Mata Pelajaran', text: 'Kelola data mata pelajaran.' },
+            { key: 'materials', icon: 'bi-journal-text', label: 'Materi Pelajaran', text: 'Kelola materi pembelajaran.' },
             { key: 'schedules', icon: 'bi-calendar-week', label: 'Jadwal Pelajaran', text: 'Jadwal guru, kelas, mata pelajaran, dan siklus.' },
-            { key: 'substitute-approvals', icon: 'bi-person-badge', label: 'Guru Pengganti', text: 'Tinjau dan setujui permohonan delegasi mengajar guru pengganti.' },
-            ...dashboardModules.map((module) => ({ key: module.key, icon: module.icon, label: module.title, text: module.description, module })),
+            ...dashboardModules.filter((module) => !['flagged', 'journal-monitoring', 'monitoring', 'substitute-approvals', 'leave-approvals', 'discrepancy', 'student-attendance-report'].includes(module.key)).map((module) => ({ key: module.key, icon: module.icon, label: module.title, text: module.description, module })),
         ];
         setAdminPanel('Dashboard Admin', `<div class="admin-welcome mb-4"><h1>Selamat datang, ${htmlSafe(activeUser?.nama || 'Pengguna')}</h1><p class="mb-0">Rekap kehadiran dan kegiatan pembelajaran hari ini.</p></div><div id="adminLiveReport"><div class="card"><div class="card-body text-secondary"><span class="spin"></span>Memuat rekap hari ini...</div></div></div><h2 class="h5 mt-4 mb-3">Menu Administrasi</h2><div class="row g-3">${quickLinks.map((item) => `<div class="col-12 col-md-6 col-xl-4"><article class="card h-100"><div class="card-body d-flex flex-column"><span class="module-icon mb-3"><i class="bi ${item.icon}"></i></span><h2 class="card-title">${htmlSafe(item.label)}</h2><p class="text-secondary small flex-grow-1">${htmlSafe(item.text)}</p><button class="btn btn-outline-success btn-sm align-self-start" data-admin-open="${htmlSafe(item.key)}">Buka menu <i class="bi bi-arrow-right"></i></button></div></article></div>`).join('')}</div>`);
         $('adminPanelContent').querySelectorAll('[data-admin-open]').forEach((button) => button.addEventListener('click', () => adminAction(button.dataset.adminOpen)));
@@ -1543,7 +1544,7 @@ renderStudentPage();
         const result = await api('/api/v1/discrepancy-cases');
         const cases = result.data?.data || [];
         const note = result.meta?.note || 'Tidak ada kasus tersimpan.';
-        setFeature('Audit Discrepancy', `<div class="alert alert-warning">${htmlSafe(note)}</div>${cases.length ? `<div class="list-group">${cases.map((item) => `<article class="list-group-item"><div class="d-flex justify-content-between"><strong>${htmlSafe(item.title)}</strong><span>${htmlSafe(item.status)}</span></div><div class="small text-secondary">${htmlSafe(formatTanggal(item.tanggal))} · ${htmlSafe(item.type)}</div><p class="small mb-2">${htmlSafe(item.description)}</p>${item.status === 'OPEN' || item.status === 'IN_REVIEW' ? `<div class="input-group input-group-sm"><input class="form-control" id="note-${item.id}" placeholder="Catatan penyelesaian"><button class="btn btn-outline-success" data-resolve="${item.id}">Tandai selesai</button><button class="btn btn-outline-secondary" data-review="${item.id}">Tinjau</button></div>` : ''}</article>`).join('')}</div>` : '<p class="text-center text-secondary">Belum ada kasus actionable tersimpan.</p>'}`);
+        setFeature('Audit Pembelajaran', `<div class="alert alert-warning">${htmlSafe(note)}</div>${cases.length ? `<div class="list-group">${cases.map((item) => `<article class="list-group-item"><div class="d-flex justify-content-between"><strong>${htmlSafe(item.title)}</strong><span>${htmlSafe(item.status)}</span></div><div class="small text-secondary">${htmlSafe(formatTanggal(item.tanggal))} · ${htmlSafe(item.type)}</div><p class="small mb-2">${htmlSafe(item.description)}</p>${item.status === 'OPEN' || item.status === 'IN_REVIEW' ? `<div class="input-group input-group-sm"><input class="form-control" id="note-${item.id}" placeholder="Catatan penyelesaian"><button class="btn btn-outline-success" data-resolve="${item.id}">Tandai selesai</button><button class="btn btn-outline-secondary" data-review="${item.id}">Tinjau</button></div>` : ''}</article>`).join('')}</div>` : '<p class="text-center text-secondary">Belum ada kasus actionable tersimpan.</p>'}`);
         document.querySelectorAll('[data-resolve]').forEach((button) => button.addEventListener('click', async () => {
             try { await api(`/api/v1/discrepancy-cases/${button.dataset.resolve}`, { method: 'PATCH', body: { status: 'RESOLVED', resolution_note: $(`note-${button.dataset.resolve}`).value } }); openDiscrepancies(); }
             catch (error) { showToast(error.message); }
@@ -1633,7 +1634,7 @@ renderStudentPage();
             add('student-attendance-report', 'view-dashboard-kurikulum', 'bi-people-fill', 'Laporan Presensi Siswa', 'Rekap kehadiran siswa per bulan dan kelas.');
             add('monitoring', 'view-dashboard-kurikulum', 'bi-bar-chart-line', 'Monitoring Pembelajaran', 'Lihat jumlah jadwal, jurnal, dan presensi hari ini.');
             add('journal-monitoring', 'view-dashboard-kurikulum', 'bi-journal-check', 'Monitoring E-Jurnal', 'Pantau status jurnal mengajar guru berdasarkan tanggal kegiatan.');
-            add('discrepancy', 'view-audit-discrepancy', 'bi-clipboard2-data', 'Audit Discrepancy', 'Tinjau dan tindak lanjuti kasus yang tersedia.');
+            add('discrepancy', 'view-audit-discrepancy', 'bi-clipboard2-data', 'Audit Pembelajaran', 'Tinjau dan tindak lanjuti kasus yang tersedia.');
             add('academic-master', 'kelola-master-data', 'bi-database', 'Master Data Akademik', 'Kelola kelas, siswa, mapel, materi, dan jadwal.');
             add('years', 'kelola-tahun-ajaran', 'bi-calendar3', 'Tahun Ajaran', 'Buat tahun ajaran dan aktifkan melalui sinkronisasi.');
             add('agendas', 'kelola-agenda-sekolah', 'bi-calendar-event', 'Agenda Sekolah', 'Kelola agenda sekolah dan override KBM.');
@@ -1657,7 +1658,7 @@ renderStudentPage();
             add('agendas', 'kelola-agenda-sekolah', 'bi-calendar-event', 'Agenda Sekolah', 'Kelola agenda sekolah dan override KBM.');
             add('holidays', 'kelola-agenda-sekolah', 'bi-calendar2-x', 'Kalender Hari Libur', 'Atur libur nasional, cuti bersama, dan libur sekolah.');
             add('monitoring', 'view-dashboard-kurikulum', 'bi-bar-chart-line', 'Monitoring Pembelajaran', 'Lihat jumlah jadwal, jurnal, dan presensi hari ini.');
-            add('discrepancy', 'view-audit-discrepancy', 'bi-clipboard2-data', 'Audit Discrepancy', 'Tinjau dan tindak lanjuti kasus yang tersedia.');
+            add('discrepancy', 'view-audit-discrepancy', 'bi-clipboard2-data', 'Audit Pembelajaran', 'Tinjau dan tindak lanjuti kasus yang tersedia.');
             add('leave-approvals', 'kelola-pengajuan-izin', 'bi-file-earmark-check', 'Persetujuan Perizinan', 'Tinjau pengajuan izin guru.');
             add('settings', 'kelola-master-data', 'bi-sliders', 'Pengaturan Sekolah', 'Atur geofence, semester aktif, dan batas presensi.');
         }
@@ -1674,11 +1675,23 @@ renderStudentPage();
         const hideRoleDashboard = canAdminDashboard || is('guru');
         $('roleIntro').hidden = hideRoleDashboard;
         $('roleModules').hidden = hideRoleDashboard;
-        $('adminSideModules').innerHTML = modules.filter((module) => module.key !== 'academic-master').map((module) => `<button class="admin-side-link" data-admin-action="${htmlSafe(module.key)}"><i class="bi ${htmlSafe(module.icon)}"></i> ${htmlSafe(module.title)}</button>`).join('');
-        $('adminSideModules').querySelectorAll('[data-admin-action]').forEach((button) => button.addEventListener('click', () => {
-            document.body.classList.remove('sidebar-open');
-            adminAction(button.dataset.adminAction);
-        }));
+        const sidebarGroups = {
+            operational: new Set(['student-attendance', 'student-attendance-report', 'substitute-approvals', 'monitoring', 'journal-monitoring', 'discrepancy', 'flagged', 'leave-approvals', 'leave-submit']),
+            calendar: new Set(['years', 'agendas', 'holidays']),
+            administration: new Set(['admin-users', 'settings'])
+        };
+        const renderSidebarGroup = (elementId, items) => {
+            $(elementId).innerHTML = items.map((module) => `<button class="admin-side-link" data-admin-action="${htmlSafe(module.key)}"><i class="bi ${htmlSafe(module.icon)}"></i> ${htmlSafe(module.title)}</button>`).join('');
+        };
+        renderSidebarGroup('adminSideOperational', modules.filter((module) => sidebarGroups.operational.has(module.key)));
+        renderSidebarGroup('adminSideCalendar', modules.filter((module) => sidebarGroups.calendar.has(module.key)));
+        renderSidebarGroup('adminSideAdministration', modules.filter((module) => sidebarGroups.administration.has(module.key)));
+        ['adminSideOperational', 'adminSideCalendar', 'adminSideAdministration'].forEach((elementId) => {
+            $(elementId).querySelectorAll('[data-admin-action]').forEach((button) => button.addEventListener('click', () => {
+                document.body.classList.remove('sidebar-open');
+                adminAction(button.dataset.adminAction);
+            }));
+        });
         window.addEventListener('aksara:open-substitutes', () => {
             openSubstituteApprovals();
         });
