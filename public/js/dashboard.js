@@ -371,7 +371,7 @@
                 const status = ({ draft: '<span class="badge bg-warning text-dark">Draft</span>', final: '<span class="badge bg-success">Final</span>', finalisasi_susulan: '<span class="badge bg-info text-dark">Finalisasi Susulan</span>', kedaluwarsa: '<span class="badge bg-danger">Kedaluwarsa</span>' })[journal.status_sesi] || '<span class="badge bg-secondary">—</span>';
                 const lengkap = journal.lengkap ? '<span class="badge bg-success">Lengkap</span>' : '<span class="badge bg-danger">Belum lengkap</span>';
                 return `<tr>
-                    <td>${htmlSafe(formatTanggal(journal.tanggal))}</td>
+                    <td>${htmlSafe(formatTanggal(journal.tanggal,'ringkas'))}</td>
                     <td>${htmlSafe(kelas)}</td>
                     <td>${htmlSafe(mapel)}</td>
                     <td>${htmlSafe(journal.materi_pembahasan || '—')}</td>
