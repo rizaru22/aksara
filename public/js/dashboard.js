@@ -1683,9 +1683,10 @@ renderStudentPage();
         const renderSidebarGroup = (elementId, items) => {
             $(elementId).innerHTML = items.map((module) => `<button class="admin-side-link" data-admin-action="${htmlSafe(module.key)}"><i class="bi ${htmlSafe(module.icon)}"></i> ${htmlSafe(module.title)}</button>`).join('');
         };
-        renderSidebarGroup('adminSideOperational', modules.filter((module) => sidebarGroups.operational.has(module.key)));
-        renderSidebarGroup('adminSideCalendar', modules.filter((module) => sidebarGroups.calendar.has(module.key)));
-        renderSidebarGroup('adminSideAdministration', modules.filter((module) => sidebarGroups.administration.has(module.key)));
+        const orderedModules = (keys) => keys.map((key) => modules.find((module) => module.key === key)).filter(Boolean);
+        renderSidebarGroup('adminSideOperational', orderedModules(['flagged', 'journal-monitoring', 'monitoring', 'substitute-approvals', 'leave-approvals', 'discrepancy', 'student-attendance-report', 'student-attendance', 'leave-submit']));
+        renderSidebarGroup('adminSideCalendar', orderedModules(['years', 'agendas', 'holidays']));
+        renderSidebarGroup('adminSideAdministration', orderedModules(['admin-users', 'settings']));
         ['adminSideOperational', 'adminSideCalendar', 'adminSideAdministration'].forEach((elementId) => {
             $(elementId).querySelectorAll('[data-admin-action]').forEach((button) => button.addEventListener('click', () => {
                 document.body.classList.remove('sidebar-open');
