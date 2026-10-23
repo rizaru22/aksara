@@ -1663,7 +1663,7 @@ renderStudentPage();
             add('settings', 'kelola-master-data', 'bi-sliders', 'Pengaturan Sekolah', 'Atur geofence, semester aktif, dan batas presensi.');
         }
 
-        if (canSubmitLeave && !is('tendik') && !modules.some((module) => module.key === 'leave-submit')) {
+        if (canSubmitLeave && !is('tendik') && !is('admin')&& !modules.some((module) => module.key === 'leave-submit')) {
             modules.push({ key: 'leave-submit', icon: 'bi-file-earmark-plus', title: 'Pengajuan Izin', description: 'Ajukan cuti atau dinas dan pantau status permohonan.' });
         }
 
