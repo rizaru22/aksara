@@ -758,13 +758,13 @@ renderStudentPage();
         const statusBadge = { PENDING: 'text-bg-warning', APPROVED: 'text-bg-success', REJECTED: 'text-bg-danger' };
         const displayDate = (value) => value ? new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : '—';
         const formatTanggal = (value) => value ? new Intl.DateTimeFormat('id-ID').format(new Date(value)) : '—';
-        const rows = items.map((item) => `<tr><td class="text-nowrap">${htmlSafe(displayDate(item.created_at))}</td><td><strong>${htmlSafe(item.user?.nama || 'Pengguna')}</strong>${item.user?.nip ? `<div class="small text-secondary">${htmlSafe(item.user.nip)}</div>` : ''}</td><td class="text-nowrap">${item.jenis_pengajuan === 'DINAS' ? 'Dinas luar' : 'Izin / cuti'}</td><td class="text-nowrap">${htmlSafe(formatTanggal(item.tanggal_mulai))}${item.tanggal_mulai !== item.tanggal_selesai ? ` – ${htmlSafe(formatTanggal(item.tanggal_selesai))}` : ''}</td><td class="leave-reason-cell" title="${htmlSafe(item.alasan)}">${htmlSafe(item.alasan)}</td><td><span class="badge ${statusBadge[item.status_approval] || 'text-bg-secondary'}">${htmlSafe(item.status_approval)}</span></td><td class="text-nowrap">${item.berkas_lampiran ? `<button class="btn btn-outline-secondary btn-sm" data-attachment="${item.id}" title="Unduh lampiran" aria-label="Unduh lampiran"><i class="bi bi-paperclip"></i></button>` : '<span class="text-secondary">—</span>'}</td><td class="text-nowrap">${item.status_approval === 'PENDING' ? `<div class="d-flex gap-1"><button class="btn btn-success btn-sm" data-leave-decision="${item.id}" data-status="APPROVED">Setujui</button><button class="btn btn-outline-danger btn-sm" data-leave-decision="${item.id}" data-status="REJECTED">Tolak</button></div>` : '<span class="text-secondary">Selesai</span>'}</td></tr>`).join('');
+        const rows = items.map((item, index) => `<tr><td>${index + 1}</td><td class="text-nowrap">${htmlSafe(displayDate(item.created_at))}</td><td><strong>${htmlSafe(item.user?.nama || 'Pengguna')}</strong>${item.user?.nip ? `<div class="small text-secondary">${htmlSafe(item.user.nip)}</div>` : ''}</td><td class="text-nowrap">${item.jenis_pengajuan === 'DINAS' ? 'Dinas luar' : 'Izin / cuti'}</td><td class="text-nowrap">${htmlSafe(formatTanggal(item.tanggal_mulai))}${item.tanggal_mulai !== item.tanggal_selesai ? ` – ${htmlSafe(formatTanggal(item.tanggal_selesai))}` : ''}</td><td class="leave-reason-cell" title="${htmlSafe(item.alasan)}">${htmlSafe(item.alasan)}</td><td><span class="badge ${statusBadge[item.status_approval] || 'text-bg-secondary'}">${htmlSafe(item.status_approval)}</span></td><td class="text-nowrap">${item.berkas_lampiran ? `<button class="btn btn-outline-secondary btn-sm" data-attachment="${item.id}" title="Unduh lampiran" aria-label="Unduh lampiran"><i class="bi bi-paperclip"></i></button>` : '<span class="text-secondary">—</span>'}</td><td class="text-nowrap">${item.status_approval === 'PENDING' ? `<div class="d-flex gap-1"><button class="btn btn-success btn-sm" data-leave-decision="${item.id}" data-status="APPROVED">Setujui</button><button class="btn btn-outline-danger btn-sm" data-leave-decision="${item.id}" data-status="REJECTED">Tolak</button></div>` : '<span class="text-secondary">Selesai</span>'}</td></tr>`).join('');
         const currentPage = Number(pagination.current_page || pageValue);
         const lastPage = Number(pagination.last_page || 1);
         const startPage = Math.max(1, Math.min(currentPage - 2, lastPage - 4));
         const endPage = Math.min(lastPage, startPage + 4);
         const pageButtons = Array.from({ length: endPage - startPage + 1 }, (_, index) => startPage + index).map((number) => `<button type="button" class="btn btn-sm ${number === currentPage ? 'btn-primary' : 'btn-outline-secondary'}" data-leave-page="${number}" aria-current="${number === currentPage ? 'page' : 'false'}">${number}</button>`).join('');
-        setFeature('Persetujuan Perizinan Guru', `<section class="card"><div class="card-body"><form id="leaveSearchForm" class="row g-2 align-items-end mb-3"><div class="col-12 col-md"><label class="form-label" for="leaveSearch">Cari nama, NIP, jenis, status, atau alasan</label><input class="form-control" type="search" id="leaveSearch" value="${htmlSafe(searchValue)}" placeholder="Ketik kata pencarian"></div><div class="col-6 col-md-2"><label class="form-label" for="leavePerPage">Baris per halaman</label><select class="form-select" id="leavePerPage">${[10, 20, 50].map((count) => `<option value="${count}" ${Number(perPage) === count ? 'selected' : ''}>${count}</option>`).join('')}</select></div><div class="col-6 col-md-auto"><button class="btn btn-primary w-100"><i class="bi bi-search"></i> Cari</button></div></form><div class="table-responsive"><table class="table table-hover table-striped align-middle leave-approval-table"><thead><tr><th>Waktu pengajuan</th><th>Guru</th><th>Jenis</th><th>Tanggal izin</th><th>Alasan</th><th>Status</th><th>Lampiran</th><th>Aksi</th></tr></thead><tbody>${rows || `<tr><td colspan="8" class="text-center text-secondary py-4">${searchValue ? 'Tidak ditemukan pengajuan yang cocok.' : 'Belum ada pengajuan izin.'}</td></tr>`}</tbody></table></div><div class="d-flex flex-wrap justify-content-between align-items-center gap-2"><small class="text-secondary">Menampilkan ${pagination.from || 0}–${pagination.to || 0} dari ${pagination.total || 0} pengajuan terbaru</small><nav class="d-flex gap-1" aria-label="Halaman pengajuan"><button type="button" class="btn btn-sm btn-outline-secondary" data-leave-page="${Math.max(1, currentPage - 1)}" ${currentPage <= 1 ? 'disabled' : ''} aria-label="Halaman sebelumnya"><i class="bi bi-chevron-left"></i></button>${pageButtons}<button type="button" class="btn btn-sm btn-outline-secondary" data-leave-page="${Math.min(lastPage, currentPage + 1)}" ${currentPage >= lastPage ? 'disabled' : ''} aria-label="Halaman berikutnya"><i class="bi bi-chevron-right"></i></button></nav></div></div></section>`);
+        setFeature('Persetujuan Perizinan Guru', `<section class="card"><div class="card-body"><form id="leaveSearchForm" class="row g-2 align-items-end mb-3"><div class="col-12 col-md"><label class="form-label" for="leaveSearch">Cari nama, NIP, jenis, status, atau alasan</label><input class="form-control" type="search" id="leaveSearch" value="${htmlSafe(searchValue)}" placeholder="Ketik kata pencarian"></div><div class="col-6 col-md-2"><label class="form-label" for="leavePerPage">Baris per halaman</label><select class="form-select" id="leavePerPage">${[10, 20, 50].map((count) => `<option value="${count}" ${Number(perPage) === count ? 'selected' : ''}>${count}</option>`).join('')}</select></div><div class="col-6 col-md-auto"><button class="btn btn-primary w-100"><i class="bi bi-search"></i> Cari</button></div></form><div class="table-responsive"><table class="table table-hover table-striped align-middle leave-approval-table"><thead><tr><th>No.</th><th>Waktu Pengajuan</th><th>Guru</th><th>Jenis</th><th>Tanggal Izin</th><th>Alasan</th><th>Status</th><th>Lampiran</th><th>Aksi</th></tr></thead><tbody>${rows || `<tr><td colspan="9" class="text-center text-secondary py-4">${searchValue ? 'Tidak ditemukan pengajuan yang cocok.' : 'Belum ada pengajuan izin.'}</td></tr>`}</tbody></table></div><div class="d-flex flex-wrap justify-content-between align-items-center gap-2"><small class="text-secondary">Menampilkan ${pagination.from || 0}–${pagination.to || 0} dari ${pagination.total || 0} pengajuan terbaru</small><nav class="d-flex gap-1" aria-label="Halaman pengajuan"><button type="button" class="btn btn-sm btn-outline-secondary" data-leave-page="${Math.max(1, currentPage - 1)}" ${currentPage <= 1 ? 'disabled' : ''} aria-label="Halaman sebelumnya"><i class="bi bi-chevron-left"></i></button>${pageButtons}<button type="button" class="btn btn-sm btn-outline-secondary" data-leave-page="${Math.min(lastPage, currentPage + 1)}" ${currentPage >= lastPage ? 'disabled' : ''} aria-label="Halaman berikutnya"><i class="bi bi-chevron-right"></i></button></nav></div></div></section>`);
         $('leaveSearchForm')?.remove();
         document.querySelector('nav[aria-label="Halaman pengajuan"]')?.parentElement.remove();
         $('leaveSearchForm')?.addEventListener('submit', (event) => {
@@ -993,7 +993,7 @@ renderStudentPage();
                 </div>
             </div>`;
 
-            const rows = items.map((item) => {
+            const rows = items.map((item, index) => {
                 const actions = item.status_approval === 'PENDING'
                     ? `<div class="d-flex gap-1">
                         <button class="btn btn-success btn-sm" data-sub-action="${item.id}" data-decision="APPROVED" title="Setujui"><i class="bi bi-check-lg"></i> Setujui</button>
@@ -1002,6 +1002,7 @@ renderStudentPage();
                     : `<span class="small text-secondary">Selesai</span>`;
 
                 return `<tr>
+                    <td>${index + 1}</td>
                     <td class="text-nowrap">${htmlSafe(formatTanggal(item.tanggal))}</td>
                     <td>
                         <strong>${htmlSafe(item.guru_utama?.nama || 'Guru Utama')}</strong>
@@ -1029,6 +1030,7 @@ renderStudentPage();
                         <table class="table table-hover table-striped align-middle">
                             <thead>
                                 <tr>
+                                    <th>No.</th>
                                     <th>Tanggal</th>
                                     <th>Guru Utama</th>
                                     <th>Guru Pengganti</th>
@@ -1039,7 +1041,7 @@ renderStudentPage();
                                 </tr>
                             </thead>
                             <tbody>
-                                ${rows || '<tr><td colspan="7" class="text-center text-secondary py-4">Tidak ada pengajuan guru pengganti.</td></tr>'}
+                                ${rows || '<tr><td colspan="8" class="text-center text-secondary py-4">Tidak ada pengajuan guru pengganti.</td></tr>'}
                             </tbody>
                         </table>
                     </div>
@@ -1178,7 +1180,7 @@ renderStudentPage();
             kedaluwarsa: '<span class="badge bg-danger">Kedaluwarsa</span>',
         };
 
-        const rows = journals.map((item) => {
+        const rows = journals.map((item, index) => {
             const guruLabel = htmlSafe(item.guru?.nama || 'Guru tidak diketahui');
             const nipLabel = item.guru?.nip ? `<div class="small text-secondary">${htmlSafe(item.guru.nip)}</div>` : '';
             const kelasLabel = htmlSafe(item.kelas?.nama_kelas || '—');
@@ -1194,6 +1196,7 @@ renderStudentPage();
                 : `<span class="badge bg-danger" title="${htmlSafe(item.presensi_count)} / ${htmlSafe(String(item.total_siswa))} siswa">Belum lengkap</span>`;
 
         return `<tr>
+            <td>${index + 1}</td>
             <td class="text-nowrap">${htmlSafe(tanggalLabel)}</td>
             <td>
                 <strong>${guruLabel}</strong>
@@ -1224,6 +1227,7 @@ renderStudentPage();
                         <table class="table table-hover table-striped align-middle mb-0">
                             <thead>                        
                                     <tr>
+                                        <th>No.</th>
                                         <th>Tanggal</th>
                                         <th>Guru / Kelas</th>
                                         <th>Waktu</th>
