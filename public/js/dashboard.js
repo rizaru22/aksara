@@ -372,7 +372,7 @@
                 const lengkap = journal.lengkap ? '<span class="badge bg-success">Lengkap</span>' : '<span class="badge bg-danger">Belum lengkap</span>';
                 return `<tr>
                     <td class="text-nowrap">${htmlSafe(formatTanggal(journal.tanggal,'ringkas'))}</td>
-                    <td>${htmlSafe(kelas)}</td>
+                    <td class="text-nowrap">${htmlSafe(kelas)}</td>
                     <td>${htmlSafe(mapel)}</td>
                     <td>${htmlSafe(journal.materi_pembahasan || '—')}</td>
                     <td>${status}</td>
