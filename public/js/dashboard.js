@@ -1191,7 +1191,7 @@ renderStudentPage();
         </tr>`;
         }).join('');
 
-        const emptyRow = `<tr><td colspan="6" class="text-center text-secondary py-4">Tidak ada jurnal pada tanggal yang dipilih.</td></tr>`;
+        const emptyRow = '';
 
         const content = `${filterBar}
             <p class="text-secondary small mb-3">
