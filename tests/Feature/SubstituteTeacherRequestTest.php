@@ -60,7 +60,7 @@ class SubstituteTeacherRequestTest extends TestCase
             'jadwal_pelajaran_id' => $schedule->id,
             'user_id' => $primaryTeacher->id,
             'guru_pengganti_id' => $substituteTeacher->id,
-            'status_sesi' => 'berlangsung',
+            'status_sesi' => 'draft',
         ]);
     }
 
