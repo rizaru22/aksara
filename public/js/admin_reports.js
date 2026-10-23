@@ -110,6 +110,16 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
         }
     }
 
+    function reportHeadingForPrint() {
+        const label = document.getElementById('adminReportPeriodLabel')?.textContent || 'Laporan';
+        const isClassReport = Boolean(window.aksaraDedicatedClassReport);
+        if (isClassReport) return period === 'weekly' ? 'Laporan Kehadiran Guru di Kelas Mingguan' : 'Laporan Kehadiran Guru di Kelas Harian';
+        if (period === 'weekly') return 'Laporan Presensi Guru Mingguan';
+        if (period === 'monthly') return 'Laporan Presensi Guru Bulanan';
+        if (period === 'student-monthly') return 'Laporan Presensi Siswa Bulanan';
+        return 'Laporan Presensi Guru Harian';
+    }
+
     // Menyiapkan UI pelaporan admin dengan pilihan harian, mingguan, dan bulanan serta tombol cetak.
     async function open(initialPeriod = 'daily', options = {}) {
         const dedicatedStudent = Boolean(options.dedicatedStudent);
@@ -161,7 +171,10 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
                     window.print();
                     return;
                 }
-                printWindow.document.write(`<!doctype html><html><head><title>AKSARA - ${htmlSafe(document.getElementById('adminReportPeriodLabel')?.textContent || 'Laporan')}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #d1d5db;padding:8px 10px;text-align:left;vertical-align:top}thead th{background:#f3f4f6;font-weight:700}.badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#e5e7eb;color:#111;font-size:11px}.text-secondary{color:#4b5563}.small{font-size:11px}.text-center{text-align:center}.text-nowrap{white-space:nowrap}</style></head><body>${printableTable.outerHTML}</body></html>`);
+                const reportLabel = document.getElementById('adminReportPeriodLabel')?.textContent || 'Laporan';
+                const schoolName = 'SMK Aksara';
+                const reportTitle = `${reportHeadingForPrint()}`;
+                printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${htmlSafe(schoolName)} - ${htmlSafe(reportTitle)}</title><style>@page{size:auto;margin:18mm}body{font-family:Arial,sans-serif;padding:0;color:#111}header{text-align:center;margin:0 0 22px;padding:0 0 14px;border-bottom:2px solid #222}h1{font-size:22pt;margin:0 0 8px;font-weight:700}h3{font-size:14pt;margin:0;font-weight:700}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #d1d5db;padding:8px 10px;text-align:left;vertical-align:top}thead th{background:#f3f4f6;font-weight:700}.badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#e5e7eb;color:#111;font-size:11px}.text-secondary{color:#4b5563}.small{font-size:11px}.text-center{text-align:center}.text-nowrap{white-space:nowrap}@media print{thead{display:table-header-group}tr{break-inside:avoid}}</style></head><body><header><h1>${htmlSafe(schoolName)}</h1><h3>${htmlSafe(reportTitle)}</h3></header>${printableTable.outerHTML}</body></html>`);
                 printWindow.document.close();
                 printWindow.focus();
                 printWindow.print();
