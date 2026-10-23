@@ -1127,27 +1127,27 @@ renderStudentPage();
             <div class="card-body">
                 <div class="row g-3 admin-form-grid">
                     
-                <div class="col-sm-12">
+                <div class="col-md-6 col-sm-12">
                     <label class="form-label" for="jmTanggalMode">Cakupan tanggal</label>
                     <select class="form-select" id="jmTanggalMode" name="tanggal_mode">
                         <option value="semua" ${!tanggal ? 'selected' : ''}>Semua tanggal</option>
                         <option value="tertentu" ${tanggal ? 'selected' : ''}>Tanggal tertentu</option>
                     </select>
                 </div>
-                <div class="col-sm-12" id="jmTanggalWrapper" ${!tanggal ? 'hidden' : ''}>
+                <div class="col-md-6 col-sm-12" id="jmTanggalWrapper" ${!tanggal ? 'hidden' : ''}>
                     <label class="form-label" for="jmTanggal">Tanggal kegiatan</label>
                     <input class="form-control" id="jmTanggal" type="date" name="tanggal" value="${htmlSafe(tanggal)}" ${!tanggal ? 'disabled' : ''}>
                 </div>
 
-                    <div class="col-sm-12">
+                    <div class="col-md-6 col-sm-12">
                         <label class="form-label" for="jmStatus">Status jurnal</label>
                         <select class="form-select" id="jmStatus" name="status">${statusOptions}</select>
                     </div>
-                    <div class="col-sm-12">
+                    <div class="col-md-6 col-sm-12">
                         <label class="form-label" for="jmSearch">Pencarian</label>
                         <input class="form-control" id="jmSearch" type="search" name="search" value="${htmlSafe(search)}" placeholder="Cari nama guru, kelas, atau materi...">
                     </div>
-                    <div class="col-sm-12 form-actions">
+                    <div class=" col-sm-12 form-actions">
                         <button class="btn btn-outline-success" type="submit">Terapkan filter</button>
                         ${activeRoleNames.includes('admin') ? '<button class="btn btn-outline-danger ms-2" type="button" id="jmExpireDrafts">Tandai draft kedaluwarsa</button>' : ''}
                     </div>
@@ -1162,7 +1162,7 @@ renderStudentPage();
             { label: 'Finalisasi susulan', value: summary.finalisasi_susulan ?? '—', variant: 'info' },
             { label: 'Kedaluwarsa', value: summary.kedaluwarsa ?? '—', variant: 'danger' },
             { label: 'Belum lengkap', value: summary.belum_lengkap ?? '—', variant: 'secondary' },
-        ].map(({ label, value, variant }) => `<div class="col-sm-12">
+        ].map(({ label, value, variant }) => `<div class="col-lg-4 col-md-6 col-sm-12">
             <div class="card border-${variant}-subtle">
                 <div class="card-body d-flex justify-content-between align-items-center py-3">
                     <span class="small text-secondary">${htmlSafe(label)}</span>
@@ -1535,7 +1535,7 @@ renderStudentPage();
             ['Guru terjadwal', data.scheduled_teachers], ['Guru dengan presensi terverifikasi', data.present_scheduled_teachers],
             ['Presensi menunggu verifikasi', data.flagged_attendances], ['Agenda override KBM', data.school_agenda_overrides],
         ];
-        setFeature('Monitoring Pembelajaran', `<form id="monitoringFilters" class="card mb-3 admin-form-card"><div class="card-body"><div class="row g-3 admin-form-grid"><div class="col-sm-12"><label class="form-label">Tanggal</label><input class="form-control" type="date" name="date" value="${htmlSafe(formatTanggal(data.date))}"></div><div class="col-sm-12"><label class="form-label">Tahun ajaran</label><select class="form-select" name="tahun_ajaran_id"><option value="">Tahun aktif</option>${data.available_years.map((year) => `<option value="${year.id}" ${String(year.id) === String(filters.tahun_ajaran_id || '') ? 'selected' : ''}>${htmlSafe(year.tahun_ajaran)}${year.is_active ? ' (aktif)' : ''}</option>`).join('')}</select></div><div class="col-sm-12"><label class="form-label">Semester</label><select class="form-select" name="semester"><option value="">Default aktif</option><option ${String(filters.semester || '') === 'Ganjil' ? 'selected' : ''}>Ganjil</option><option ${String(filters.semester || '') === 'Genap' ? 'selected' : ''}>Genap</option></select></div><div class="col-sm-12 form-actions"><button class="btn btn-outline-success">Terapkan filter</button></div></div></div></form><div class="alert alert-info">Angka di bawah adalah hitungan sumber untuk tanggal ${htmlSafe(formatTanggal(data.date))}. Persentase KPI menunggu rumus resmi.</div><div class="row g-3">${rows.map(([label, value]) => `<div class="col-sm-12"><div class="card"><div class="card-body d-flex justify-content-between"><span>${htmlSafe(label)}</span><strong>${htmlSafe(value)}</strong></div></div></div>`).join('')}</div>`);
+        setFeature('Monitoring Pembelajaran', `<form id="monitoringFilters" class="card mb-3 admin-form-card"><div class="card-body"><div class="row g-3 admin-form-grid"><div class="col-sm-12"><label class="form-label">Tanggal</label><input class="form-control" type="date" name="date" value="${htmlSafe(formatTanggal(data.date))}"></div><div class="col-sm-12"><label class="form-label">Tahun ajaran</label><select class="form-select" name="tahun_ajaran_id"><option value="">Tahun aktif</option>${data.available_years.map((year) => `<option value="${year.id}" ${String(year.id) === String(filters.tahun_ajaran_id || '') ? 'selected' : ''}>${htmlSafe(year.tahun_ajaran)}${year.is_active ? ' (aktif)' : ''}</option>`).join('')}</select></div><div class="col-sm-12"><label class="form-label">Semester</label><select class="form-select" name="semester"><option value="">Default aktif</option><option ${String(filters.semester || '') === 'Ganjil' ? 'selected' : ''}>Ganjil</option><option ${String(filters.semester || '') === 'Genap' ? 'selected' : ''}>Genap</option></select></div><div class="col-sm-12 form-actions"><button class="btn btn-outline-success">Terapkan filter</button></div></div></div></form><div class="alert alert-info">Angka di bawah adalah hitungan sumber untuk tanggal ${htmlSafe(formatTanggal(data.date))}. Persentase KPI menunggu rumus resmi.</div><div class="row g-3">${rows.map(([label, value]) => `<div class="col col-lg-4 col-md-6 col-sm-12"><div class="card"><div class="card-body d-flex justify-content-between"><span>${htmlSafe(label)}</span><strong>${htmlSafe(value)}</strong></div></div></div>`).join('')}</div>`);
         $('monitoringFilters').addEventListener('submit', (event) => { event.preventDefault(); const form = new FormData(event.currentTarget); openMonitoring(Object.fromEntries(form.entries())); });
     }
 
