@@ -22,21 +22,70 @@ window.createAksaraModeration = function ({ $, api, htmlSafe, setFeature, showTo
 
             const records = items.map((item) => {
                 const sessions = ['masuk', 'pulang'].filter((session) => waitingStatuses.includes(item[`status_verifikasi_${session}`]));
-                const sessionContent = sessions.map((session) => {
-                    const label = session === 'masuk' ? 'Absen masuk' : 'Absen pulang';
+                const sessionRows = sessions.map((session) => {
+                    const label = session === 'masuk' ? 'Masuk' : 'Pulang';
                     const status = item[`status_verifikasi_${session}`];
-                    const time = item[`jam_${session}`] || 'Waktu tidak tercatat';
-                    return `<details class="moderation-session border rounded p-3 mt-2"><summary class="d-flex flex-wrap align-items-center justify-content-between gap-2"><span><strong>${label}</strong> <span class="text-secondary">${htmlSafe(time)}</span></span><span class="badge text-bg-warning">${htmlSafe(status)}</span></summary><div class="pt-3">${item[`foto_${session}`] ? `<button class="btn btn-outline-primary btn-sm mb-2" type="button" data-attendance-photo="${item.id}" data-photo-session="${session}"><i class="bi bi-image"></i> Lihat foto</button>` : '<div class="small text-secondary mb-2">Foto bukti tidak tersedia.</div>'}<label class="form-label small mb-1" for="review-note-${item.id}-${session}">Catatan admin <span class="text-secondary">(opsional)</span></label><textarea class="form-control form-control-sm mb-2" rows="2" id="review-note-${item.id}-${session}" placeholder="Tambahkan catatan bila diperlukan"></textarea><div class="d-flex gap-2"><button class="btn btn-success btn-sm" data-review-id="${item.id}" data-review-session="${session}" data-decision="APPROVED">Setujui</button><button class="btn btn-outline-danger btn-sm" data-review-id="${item.id}" data-review-session="${session}" data-decision="REJECTED">Tolak</button></div></div></details>`;
+                    const time = item[`jam_${session}`] || '—';
+                    const noteId = `review-note-${item.id}-${session}`;
+                    return `<tr>
+                        <td>${label}</td>
+                        <td>${htmlSafe(time)}</td>
+                        <td><span class="badge text-bg-warning">${htmlSafe(status)}</span></td>
+                        <td>
+                            ${item[`foto_${session}`] ? `<button class="btn btn-outline-primary btn-sm" type="button" data-attendance-photo="${item.id}" data-photo-session="${session}"><i class="bi bi-image"></i> Foto</button>` : '<span class="small text-secondary">Foto tidak tersedia</span>'}
+                            <details class="mt-2">
+                                <summary class="small">Tinjau</summary>
+                                <div class="pt-2" style="min-width:220px">
+                                    <label class="form-label small mb-1" for="${noteId}">Catatan admin (opsional)</label>
+                                    <textarea class="form-control form-control-sm mb-2" rows="2" id="${noteId}" placeholder="Tambahkan catatan bila diperlukan"></textarea>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <button class="btn btn-success btn-sm" data-review-id="${item.id}" data-review-session="${session}" data-decision="APPROVED">Setujui</button>
+                                        <button class="btn btn-outline-danger btn-sm" data-review-id="${item.id}" data-review-session="${session}" data-decision="REJECTED">Tolak</button>
+                                    </div>
+                                </div>
+                            </details>
+                        </td>
+                    </tr>`;
                 }).join('');
-                return `<article class="card mb-2"><div class="card-body p-3"><div class="d-flex flex-wrap justify-content-between align-items-start gap-2"><div><h3 class="h6 mb-1">${htmlSafe(item.user?.nama || 'Nama tidak tersedia')}</h3><div class="small text-secondary">${htmlSafe(item.tanggal)}${item.user?.nip ? ` · NIP ${htmlSafe(item.user.nip)}` : ''}</div></div><span class="badge text-bg-primary">${sessions.length} sesi menunggu</span></div><div class="small mt-2">Masuk ${htmlSafe(item.jam_masuk || '—')} · Pulang ${htmlSafe(item.jam_pulang || '—')}${item.status_waktu_pulang ? ` · ${htmlSafe(item.status_waktu_pulang.replaceAll('_', ' '))}` : ''}</div>${sessionContent}</div></article>`;
+                return `<tr>
+                    <td>${htmlSafe(item.user?.nama || 'Nama tidak tersedia')}${item.user?.nip ? `<div class="small text-secondary">NIP ${htmlSafe(item.user.nip)}</div>` : ''}</td>
+                    <td>${htmlSafe(item.tanggal || '—')}</td>
+                    <td colspan="3" class="p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0 align-middle">
+                                <thead class="table-light"><tr><th>Sesi</th><th>Waktu</th><th>Status</th><th>Aksi</th></tr></thead>
+                                <tbody>${sessionRows || '<tr><td colspan="4" class="text-secondary small">Tidak ada sesi menunggu.</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                    </td>
+                </tr>`;
             }).join('');
 
-            const correctionCards = corrections.map((entry) => `<article class="card mb-2"><div class="card-body p-3"><div class="d-flex flex-wrap justify-content-between gap-2"><div><h3 class="h6 mb-1">${htmlSafe(entry.user?.nama || 'Nama tidak tersedia')} · Koreksi absen ${htmlSafe(entry.session)}</h3><div class="small text-secondary">${htmlSafe(entry.attendance?.tanggal || '')} · Waktu tercatat ${htmlSafe(entry.attendance?.[`jam_${entry.session}`] || '—')}</div></div><span class="badge text-bg-info">KOREKSI</span></div><p class="small my-2"><strong>Alasan guru:</strong> ${htmlSafe(entry.reason)}</p>${entry.evidence_photo ? `<button class="btn btn-outline-primary btn-sm mb-2" type="button" data-correction-evidence="${entry.id}"><i class="bi bi-image"></i> Lihat bukti tambahan</button>` : '<div class="small text-secondary mb-2">Tidak ada bukti tambahan.</div>'}<label class="form-label small mb-1" for="correction-review-note-${entry.id}">Catatan admin (opsional)</label><textarea class="form-control form-control-sm mb-2" rows="2" id="correction-review-note-${entry.id}" placeholder="Catatan untuk guru"></textarea><div class="d-flex gap-2"><button class="btn btn-success btn-sm" data-correction-review="${entry.id}" data-decision="APPROVED">Terima koreksi</button><button class="btn btn-outline-danger btn-sm" data-correction-review="${entry.id}" data-decision="REJECTED">Tolak koreksi</button></div></div></article>`).join('');
+            const correctionRows = corrections.map((entry) => `<tr>
+                <td>${htmlSafe(entry.user?.nama || 'Nama tidak tersedia')}</td>
+                <td>${htmlSafe(entry.attendance?.tanggal || '—')}</td>
+                <td>${htmlSafe(entry.session === 'masuk' ? 'Masuk' : entry.session === 'pulang' ? 'Pulang' : entry.session)}</td>
+                <td>${htmlSafe(entry.attendance?.[`jam_${entry.session}`] || '—')}</td>
+                <td style="min-width:200px">${htmlSafe(entry.reason || '—')}</td>
+                <td>${entry.evidence_photo ? `<button class="btn btn-outline-primary btn-sm" type="button" data-correction-evidence="${entry.id}"><i class="bi bi-image"></i> Lihat bukti</button>` : '<span class="small text-secondary">Tidak ada bukti</span>'}</td>
+                <td style="min-width:220px">
+                    <label class="form-label small mb-1" for="correction-review-note-${entry.id}">Catatan admin (opsional)</label>
+                    <textarea class="form-control form-control-sm mb-2" rows="2" id="correction-review-note-${entry.id}" placeholder="Catatan untuk guru"></textarea>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="btn btn-success btn-sm" data-correction-review="${entry.id}" data-decision="APPROVED">Terima</button>
+                        <button class="btn btn-outline-danger btn-sm" data-correction-review="${entry.id}" data-decision="REJECTED">Tolak</button>
+                    </div>
+                </td>
+            </tr>`).join('');
             const attendancePagination = total > 0 ? `<nav class="d-flex justify-content-between align-items-center gap-2 mt-3" aria-label="Halaman moderasi presensi"><span class="small text-secondary">${total} record · Halaman ${currentPage} dari ${lastPage}</span><div class="btn-group btn-group-sm"><button class="btn btn-outline-secondary" type="button" data-page="${currentPage - 1}" ${currentPage <= 1 ? 'disabled' : ''}>Sebelumnya</button><button class="btn btn-outline-secondary" type="button" data-page="${currentPage + 1}" ${currentPage >= lastPage ? 'disabled' : ''}>Berikutnya</button></div></nav>` : '';
             const correctionPagination = Number(correctionResult.total || 0) > 0 ? `<nav class="d-flex justify-content-between align-items-center gap-2 mt-3" aria-label="Halaman pengajuan koreksi"><span class="small text-secondary">${correctionResult.total} pengajuan · Halaman ${correctionCurrentPage} dari ${correctionLastPage}</span><div class="btn-group btn-group-sm"><button class="btn btn-outline-secondary" type="button" data-correction-page="${correctionCurrentPage - 1}" ${correctionCurrentPage <= 1 ? 'disabled' : ''}>Sebelumnya</button><button class="btn btn-outline-secondary" type="button" data-correction-page="${correctionCurrentPage + 1}" ${correctionCurrentPage >= correctionLastPage ? 'disabled' : ''}>Berikutnya</button></div></nav>` : '';
             const modal = `<div class="modal fade" id="moderationPhotoModal" tabindex="-1" aria-labelledby="moderationPhotoTitle" aria-hidden="true"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><h2 class="modal-title h5" id="moderationPhotoTitle">Foto bukti</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div><div class="modal-body text-center"><img id="moderationPhotoImage" class="img-fluid rounded" alt="Foto bukti presensi" style="max-height:75vh;object-fit:contain"><div id="moderationPhotoLoading" class="text-secondary py-5" hidden>Memuat foto...</div></div></div></div></div>`;
 
-            setFeature('Moderasi Presensi', `<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><p class="small text-secondary mb-0">Tinjau presensi dan pengajuan koreksi guru.</p><button class="btn btn-outline-secondary btn-sm" type="button" data-refresh-moderation><i class="bi bi-arrow-clockwise"></i> Muat ulang</button></div><h2 class="h5">Presensi menunggu verifikasi</h2>${items.length ? `${records}${attendancePagination}` : '<p class="small text-secondary">Tidak ada presensi baru yang menunggu.</p>'}<h2 class="h5 mt-4">Pengajuan koreksi dari guru</h2>${corrections.length ? `${correctionCards}${correctionPagination}` : '<p class="small text-secondary">Tidak ada pengajuan koreksi yang menunggu.</p>'}${modal}`);
+            setFeature('Moderasi Presensi', `<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><p class="small text-secondary mb-0">Tinjau presensi dan pengajuan koreksi guru.</p><button class="btn btn-outline-secondary btn-sm" type="button" data-refresh-moderation><i class="bi bi-arrow-clockwise"></i> Muat ulang</button></div>
+                <h2 class="h5">Presensi menunggu verifikasi</h2>
+                ${items.length ? `<div class="table-responsive"><table class="table table-bordered table-hover align-middle"><thead class="table-light"><tr><th>Guru</th><th>Tanggal</th><th colspan="3">Detail sesi dan verifikasi</th></tr></thead><tbody>${records}</tbody></table></div>${attendancePagination}` : '<p class="small text-secondary">Tidak ada presensi baru yang menunggu.</p>'}
+                <h2 class="h5 mt-4">Pengajuan koreksi dari guru</h2>
+                ${corrections.length ? `<div class="table-responsive"><table class="table table-bordered table-hover align-middle"><thead class="table-light"><tr><th>Guru</th><th>Tanggal</th><th>Sesi</th><th>Waktu tercatat</th><th>Alasan</th><th>Bukti</th><th>Keputusan</th></tr></thead><tbody>${correctionRows}</tbody></table></div>${correctionPagination}` : '<p class="small text-secondary">Tidak ada pengajuan koreksi yang menunggu.</p>'}${modal}`);
 
             document.querySelector('[data-refresh-moderation]')?.addEventListener('click', () => openFlagged(currentPage, correctionCurrentPage));
             document.querySelectorAll('[data-page]').forEach((button) => button.addEventListener('click', () => openFlagged(Number(button.dataset.page), correctionCurrentPage)));
