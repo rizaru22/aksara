@@ -39,11 +39,15 @@ class AdminReportController extends Controller
             'class_id' => ['nullable', 'integer', 'exists:kelas,id'],
         ]);
 
-        return match ($filters['period']) {
-            'daily' => response()->json(['data' => $this->daily($filters['date'], $cycles, $filters['class_id'] ?? null)]),
-            'weekly' => response()->json(['data' => $this->weekly($filters['date'], $cycles, $filters['class_id'] ?? null)]),
-            'monthly' => response()->json(['data' => $this->monthly($filters['month'])]),
+        $response = match ($filters['period']) {
+            'daily' => $this->daily($filters['date'], $cycles, $filters['class_id'] ?? null),
+            'weekly' => $this->weekly($filters['date'], $cycles, $filters['class_id'] ?? null),
+            'monthly' => $this->monthly($filters['month']),
         };
+
+        $response['school_name'] = Setting::value('school_name', 'Nama Sekolah');
+
+        return response()->json(['data' => $response]);
     }
 
     /**
@@ -59,7 +63,10 @@ class AdminReportController extends Controller
             'class_id' => ['nullable', 'integer', 'exists:kelas,id'],
         ]);
 
-        return response()->json(['data' => $this->studentMonthly($filters['month'], $filters['class_id'] ?? null)]);
+        $data = $this->studentMonthly($filters['month'], $filters['class_id'] ?? null);
+        $data['school_name'] = Setting::value('school_name', 'Nama Sekolah');
+
+        return response()->json(['data' => $data]);
     }
 
     /**
