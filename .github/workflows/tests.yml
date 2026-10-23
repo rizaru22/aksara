@@ -108,11 +108,11 @@ jobs:
           php <<'PHP'
           <?php
           $app = require 'bootstrap/app.php';
-          $app->make(Illuminate\\Contracts\\Console\\Kernel::class)->bootstrap();
-          $statuses = Illuminate\\Support\\Facades\\DB::table('jurnal_mengajars')->orderBy('id')->pluck('status_sesi')->all();
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          $statuses = Illuminate\Support\Facades\DB::table('jurnal_mengajars')->orderBy('id')->pluck('status_sesi')->all();
           if ($statuses !== ['draft', 'final', 'draft']) {
               fwrite(STDERR, json_encode($statuses));
               exit(1);
           }
-          echo "Legacy statuses normalized correctly\\n";
+          echo "Legacy statuses normalized correctly\n";
           PHP
