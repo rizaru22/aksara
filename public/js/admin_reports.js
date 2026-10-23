@@ -31,8 +31,8 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
     // Menampilkan jadwal kelas dan status jurnal untuk memberi gambaran pembelajaran yang sedang berjalan.
     function renderClassTable(rows) {
         return renderTable(
-            ['Tanggal', 'Jam', 'Kelas', 'Mata pelajaran', 'Guru', 'Status jurnal', 'Materi / keterangan'],
-            rows.map((row) => { const isDraft = row.journal_status === 'berlangsung'; return `<tr><td class="text-nowrap">${htmlSafe(row.date)}</td><td class="text-nowrap">${htmlSafe(row.start)}–${htmlSafe(row.end)}</td><td>${htmlSafe(row.class_name)}</td><td>${htmlSafe(row.subject_name)}</td><td>${htmlSafe(row.teacher_name)}</td><td><span class="badge ${row.journal_filled ? 'text-bg-success' : isDraft ? 'text-bg-info' : 'text-bg-warning'}">${row.journal_filled ? 'Selesai' : isDraft ? 'Draf' : 'Belum diisi'}</span>${row.journal_filled ? `<div class="small text-secondary">Foto ${row.has_photo ? 'ada' : 'belum ada'}</div>` : ''}</td><td>${htmlSafe([row.materi, row.catatan].filter(Boolean).join(' · ') || '—')}</td></tr>`; }),
+            ['Tanggal', 'Kelas', 'Guru', 'Waktu', 'Status Jurnal'],
+            rows.map((row) => { const isDraft = row.journal_status === 'berlangsung'; const status = row.journal_filled ? 'Terisi' : isDraft ? 'Berlangsung' : 'Tidak Diisi'; return `<tr><td class="text-nowrap">${htmlSafe(new Date(`${row.date}T00:00:00`).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }))}</td><td>${htmlSafe(row.class_name)}</td><td>${htmlSafe(row.teacher_name)}</td><td class="text-nowrap">${htmlSafe(row.start)} - ${htmlSafe(row.end)}</td><td><span class="badge ${row.journal_filled ? 'text-bg-success' : isDraft ? 'text-bg-info' : 'text-bg-danger'}">${status}</span></td></tr>`; }),
             'Tidak ada jadwal kelas pada periode ini.',
         );
     }
@@ -82,7 +82,8 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
         }
         const summary = data.class_summary || {};
         const missing = (data.teachers_missing_journal || []).map((item) => `<tr><td>${htmlSafe(item.teacher_name)}</td><td>${htmlSafe(item.missing_sessions)}</td><td>${htmlSafe(item.sessions.map((session) => `${session.date} · ${session.class_name} ${session.start}`).join('; '))}</td></tr>`);
-        return `<section class="card mb-3"><div class="card-body"><h2 class="h5">Kehadiran guru dan total jam</h2><p class="small text-secondary">${htmlSafe(data.attendance_hours_note || 'Total jam dihitung dari durasi presensi tercatat.')}</p>${renderAttendanceTable(data.attendance || [], true)}</div></section><section class="card mb-3"><div class="card-body"><h2 class="h5">Rekap jurnal kelas</h2><p class="small text-secondary">${htmlSafe(summary.filled || 0)} selesai, ${htmlSafe(summary.draft || 0)} draf, dan ${htmlSafe(summary.missing || 0)} belum diisi dari ${htmlSafe(summary.total || 0)} sesi terjadwal.</p>${renderClassTable(data.classes || [])}</div></section><section class="card"><div class="card-body"><h2 class="h5">Guru yang jurnalnya belum selesai</h2>${renderTable(['Guru', 'Sesi belum selesai', 'Rincian jadwal'], missing, 'Semua jurnal pada jadwal minggu ini sudah selesai.')}</div></section>`;
+        const teacherSessionRows = Object.values((data.classes || []).reduce((acc, row) => { const key = row.teacher_name; if (!acc[key]) acc[key] = { name: key, total: 0, filled: 0 }; acc[key].total += 1; if (row.journal_filled) acc[key].filled += 1; return acc; }, {})).map((item) => `<tr><td>${htmlSafe(item.name)}</td><td>${item.total}</td><td>${item.filled}</td><td>${item.total - item.filled}</td><td><strong>${item.total ? (item.filled / item.total * 100).toFixed(2) : '0.00'}%</strong></td></tr>`);
+        return `<section class="card mb-3"><div class="card-body"><h2 class="h5">Kehadiran guru dan total jam</h2><p class="small text-secondary">${htmlSafe(data.attendance_hours_note || 'Total jam dihitung dari durasi presensi tercatat.')}</p>${renderAttendanceTable(data.attendance || [], true)}</div></section><section class="card mb-3"><div class="card-body"><h2 class="h5">Rekap Kehadiran Guru di Kelas</h2><p class="small text-secondary">Persentase dihitung dari jurnal terisi dibanding total jadwal guru pada minggu terpilih. Jurnal kosong dihitung sebagai tidak mengisi jurnal.</p>${renderTable(['Guru', 'Total Jadwal', 'Jurnal Terisi', 'Tidak Mengisi', 'Persentase Kehadiran'], teacherSessionRows, 'Tidak ada jadwal kelas pada minggu ini.')}</div></section><section class="card mb-3"><div class="card-body"><h2 class="h5">Rincian Jadwal Mingguan</h2><p class="small text-secondary">${htmlSafe(summary.filled || 0)} jurnal terisi dari ${htmlSafe(summary.total || 0)} sesi terjadwal.</p>${renderClassTable(data.classes || [])}</div></section><section class="card"><div class="card-body"><h2 class="h5">Guru yang jurnalnya belum selesai</h2>${renderTable(['Guru', 'Sesi belum selesai', 'Rincian jadwal'], missing, 'Semua jurnal pada jadwal minggu ini sudah selesai.')}</div></section>`;
     }
 
     // Mengambil data laporan dari backend sesuai periode yang dipilih dan me-render hasil ke panel admin.
@@ -91,7 +92,7 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
         if (!target) return;
         target.innerHTML = '<div class="card"><div class="card-body text-secondary"><span class="spin"></span>Memuat laporan...</div></div>';
         const query = new URLSearchParams({ period: selectedPeriod, [selectedPeriod === 'monthly' || selectedPeriod === 'student-monthly' ? 'month' : 'date']: value });
-        if (selectedPeriod === 'student-monthly' && classId) {
+        if (['daily', 'weekly', 'student-monthly'].includes(selectedPeriod) && classId) {
             query.set('class_id', classId);
         }
         const endpoint = selectedPeriod === 'student-monthly' ? '/api/v1/admin/reports/student-attendance' : '/api/v1/admin/reports';
@@ -195,7 +196,7 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
                 const isMonthPeriod = period === 'monthly' || period === 'student-monthly';
                 dateInput.parentElement.hidden = !isDatePeriod;
                 monthField.hidden = !isMonthPeriod;
-                classField.hidden = period !== 'student-monthly';
+                classField.hidden = !['daily', 'weekly', 'student-monthly'].includes(period);
                 load();
             });
         });
@@ -203,7 +204,7 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
         classInput.addEventListener('change', load);
         dateInput.parentElement.hidden = !(period === 'daily' || period === 'weekly');
         monthField.hidden = !(period === 'monthly' || period === 'student-monthly');
-        classField.hidden = period !== 'student-monthly';
+        classField.hidden = !['daily', 'weekly', 'student-monthly'].includes(period);
         if (initialPeriod === 'student-monthly') {
             dateInput.parentElement.hidden = true;
             monthField.hidden = false;
