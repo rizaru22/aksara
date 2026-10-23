@@ -45,14 +45,13 @@ class JournalMonitoringController extends Controller
             'search'  => ['nullable', 'string', 'max:255'],
         ]);
 
-        $tanggal = $validated['tanggal']
-            ?? Carbon::now(config('app.timezone'))->toDateString();
+        $tanggal = $validated['tanggal'] ?? null;
         $status  = $validated['status'] ?? null;
         $search  = $validated['search'] ?? null;
 
         // --- Build query (anti N+1) ---
         $query = JurnalMengajar::query()
-            ->whereDate('tanggal', $tanggal)
+            ->when($tanggal, fn ($q) => $q->whereDate('tanggal', $tanggal))
             ->with([
                 'guru:id,nama,nip',
                 'guruPengganti:id,nama,nip',

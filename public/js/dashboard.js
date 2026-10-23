@@ -1066,12 +1066,13 @@ renderStudentPage();
     let jmLastFilters = {};
     async function openJournalMonitoring(filters = {}) {
         jmLastFilters = filters;
-        const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD lokal
-        const tanggal = filters.tanggal || today;
+      
+        const tanggal = filters.tanggal || '';
         const status = filters.status || '';
         const search = filters.search || '';
 
-        const params = new URLSearchParams({ tanggal });
+        const params = new URLSearchParams();
+        if (tanggal) params.set('tanggal', tanggal);
         if (status) params.set('status', status);
         if (search) params.set('search', search);
 
@@ -1100,10 +1101,19 @@ renderStudentPage();
         const filterBar = `<form id="jmFilters" class="card mb-3 admin-form-card">
             <div class="card-body">
                 <div class="row g-3 admin-form-grid">
-                    <div class="col-sm-12">
-                        <label class="form-label" for="jmTanggal">Tanggal kegiatan</label>
-                        <input class="form-control" id="jmTanggal" type="date" name="tanggal" value="${htmlSafe(tanggal)}">
-                    </div>
+                    
+                <div class="col-sm-12">
+                    <label class="form-label" for="jmTanggalMode">Cakupan tanggal</label>
+                    <select class="form-select" id="jmTanggalMode" name="tanggal_mode">
+                        <option value="semua" ${!tanggal ? 'selected' : ''}>Semua tanggal</option>
+                        <option value="tertentu" ${tanggal ? 'selected' : ''}>Tanggal tertentu</option>
+                    </select>
+                </div>
+                <div class="col-sm-12" id="jmTanggalWrapper" ${!tanggal ? 'hidden' : ''}>
+                    <label class="form-label" for="jmTanggal">Tanggal kegiatan</label>
+                    <input class="form-control" id="jmTanggal" type="date" name="tanggal" value="${htmlSafe(tanggal)}" ${!tanggal ? 'disabled' : ''}>
+                </div>
+
                     <div class="col-sm-12">
                         <label class="form-label" for="jmStatus">Status jurnal</label>
                         <select class="form-select" id="jmStatus" name="status">${statusOptions}</select>
@@ -1221,6 +1231,26 @@ renderStudentPage();
                 button.disabled = false;
             }
         });
+        
+        $('jmTanggalMode')?.addEventListener('change', (event) => {
+            const mode = event.target.value;
+            const wrapper = $('jmTanggalWrapper');
+            const input = $('jmTanggal');
+
+            if (!wrapper || !input) return;
+
+            const gunakanTanggal = mode === 'tertentu';
+
+            wrapper.hidden = !gunakanTanggal;
+            input.disabled = !gunakanTanggal;
+
+            if (!gunakanTanggal) {
+                input.value = '';
+            } else if (!input.value) {
+                input.value = new Date().toLocaleDateString('en-CA');
+            }
+        });
+
 
         $('jmFilters')?.addEventListener('submit', (event) => {
             event.preventDefault();
