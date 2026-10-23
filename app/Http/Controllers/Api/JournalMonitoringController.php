@@ -15,9 +15,10 @@ class JournalMonitoringController extends Controller
      * Mapping status_sesi ke label yang ditampilkan ke admin.
      */
     private const STATUS_LABEL = [
-        'berlangsung' => 'Draft',
-        'selesai'     => 'Final',
-        'flagged'     => 'Flagged',
+        'draft' => 'Draft',
+        'final' => 'Final',
+        'finalisasi_susulan' => 'Finalisasi Susulan',
+        'kedaluwarsa' => 'Kedaluwarsa',
     ];
 
     /**
@@ -26,7 +27,7 @@ class JournalMonitoringController extends Controller
      * Daftar jurnal mengajar per tanggal untuk monitoring admin.
      * Query param:
      *   - tanggal (date, default: hari ini di timezone app)
-     *   - status  (optional: berlangsung|selesai|flagged)
+     *   - status  (optional: draft|final|finalisasi_susulan|kedaluwarsa)
      *   - search  (optional: nama guru / nama kelas / materi pembahasan)
      */
     public function index(Request $request): JsonResponse
@@ -40,7 +41,7 @@ class JournalMonitoringController extends Controller
 
         $validated = $request->validate([
             'tanggal' => ['nullable', 'date'],
-            'status'  => ['nullable', 'in:berlangsung,selesai,flagged'],
+            'status'  => ['nullable', 'in:draft,final,finalisasi_susulan,kedaluwarsa'],
             'search'  => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -97,9 +98,11 @@ class JournalMonitoringController extends Controller
         $totalCount       = 0;
         $finalCount       = 0;
         $draftCount       = 0;
+        $lateFinalCount   = 0;
+        $expiredCount     = 0;
         $belumLengkapCount = 0;
 
-        $data = $journals->map(function (JurnalMengajar $journal) use ($siswaCounts, &$totalCount, &$finalCount, &$draftCount, &$belumLengkapCount): array {
+        $data = $journals->map(function (JurnalMengajar $journal) use ($siswaCounts, &$totalCount, &$finalCount, &$draftCount, &$lateFinalCount, &$expiredCount, &$belumLengkapCount): array {
             $totalCount++;
 
             $jadwal      = $journal->jadwalPelajaran;
@@ -108,13 +111,17 @@ class JournalMonitoringController extends Controller
             $presensiCount = (int) $journal->presensi_siswas_count;
             $lengkap     = $totalSiswa > 0 && $presensiCount === $totalSiswa;
 
-            if ($journal->status_sesi === 'selesai') {
+            if ($journal->status_sesi === 'final') {
                 $finalCount++;
-            } else {
+            } elseif ($journal->status_sesi === 'draft') {
                 $draftCount++;
+            } elseif ($journal->status_sesi === 'finalisasi_susulan') {
+                $lateFinalCount++;
+            } elseif ($journal->status_sesi === 'kedaluwarsa') {
+                $expiredCount++;
             }
 
-            if ($journal->status_sesi !== 'selesai' && !$lengkap) {
+            if (in_array($journal->status_sesi, ['draft', 'kedaluwarsa'], true) && !$lengkap) {
                 $belumLengkapCount++;
             }
 
@@ -162,7 +169,9 @@ class JournalMonitoringController extends Controller
             'summary' => [
                 'total'         => $totalCount,
                 'final'         => $finalCount,
-                'draft'         => $draftCount,
+                'draft' => $draftCount,
+                'finalisasi_susulan' => $lateFinalCount,
+                'kedaluwarsa' => $expiredCount,
                 'belum_lengkap' => $belumLengkapCount,
             ],
             'data'    => $data,
@@ -171,6 +180,36 @@ class JournalMonitoringController extends Controller
                 'status'  => $status,
                 'search'  => $search,
             ],
+        ]);
+    }
+
+    /**
+     * POST /api/v1/admin/journal-monitoring/expire-drafts
+     * Menandai draft yang sudah melewati 48 jam sebagai kedaluwarsa.
+     * Admin hanya menjalankan proses; Admin tidak memfinalisasi jurnal guru.
+     */
+    public function expireDrafts(Request $request): JsonResponse
+    {
+        abort_unless(
+            $request->user()->hasRole('admin')
+                || $request->user()->can('kelola-master-data')
+                || $request->user()->can('view-dashboard-kurikulum'),
+            403
+        );
+
+        $now = Carbon::now(config('app.timezone'));
+        $expiredCount = JurnalMengajar::query()
+            ->where('status_sesi', 'draft')
+            ->where('created_at', '<=', $now->copy()->subHours(48))
+            ->update([
+                'status_sesi' => 'kedaluwarsa',
+                'updated_at' => $now,
+            ]);
+
+        return response()->json([
+            'message' => 'Proses kedaluwarsa draft selesai.',
+            'expired_count' => $expiredCount,
+            'checked_at' => $now->toIso8601String(),
         ]);
     }
 
@@ -218,7 +257,7 @@ class JournalMonitoringController extends Controller
             $bagianBelumLengkap[] = "Presensi belum lengkap ({$presensiCount}/{$totalSiswa} siswa)";
         }
 
-        if (! $jurnalMengajar->foto_kegiatan && $jurnalMengajar->status_sesi === 'berlangsung') {
+        if (! $jurnalMengajar->foto_kegiatan && $jurnalMengajar->status_sesi === 'draft') {
             $bagianBelumLengkap[] = 'Foto kegiatan belum diisi';
         }
 
