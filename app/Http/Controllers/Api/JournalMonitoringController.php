@@ -261,7 +261,7 @@ class JournalMonitoringController extends Controller
             $bagianBelumLengkap[] = 'Foto kegiatan belum diisi';
         }
 
-        if (! $jurnalMengajar->jam_selesai_realisasi && $jurnalMengajar->status_sesi === 'berlangsung') {
+        if (! $jurnalMengajar->jam_selesai_realisasi && $jurnalMengajar->status_sesi === 'draft') {
             $bagianBelumLengkap[] = 'Waktu selesai belum dicatat';
         }
 
