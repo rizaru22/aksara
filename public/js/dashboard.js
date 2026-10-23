@@ -352,7 +352,6 @@
                     <td>${htmlSafe(mapel)}</td>
                     <td>${htmlSafe(journal.materi_pembahasan || '—')}</td>
                     <td>${status}</td>
-                    <td>${lengkap}</td>
                     <td class="text-nowrap">
                         <button class="btn btn-outline-secondary btn-sm" data-teacher-journal="${journal.id}">Lihat detail</button>
                         ${journal.status_sesi === 'draft' ? `<button class="btn btn-outline-primary btn-sm mt-1" data-teacher-late-finalize="${journal.id}">Finalisasi susulan</button>` : ''}
@@ -366,7 +365,7 @@
                         <div class="table-responsive">
                             <table class="table table-sm table-hover align-middle mb-0">
                                 <thead>
-                                    <tr><th>Tanggal</th><th>Kelas</th><th>Mata Pelajaran</th><th>Materi</th><th>Status</th><th>Kelengkapan</th><th>Aksi</th></tr>
+                                    <tr><th>Tanggal</th><th>Kelas</th><th>Mata Pelajaran</th><th>Materi</th><th>Status</th><th>Aksi</th></tr>
                                 </thead>
                                 <tbody>${rows}</tbody>
                             </table>
