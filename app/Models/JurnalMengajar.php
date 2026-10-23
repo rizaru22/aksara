@@ -7,7 +7,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class JurnalMengajar extends Model
-{ 
+{
+    public const STATUS_DRAFT = 'draft';
+    public const STATUS_FINAL = 'final';
+    public const STATUS_FINALISASI_SUSULAN = 'finalisasi_susulan';
+    public const STATUS_KEDALUWARSA = 'kedaluwarsa';
+
+    public const STATUSES = [
+        self::STATUS_DRAFT,
+        self::STATUS_FINAL,
+        self::STATUS_FINALISASI_SUSULAN,
+        self::STATUS_KEDALUWARSA,
+    ];
+
     protected $fillable = [
         'user_id', 'guru_pengganti_id', 'jadwal_pelajaran_id', 'materi_pelajaran_id',
         'tanggal', 'materi_pembahasan', 'catatan_kejadian_kelas', 'foto_kegiatan',

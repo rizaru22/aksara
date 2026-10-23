@@ -48,7 +48,7 @@ class LessonJournalController extends Controller
             ->where('jadwal_pelajaran_id', $jadwalPelajaran->id)
             ->whereDate('tanggal', $now->toDateString())
             ->where(fn ($query) => $query->where('user_id', $request->user()->id)->orWhere('guru_pengganti_id', $request->user()->id))
-            ->where('status_sesi', 'berlangsung')
+            ->where('status_sesi', JurnalMengajar::STATUS_DRAFT)
             ->first();
 
         return response()->json([
@@ -116,7 +116,7 @@ class LessonJournalController extends Controller
                 ->whereDate('tanggal', $now->toDateString())
                 ->lockForUpdate()
                 ->first();
-            if ($journal && $journal->status_sesi !== 'berlangsung') {
+            if ($journal && $journal->status_sesi !== JurnalMengajar::STATUS_DRAFT) {
                 throw new ConflictHttpException('Jurnal sesi ini sudah selesai dan tidak dapat diubah.');
             }
             $created = ! $journal;
@@ -131,7 +131,7 @@ class LessonJournalController extends Controller
                 'catatan_kejadian_kelas' => $data['catatan_kejadian_kelas'] ?? null,
                 'jam_mulai_realisasi' => $journal->jam_mulai_realisasi ?? $now,
                 'jam_selesai_realisasi' => null,
-                'status_sesi' => 'berlangsung',
+                'status_sesi' => JurnalMengajar::STATUS_DRAFT,
             ])->save();
 
             $studentIds = collect($data['presensi'])->pluck('siswa_id')->map(fn ($id) => (int) $id)->all();
@@ -162,7 +162,7 @@ class LessonJournalController extends Controller
         abort_unless($request->user()->can('isi-ejurnal'), 403);
 
         $validated = $request->validate([
-            'status' => ['nullable', 'in:all,draft,final,berlangsung,selesai,flagged'],
+            'status' => ['nullable', 'in:all,draft,final,finalisasi_susulan,kedaluwarsa'],
             'tanggal' => ['nullable', 'date'],
             'tanggal_mulai' => ['nullable', 'date'],
             'tanggal_selesai' => ['nullable', 'date'],
@@ -185,9 +185,10 @@ class LessonJournalController extends Controller
         $status = $validated['status'] ?? 'all';
         if ($status !== 'all') {
             $normalizedStatus = match ($status) {
-                'draft', 'berlangsung' => 'berlangsung',
-                'final', 'selesai' => 'selesai',
-                'flagged' => 'flagged',
+                'draft' => JurnalMengajar::STATUS_DRAFT,
+                'final' => JurnalMengajar::STATUS_FINAL,
+                'finalisasi_susulan' => JurnalMengajar::STATUS_FINALISASI_SUSULAN,
+                'kedaluwarsa' => JurnalMengajar::STATUS_KEDALUWARSA,
                 default => null,
             };
 
@@ -240,7 +241,7 @@ class LessonJournalController extends Controller
                 'id' => $journal->id,
                 'tanggal' => $journal->tanggal instanceof \Carbon\Carbon ? $journal->tanggal->toDateString() : (string) $journal->tanggal,
                 'status_sesi' => $journal->status_sesi,
-                'status_label' => $journal->status_sesi === 'berlangsung' ? 'Draft' : ($journal->status_sesi === 'selesai' ? 'Final' : ucfirst($journal->status_sesi)),
+                'status_label' => match ($journal->status_sesi) { JurnalMengajar::STATUS_DRAFT => 'Draft', JurnalMengajar::STATUS_FINAL => 'Final', JurnalMengajar::STATUS_FINALISASI_SUSULAN => 'Finalisasi Susulan', JurnalMengajar::STATUS_KEDALUWARSA => 'Kedaluwarsa', default => ucfirst($journal->status_sesi) },
                 'materi_pembahasan' => $journal->materi_pembahasan,
                 'catatan_kejadian_kelas' => $journal->catatan_kejadian_kelas,
                 'kelas' => $kelas ? ['id' => $kelas->id, 'nama_kelas' => $kelas->nama_kelas] : null,
@@ -294,25 +295,44 @@ class LessonJournalController extends Controller
         abort_unless(
             $jurnalMengajar->user_id === $request->user()->id || $jurnalMengajar->guru_pengganti_id === $request->user()->id,
             403,
-            'Anda hanya dapat memfinalisasi draf jurnal yang relevan dengan jadwal Anda.'
+            'Anda hanya dapat memfinalisasi jurnal yang relevan dengan jadwal Anda.'
         );
-        $data = $request->validate([
-            'foto_kegiatan' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'latitude' => ['required', 'numeric', 'between:-90,90'],
-            'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'accuracy' => ['required', 'numeric', 'min:0', 'max:'.$this->maxGpsAccuracyMeters()],
-            'darurat' => ['nullable', 'boolean'],
+
+        $isLateFinalization = $request->boolean('finalisasi_susulan');
+        $rules = [
+            'finalisasi_susulan' => ['nullable', 'boolean'],
             'catatan_penutupan' => ['nullable', 'string', 'max:2000'],
-        ]);
-        if ($jurnalMengajar->status_sesi !== 'berlangsung') {
-            throw new ConflictHttpException('Hanya draf jurnal yang dapat difinalisasi.');
+        ];
+        if (! $isLateFinalization) {
+            $rules += [
+                'foto_kegiatan' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+                'latitude' => ['required', 'numeric', 'between:-90,90'],
+                'longitude' => ['required', 'numeric', 'between:-180,180'],
+                'accuracy' => ['required', 'numeric', 'min:0', 'max:'.$this->maxGpsAccuracyMeters()],
+                'darurat' => ['nullable', 'boolean'],
+            ];
         }
+        $data = $request->validate($rules);
+
+        if ($jurnalMengajar->status_sesi !== JurnalMengajar::STATUS_DRAFT) {
+            throw new ConflictHttpException('Hanya jurnal berstatus Draft yang dapat difinalisasi.');
+        }
+
         $now = now(config('app.timezone'));
+        $deadline = $jurnalMengajar->created_at->copy()->addHours(48);
+        if ($now->greaterThan($deadline)) {
+            DB::table('jurnal_mengajars')
+                ->where('id', $jurnalMengajar->id)
+                ->where('status_sesi', JurnalMengajar::STATUS_DRAFT)
+                ->update(['status_sesi' => JurnalMengajar::STATUS_KEDALUWARSA, 'updated_at' => $now]);
+
+            throw new ConflictHttpException('Batas finalisasi 48 jam telah lewat. Jurnal sudah kedaluwarsa.');
+        }
+
         $schedule = $jurnalMengajar->jadwalPelajaran()->firstOrFail();
-        $this->authorizeSchedule($request, $schedule, $now, $cycles);
-        $isEmergency = filter_var($data['darurat'] ?? false, FILTER_VALIDATE_BOOLEAN) || filled($data['catatan_penutupan'] ?? null);
-        $distanceMeters = $this->verifyFinalizationLocation($data, $distance);
-        $this->authorizeFinalizationWindow($schedule, $now, $isEmergency);
+        if (! $isLateFinalization) {
+            $this->authorizeSchedule($request, $schedule, $now, $cycles);
+        }
 
         $expectedIds = DB::table('siswas')->where('kelas_id', $schedule->kelas_id)->pluck('id')->map(fn ($id) => (int) $id)->sort()->values();
         $draftIds = $jurnalMengajar->presensiSiswas()->pluck('siswa_id')->map(fn ($id) => (int) $id)->sort()->values();
@@ -320,34 +340,58 @@ class LessonJournalController extends Controller
             throw ValidationException::withMessages(['presensi' => 'Perbarui draf agar mencakup seluruh siswa kelas sebelum finalisasi.']);
         }
 
-        $photoPath = $data['foto_kegiatan']->store('lesson-journals', 'local');
+        $photoPath = null;
+        $distanceMeters = null;
+        if (! $isLateFinalization) {
+            $isEmergency = filter_var($data['darurat'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            $distanceMeters = $this->verifyFinalizationLocation($data, $distance);
+            $this->authorizeFinalizationWindow($schedule, $now, $isEmergency);
+            $photoPath = $data['foto_kegiatan']->store('lesson-journals', 'local');
+        }
+
         try {
-            $journal = DB::transaction(function () use ($jurnalMengajar, $data, $now, $distanceMeters, $photoPath): JurnalMengajar {
+            $journal = DB::transaction(function () use ($jurnalMengajar, $data, $now, $distanceMeters, $photoPath, $isLateFinalization): JurnalMengajar {
                 $journal = JurnalMengajar::query()->lockForUpdate()->findOrFail($jurnalMengajar->id);
-                if ($journal->status_sesi !== 'berlangsung') {
-                    throw new ConflictHttpException('Draf jurnal sudah difinalisasi.');
+                if ($journal->status_sesi !== JurnalMengajar::STATUS_DRAFT) {
+                    throw new ConflictHttpException('Jurnal sudah difinalisasi atau tidak lagi berstatus Draft.');
+                }
+                if ($now->greaterThan($journal->created_at->copy()->addHours(48))) {
+                    $journal->status_sesi = JurnalMengajar::STATUS_KEDALUWARSA;
+                    $journal->save();
+                    throw new ConflictHttpException('Batas finalisasi 48 jam telah lewat. Jurnal sudah kedaluwarsa.');
+                }
+
+                if (! $isLateFinalization) {
+                    $journal->fill([
+                        'foto_kegiatan' => $photoPath,
+                        'lat_finalisasi' => $data['latitude'],
+                        'long_finalisasi' => $data['longitude'],
+                        'gps_accuracy_finalisasi' => $data['accuracy'],
+                        'jarak_geofence_finalisasi' => $distanceMeters,
+                    ]);
                 }
                 $journal->fill([
-                    'foto_kegiatan' => $photoPath,
-                    'lat_finalisasi' => $data['latitude'],
-                    'long_finalisasi' => $data['longitude'],
-                    'gps_accuracy_finalisasi' => $data['accuracy'],
-                    'jarak_geofence_finalisasi' => $distanceMeters,
                     'jam_selesai_realisasi' => $now,
-                    'status_sesi' => 'selesai',
+                    'status_sesi' => $isLateFinalization
+                        ? JurnalMengajar::STATUS_FINALISASI_SUSULAN
+                        : JurnalMengajar::STATUS_FINAL,
                     'catatan_penutupan' => $data['catatan_penutupan'] ?? null,
                 ])->save();
 
                 return $journal->load(['jadwalPelajaran.kelas', 'jadwalPelajaran.mataPelajaran', 'presensiSiswas.siswa']);
             });
-        } catch (\Throwable $exception) {
-            Storage::disk('local')->delete($photoPath);
+        } catch (\\Throwable $exception) {
+            if ($photoPath) {
+                Storage::disk('local')->delete($photoPath);
+            }
             throw $exception;
         }
 
-        $message = ($data['darurat'] ?? false) || filled($data['catatan_penutupan'] ?? null)
-            ? 'Jurnal dan presensi siswa berhasil difinalisasi dengan catatan darurat.'
-            : 'Jurnal dan presensi siswa berhasil difinalisasi.';
+        $message = $isLateFinalization
+            ? 'Jurnal berhasil difinalisasi sebagai Finalisasi Susulan.'
+            : ((($data['darurat'] ?? false) && filter_var($data['darurat'], FILTER_VALIDATE_BOOLEAN))
+                ? 'Jurnal dan presensi siswa berhasil difinalisasi dengan catatan darurat.'
+                : 'Jurnal dan presensi siswa berhasil difinalisasi.');
 
         return response()->json(['message' => $message, 'data' => $journal]);
     }
@@ -437,7 +481,7 @@ class LessonJournalController extends Controller
             ->where('jadwal_pelajaran_id', $schedule->id)
             ->whereDate('tanggal', $now->toDateString())
             ->where(fn ($query) => $query->where('user_id', $request->user()->id)->orWhere('guru_pengganti_id', $request->user()->id))
-            ->where('status_sesi', 'berlangsung')
+            ->where('status_sesi', JurnalMengajar::STATUS_DRAFT)
             ->exists();
         if ($hasOpenDraft) {
             return;
