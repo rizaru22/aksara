@@ -1093,6 +1093,7 @@ renderStudentPage();
                     </div>
                     <div class="col-sm-12 form-actions">
                         <button class="btn btn-outline-success" type="submit">Terapkan filter</button>
+                        <button class="btn btn-outline-danger ms-2" type="button" id="jmExpireDrafts">Tandai draft kedaluwarsa</button>
                     </div>
                 </div>
             </div>
@@ -1102,7 +1103,9 @@ renderStudentPage();
             { label: 'Total jurnal', value: summary.total ?? '—', variant: 'secondary' },
             { label: 'Sudah final', value: summary.final ?? '—', variant: 'success' },
             { label: 'Masih draft', value: summary.draft ?? '—', variant: 'warning' },
-            { label: 'Belum lengkap', value: summary.belum_lengkap ?? '—', variant: 'danger' },
+            { label: 'Finalisasi susulan', value: summary.finalisasi_susulan ?? '—', variant: 'info' },
+            { label: 'Kedaluwarsa', value: summary.kedaluwarsa ?? '—', variant: 'danger' },
+            { label: 'Belum lengkap', value: summary.belum_lengkap ?? '—', variant: 'secondary' },
         ].map(({ label, value, variant }) => `<div class="col-sm-12">
             <div class="card border-${variant}-subtle">
                 <div class="card-body d-flex justify-content-between align-items-center py-3">
@@ -1182,6 +1185,21 @@ renderStudentPage();
             </section>`;
 
         setFeature('Monitoring E-Jurnal', content);
+
+        $('jmExpireDrafts')?.addEventListener('click', async (event) => {
+            const button = event.currentTarget;
+            if (!window.confirm('Tandai semua draft yang telah melewati 48 jam sebagai Kedaluwarsa? Tindakan ini tidak dapat dibatalkan melalui tombol ini.')) return;
+            button.disabled = true;
+            try {
+                const response = await api('/api/v1/admin/journal-monitoring/expire-drafts', { method: 'POST' });
+                showToast(response.message || 'Proses kedaluwarsa selesai.');
+                await openJournalMonitoring(jmLastFilters);
+            } catch (error) {
+                showToast(error.message || 'Gagal memproses draft kedaluwarsa.');
+            } finally {
+                button.disabled = false;
+            }
+        });
 
         $('jmFilters')?.addEventListener('submit', (event) => {
             event.preventDefault();
