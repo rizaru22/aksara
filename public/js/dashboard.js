@@ -50,6 +50,30 @@
         : { show() {}, hide() {} };
     const htmlSafe = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]);
 
+    //format tanggal
+    const formatTanggal = (tanggal, format = 'panjang') => {
+        if (!tanggal) return '—';
+
+        const nilai = String(tanggal).slice(0, 10);
+        const bagian = nilai.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+        if (!bagian) return tanggal;
+
+        const tanggalObj = new Date(
+            Number(bagian[1]),
+            Number(bagian[2]) - 1,
+            Number(bagian[3])
+        );
+
+        return new Intl.DateTimeFormat('id-ID', {
+            day: 'numeric',
+            month: format === 'ringkas' ? 'short' : 'long',
+            year: 'numeric',
+            timeZone: 'Asia/Jakarta',
+        }).format(tanggalObj);
+    };
+
+
     // Wrapper request yang menambahkan token autentikasi dan menangani error dari backend secara konsisten.
     async function api(path, options = {}) {
         const headers = { Accept: 'application/json', Authorization: `Bearer ${token}`, ...(options.headers || {}) };
@@ -306,7 +330,7 @@
                         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                             <div>
                                 <div class="small text-secondary">Tanggal kegiatan</div>
-                                <strong>${htmlSafe(journal.tanggal || '—')}</strong>
+                                <strong>${htmlSafe(formatTanggal(journal.tanggal))}</strong>
                             </div>
                             <span class="badge ${({ draft: 'bg-warning text-dark', final: 'bg-success', finalisasi_susulan: 'bg-info text-dark', kedaluwarsa: 'bg-danger' })[journal.status_sesi] || 'bg-secondary'}">${htmlSafe(statusText)}</span>
                         </div>
@@ -347,7 +371,7 @@
                 const status = ({ draft: '<span class="badge bg-warning text-dark">Draft</span>', final: '<span class="badge bg-success">Final</span>', finalisasi_susulan: '<span class="badge bg-info text-dark">Finalisasi Susulan</span>', kedaluwarsa: '<span class="badge bg-danger">Kedaluwarsa</span>' })[journal.status_sesi] || '<span class="badge bg-secondary">—</span>';
                 const lengkap = journal.lengkap ? '<span class="badge bg-success">Lengkap</span>' : '<span class="badge bg-danger">Belum lengkap</span>';
                 return `<tr>
-                    <td>${htmlSafe(journal.tanggal || '—')}</td>
+                    <td>${htmlSafe(formatTanggal(journal.tanggal))}</td>
                     <td>${htmlSafe(kelas)}</td>
                     <td>${htmlSafe(mapel)}</td>
                     <td>${htmlSafe(journal.materi_pembahasan || '—')}</td>
@@ -685,7 +709,7 @@ renderStudentPage();
     async function openWaliSessions() {
         const result = await api('/api/v1/student-attendances/wali-sessions');
         const journals = result.data?.data || [];
-        const content = journals.map((journal) => `<article class="card mb-3"><div class="card-body"><h3 class="h6">${htmlSafe(journal.tanggal)} · ${htmlSafe(journal.jadwal_pelajaran?.kelas?.nama_kelas)}</h3><p class="small text-secondary">${htmlSafe(journal.materi_pembahasan)}</p>${journal.presensi_siswas.map((row) => `<div class="row g-2 align-items-center border-top py-2"><div class="col-sm-12 col-md-4">${htmlSafe(row.siswa?.nama)}</div><div class="col-sm-12 col-md-4"><select class="form-select form-select-sm" id="status-${row.id}">${['HADIR', 'SAKIT', 'IZIN', 'ALPHA', 'CABUT'].map((status) => `<option ${status === row.status ? 'selected' : ''}>${status}</option>`).join('')}</select></div><div class="col-sm-12 col-md-4"><button class="btn btn-outline-primary btn-sm" data-attendance-save="${row.id}">Simpan koreksi</button></div></div>`).join('')}</div></article>`).join('');
+        const content = journals.map((journal) => `<article class="card mb-3"><div class="card-body"><h3 class="h6">${htmlSafe(formatTanggal(journal.tanggal))} · ${htmlSafe(journal.jadwal_pelajaran?.kelas?.nama_kelas)}</h3><p class="small text-secondary">${htmlSafe(journal.materi_pembahasan)}</p>${journal.presensi_siswas.map((row) => `<div class="row g-2 align-items-center border-top py-2"><div class="col-sm-12 col-md-4">${htmlSafe(row.siswa?.nama)}</div><div class="col-sm-12 col-md-4"><select class="form-select form-select-sm" id="status-${row.id}">${['HADIR', 'SAKIT', 'IZIN', 'ALPHA', 'CABUT'].map((status) => `<option ${status === row.status ? 'selected' : ''}>${status}</option>`).join('')}</select></div><div class="col-sm-12 col-md-4"><button class="btn btn-outline-primary btn-sm" data-attendance-save="${row.id}">Simpan koreksi</button></div></div>`).join('')}</div></article>`).join('');
         setFeature('Koreksi Presensi Per Sesi', content || '<div class="card"><div class="card-body text-center text-secondary">Belum ada sesi jurnal pada kelas perwalian.</div></div>');
         document.querySelectorAll('[data-attendance-save]').forEach((button) => button.addEventListener('click', async () => {
             try { await api(`/api/v1/student-attendances/${button.dataset.attendanceSave}`, { method: 'PATCH', body: { status: $(`status-${button.dataset.attendanceSave}`).value } }); showToast('Koreksi disimpan.'); }
