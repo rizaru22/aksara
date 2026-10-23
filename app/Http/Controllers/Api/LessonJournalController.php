@@ -333,7 +333,7 @@ class LessonJournalController extends Controller
 
         $schedule = $jurnalMengajar->jadwalPelajaran()->firstOrFail();
         if ($isLateFinalization) {
-            $sessionDate = $jurnalMengajar->tanggal instanceof \\Carbon\\Carbon
+            $sessionDate = $jurnalMengajar->tanggal instanceof \Carbon\Carbon
                 ? $jurnalMengajar->tanggal->toDateString()
                 : (string) $jurnalMengajar->tanggal;
             $sessionEnd = Carbon::parse($sessionDate.' '.$schedule->jam_selesai, config('app.timezone'));
@@ -391,7 +391,7 @@ class LessonJournalController extends Controller
 
                 return $journal->load(['jadwalPelajaran.kelas', 'jadwalPelajaran.mataPelajaran', 'presensiSiswas.siswa']);
             });
-        } catch (\\Throwable $exception) {
+        } catch (\Throwable $exception) {
             if ($photoPath) {
                 Storage::disk('local')->delete($photoPath);
             }
