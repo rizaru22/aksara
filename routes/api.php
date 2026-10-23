@@ -62,6 +62,7 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
     Route::get('/admin/substitute-requests', [SubstituteTeacherController::class, 'index'])->middleware('role_or_permission:admin|kepsek|kurikulum|kelola-master-data');
     Route::patch('/admin/substitute-requests/{pengajuanGuruPengganti}', [SubstituteTeacherController::class, 'decide'])->middleware('role_or_permission:admin|kepsek|kurikulum|kelola-master-data');
     Route::get('/admin/journal-monitoring', [JournalMonitoringController::class, 'index']);
+    Route::post('/admin/journal-monitoring/expire-drafts', [JournalMonitoringController::class, 'expireDrafts']);
     Route::get('/admin/journal-monitoring/{jurnalMengajar}', [JournalMonitoringController::class, 'show']);
     Route::get('/announcements', [TeacherScheduleController::class, 'announcements']);
     Route::get('/calendar/holidays', [HolidayCalendarController::class, 'index']);
