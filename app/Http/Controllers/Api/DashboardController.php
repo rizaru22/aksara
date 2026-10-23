@@ -127,11 +127,11 @@ class DashboardController extends Controller
                     'subject_name' => $schedule->mataPelajaran?->nama_mapel ?? 'Mata pelajaran',
                     'start' => substr((string) $schedule->jam_mulai, 0, 5),
                     'end' => substr((string) $schedule->jam_selesai, 0, 5),
-                    'journal_filled' => $journal?->status_sesi === 'selesai',
+                    'journal_filled' => in_array($journal?->status_sesi, ['final', 'finalisasi_susulan'], true),
                     'journal_status' => $journal?->status_sesi ?? 'Belum diisi',
                     'expected_students' => $expectedStudents,
                     'marked_students' => $markedStudents,
-                    'is_in_class' => $journal?->status_sesi === 'selesai' && $expectedStudents > 0 && $markedStudents >= $expectedStudents,
+                    'is_in_class' => $journal?->status_sesi === 'final' && $expectedStudents > 0 && $markedStudents >= $expectedStudents,
                 ];
             });
         }
@@ -212,7 +212,7 @@ class DashboardController extends Controller
             ->whereIn('status_verifikasi_masuk', ['VERIFIED', 'APPROVED'])
             ->distinct('user_id')->count('user_id');
         $journals = JurnalMengajar::query()->whereDate('tanggal', $date->toDateString())
-            ->whereIn('jadwal_pelajaran_id', $scheduleIds)->where('status_sesi', 'selesai')->count();
+            ->whereIn('jadwal_pelajaran_id', $scheduleIds)->whereIn('status_sesi', ['final', 'finalisasi_susulan'])->count();
         $flagged = Absensi::query()->whereDate('tanggal', $date->toDateString())
             ->where(fn ($query) => $query
                 ->whereIn('status_verifikasi_masuk', ['PENDING', 'FLAGGED'])
