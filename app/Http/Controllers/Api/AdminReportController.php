@@ -156,6 +156,8 @@ class AdminReportController extends Controller
                 'total' => $classRows->count(),
                 'filled' => $classRows->where('journal_filled', true)->count(),
                 'draft' => $classRows->where('journal_status', 'draft')->count(),
+                'finalisasi_susulan' => $classRows->where('journal_status', 'finalisasi_susulan')->count(),
+                'kedaluwarsa' => $classRows->where('journal_status', 'kedaluwarsa')->count(),
                 'missing' => $classRows->where('journal_status', 'Belum diisi')->count(),
             ],
             'teachers_missing_journal' => $missingByTeacher,
