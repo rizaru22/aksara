@@ -11,7 +11,9 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
 
     // Membuat template tabel laporan agar hasil rendering konsisten untuk laporan harian, mingguan, dan bulanan.
     function renderTable(headers, rows, emptyMessage) {
-        return `<div class="table-responsive"><table class="table table-sm table-striped table-hover align-middle"><thead><tr>${headers.map((header) => `<th>${htmlSafe(header)}</th>`).join('')}</tr></thead><tbody>${rows.length ? rows.join('') : empty(headers.length, emptyMessage)}</tbody></table></div>`;
+        const numberedHeaders = ['No.', ...headers];
+        const numberedRows = rows.map((row, index) => row.replace('<tr>', `<tr><td>${index + 1}</td>`));
+        return `<div class="table-responsive"><table class="table table-sm table-striped table-hover align-middle"><thead><tr>${numberedHeaders.map((header) => `<th>${htmlSafe(header)}</th>`).join('')}</tr></thead><tbody>${numberedRows.length ? numberedRows.join('') : empty(numberedHeaders.length, emptyMessage)}</tbody></table></div>`;
     }
 
     // Menampilkan rekap kehadiran guru per hari atau per minggu sesuai kebutuhan laporan admin.
