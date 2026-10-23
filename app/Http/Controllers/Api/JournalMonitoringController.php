@@ -190,12 +190,7 @@ class JournalMonitoringController extends Controller
      */
     public function expireDrafts(Request $request): JsonResponse
     {
-        abort_unless(
-            $request->user()->hasRole('admin')
-                || $request->user()->can('kelola-master-data')
-                || $request->user()->can('view-dashboard-kurikulum'),
-            403
-        );
+        abort_unless($request->user()->hasRole('admin'), 403);
 
         $now = Carbon::now(config('app.timezone'));
         $expiredCount = JurnalMengajar::query()
