@@ -36,11 +36,12 @@ class AdminReportController extends Controller
             'period' => ['required', 'in:daily,weekly,monthly'],
             'date' => ['required_if:period,daily,weekly', 'nullable', 'date'],
             'month' => ['required_if:period,monthly', 'nullable', 'date_format:Y-m'],
+            'class_id' => ['nullable', 'integer', 'exists:kelas,id'],
         ]);
 
         return match ($filters['period']) {
-            'daily' => response()->json(['data' => $this->daily($filters['date'], $cycles)]),
-            'weekly' => response()->json(['data' => $this->weekly($filters['date'], $cycles)]),
+            'daily' => response()->json(['data' => $this->daily($filters['date'], $cycles, $filters['class_id'] ?? null)]),
+            'weekly' => response()->json(['data' => $this->weekly($filters['date'], $cycles, $filters['class_id'] ?? null)]),
             'monthly' => response()->json(['data' => $this->monthly($filters['month'])]),
         };
     }
@@ -64,7 +65,7 @@ class AdminReportController extends Controller
     /**
      * Menyusun data laporan harian untuk semua guru, termasuk status kehadiran, cuti, libur, dan sesi kelas yang berjalan.
      */
-    private function daily(string $date, CycleScheduleService $cycles): array
+    private function daily(string $date, CycleScheduleService $cycles, ?int $classId = null): array
     {
         $day = Carbon::parse($date, config('app.timezone'))->startOfDay();
         $teachers = $this->userRoster();
@@ -90,14 +91,14 @@ class AdminReportController extends Controller
             'period' => ['from' => $date, 'to' => $date, 'label' => $day->translatedFormat('l, d F Y')],
             'holiday' => $holiday ? ['nama' => $holiday->nama, 'jenis' => $holiday->jenis] : ($day->isSunday() ? ['nama' => 'Hari Minggu', 'jenis' => 'MINGGU'] : null),
             'attendance' => $teacherRows,
-            'classes' => $this->classSessions(collect([$day]), $cycles),
+            'classes' => $this->classSessions(collect([$day]), $cycles, $classId),
         ];
     }
 
     /**
      * Menghitung ringkasan satu pekan kerja, termasuk durasi hadir, daftar guru yang belum mengisi jurnal, dan status kelas.
      */
-    private function weekly(string $date, CycleScheduleService $cycles): array
+    private function weekly(string $date, CycleScheduleService $cycles, ?int $classId = null): array
     {
         $start = Carbon::parse($date, config('app.timezone'))->startOfWeek(Carbon::MONDAY)->startOfDay();
         $end = $start->copy()->addDays(6)->endOfDay();
@@ -140,7 +141,7 @@ class AdminReportController extends Controller
             ];
         });
 
-        $classRows = $this->classSessions(collect(CarbonPeriod::create($start->toDateString(), $start->copy()->addDays(6)->toDateString())), $cycles);
+        $classRows = $this->classSessions(collect(CarbonPeriod::create($start->toDateString(), $start->copy()->addDays(6)->toDateString())), $cycles, $classId);
         $missingByTeacher = $classRows->where('journal_filled', false)->groupBy('teacher_name')->map(fn ($rows, $name) => [
             'teacher_name' => $name,
             'missing_sessions' => $rows->count(),
@@ -312,13 +313,15 @@ class AdminReportController extends Controller
     /**
      * Mengambil seluruh sesi kelas untuk rentang tanggal tertentu dan menandai apakah jurnal sudah diisi atau belum.
      */
-    private function classSessions($dates, CycleScheduleService $cycles)
+    private function classSessions($dates, CycleScheduleService $cycles, ?int $classId = null)
     {
         $year = TahunAjaran::query()->where('is_active', true)->first();
         if (! $year) return collect();
         $semester = Setting::value('active_semester') ?: (now(config('app.timezone'))->month >= 7 ? 'Ganjil' : 'Genap');
         $allSchedules = JadwalPelajaran::query()->with(['guru:id,nama,nip', 'kelas:id,nama_kelas', 'mataPelajaran:id,nama_mapel'])
-            ->where('tahun_ajaran_id', $year->id)->where('semester', $semester)->get()->groupBy('hari');
+            ->where('tahun_ajaran_id', $year->id)->where('semester', $semester)
+            ->when($classId, fn ($query) => $query->where('kelas_id', $classId))
+            ->get()->groupBy('hari');
         $rows = collect();
         foreach ($dates as $day) {
             if ($day->isSunday() || HariLibur::query()->whereDate('tanggal', $day->toDateString())->exists()) continue;
