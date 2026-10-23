@@ -186,7 +186,7 @@
             }
             return `<article class="list-group-item"><div class="d-flex justify-content-between gap-2"><strong>${htmlSafe(schedule.kelas?.nama_kelas)} · ${htmlSafe(schedule.mata_pelajaran?.nama_mapel)}</strong><span class="small">${htmlSafe(schedule.jam_mulai)}–${htmlSafe(schedule.jam_selesai)}</span></div><div class="small text-secondary">${htmlSafe(schedule.hari)} · Siklus ${htmlSafe(schedule.siklus_minggu || 'Mingguan')}</div>${schedule.substitute_active ? `<div class="alert alert-info mt-2 mb-0 small"><i class="bi bi-person-badge"></i> Mengajar pengganti: ${htmlSafe(schedule.substitute_teacher?.nama || 'Guru pengganti')}</div>` : ''}${schedule.kbm_ditangguhkan ? `<div class="alert alert-warning mt-2 mb-0 small">KBM ditangguhkan: ${htmlSafe(schedule.agenda_pengganti)}</div>` : `<div class="d-flex flex-wrap align-items-center justify-content-end gap-1 mt-2">${renderJournalAction(schedule)}${substituteAction}</div>`}</article>`;
         }).join('')}</div>` : '<div class="card"><div class="card-body text-center text-secondary">Tidak ada jadwal untuk tanggal dan siklus ini.</div></div>';
-        const headerToolbar = `<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><div class="alert alert-info small mb-0 py-2 flex-grow-1">${htmlSafe(meta.hari)} · ${htmlSafe(meta.tanggal)} · ${htmlSafe(meta.tahun_ajaran)} / ${htmlSafe(meta.semester)} · Siklus ${htmlSafe(meta.siklus_minggu)}</div><button class="btn btn-outline-secondary btn-sm" id="btnMySubstitutes"><i class="bi bi-person-lines-fill"></i> Riwayat Pengganti</button></div>`;
+        const headerToolbar = `<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><div class="alert alert-info small mb-0 py-2 flex-grow-1">${htmlSafe(meta.hari)} · ${htmlSafe(formatTanggal(meta.tanggal))} · ${htmlSafe(meta.tahun_ajaran)} / ${htmlSafe(meta.semester)} · Siklus ${htmlSafe(meta.siklus_minggu)}</div><button class="btn btn-outline-secondary btn-sm" id="btnMySubstitutes"><i class="bi bi-person-lines-fill"></i> Riwayat Pengganti</button></div>`;
         setFeature('Jadwal & E-Jurnal Hari Ini', `${headerToolbar}${holidayNote || list}`);
         $('btnMySubstitutes')?.addEventListener('click', openMySubstituteRequests);
         document.querySelectorAll('[data-journal]').forEach((button) => button.addEventListener('click', () => {
@@ -925,7 +925,7 @@ renderStudentPage();
             };
 
             const rows = items.map((item) => `<tr>
-                <td class="text-nowrap">${htmlSafe(item.tanggal)}</td>
+                <td class="text-nowrap">${htmlSafe(formatTanggal(item.tanggal))}</td>
                 <td>
                     <strong>${htmlSafe(item.jadwal_pelajaran?.kelas?.nama_kelas || 'Kelas')}</strong> · ${htmlSafe(item.jadwal_pelajaran?.mata_pelajaran?.nama_mapel || 'Mapel')}
                 </td>
@@ -1000,7 +1000,7 @@ renderStudentPage();
                     : `<span class="small text-secondary">Selesai</span>`;
 
                 return `<tr>
-                    <td class="text-nowrap">${htmlSafe(item.tanggal)}</td>
+                    <td class="text-nowrap">${htmlSafe(formatTanggal(item.tanggal))}</td>
                     <td>
                         <strong>${htmlSafe(item.guru_utama?.nama || 'Guru Utama')}</strong>
                         ${item.guru_utama?.nip ? `<div class="small text-secondary">${htmlSafe(item.guru_utama.nip)}</div>` : ''}
@@ -1180,13 +1180,7 @@ renderStudentPage();
             const guruLabel = htmlSafe(item.guru?.nama || 'Guru tidak diketahui');
             const nipLabel = item.guru?.nip ? `<div class="small text-secondary">${htmlSafe(item.guru.nip)}</div>` : '';
             const kelasLabel = htmlSafe(item.kelas?.nama_kelas || '—');
-            const tanggalLabel = item.tanggal
-    ?                       new Date(`${item.tanggal}T12:00:00`).toLocaleDateString('id-ID', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                        })
-                        : '—';
+            const tanggalLabel = formatTanggal(item.tanggal,'ringkas');
             const mapelLabel = htmlSafe(item.mata_pelajaran?.nama_mapel || '—');
             const waktu = item.jam_mulai && item.jam_selesai ? `${htmlSafe(item.jam_mulai)}–${htmlSafe(item.jam_selesai)}` : '—';
             const materi = item.materi_pembahasan
@@ -1548,7 +1542,7 @@ renderStudentPage();
         const result = await api('/api/v1/discrepancy-cases');
         const cases = result.data?.data || [];
         const note = result.meta?.note || 'Tidak ada kasus tersimpan.';
-        setFeature('Audit Discrepancy', `<div class="alert alert-warning">${htmlSafe(note)}</div>${cases.length ? `<div class="list-group">${cases.map((item) => `<article class="list-group-item"><div class="d-flex justify-content-between"><strong>${htmlSafe(item.title)}</strong><span>${htmlSafe(item.status)}</span></div><div class="small text-secondary">${htmlSafe(item.tanggal)} · ${htmlSafe(item.type)}</div><p class="small mb-2">${htmlSafe(item.description)}</p>${item.status === 'OPEN' || item.status === 'IN_REVIEW' ? `<div class="input-group input-group-sm"><input class="form-control" id="note-${item.id}" placeholder="Catatan penyelesaian"><button class="btn btn-outline-success" data-resolve="${item.id}">Tandai selesai</button><button class="btn btn-outline-secondary" data-review="${item.id}">Tinjau</button></div>` : ''}</article>`).join('')}</div>` : '<p class="text-center text-secondary">Belum ada kasus actionable tersimpan.</p>'}`);
+        setFeature('Audit Discrepancy', `<div class="alert alert-warning">${htmlSafe(note)}</div>${cases.length ? `<div class="list-group">${cases.map((item) => `<article class="list-group-item"><div class="d-flex justify-content-between"><strong>${htmlSafe(item.title)}</strong><span>${htmlSafe(item.status)}</span></div><div class="small text-secondary">${htmlSafe(formatTanggal(item.tanggal))} · ${htmlSafe(item.type)}</div><p class="small mb-2">${htmlSafe(item.description)}</p>${item.status === 'OPEN' || item.status === 'IN_REVIEW' ? `<div class="input-group input-group-sm"><input class="form-control" id="note-${item.id}" placeholder="Catatan penyelesaian"><button class="btn btn-outline-success" data-resolve="${item.id}">Tandai selesai</button><button class="btn btn-outline-secondary" data-review="${item.id}">Tinjau</button></div>` : ''}</article>`).join('')}</div>` : '<p class="text-center text-secondary">Belum ada kasus actionable tersimpan.</p>'}`);
         document.querySelectorAll('[data-resolve]').forEach((button) => button.addEventListener('click', async () => {
             try { await api(`/api/v1/discrepancy-cases/${button.dataset.resolve}`, { method: 'PATCH', body: { status: 'RESOLVED', resolution_note: $(`note-${button.dataset.resolve}`).value } }); openDiscrepancies(); }
             catch (error) { showToast(error.message); }
