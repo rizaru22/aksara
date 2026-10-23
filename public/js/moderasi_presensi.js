@@ -20,15 +20,18 @@ window.createAksaraModeration = function ({ $, api, htmlSafe, setFeature, showTo
             if (!items.length && currentPage > lastPage) return openFlagged(lastPage, correctionCurrentPage);
             if (!corrections.length && correctionCurrentPage > correctionLastPage) return openFlagged(currentPage, correctionLastPage);
 
+            let attendanceRowNumber = 0;
             const records = items.map((item) => {
                 const sessions = ['masuk', 'pulang'].filter((session) => waitingStatuses.includes(item[`status_verifikasi_${session}`]));
                 return sessions.map((session) => {
+                    attendanceRowNumber += 1;
                     const label = session === 'masuk' ? 'Masuk' : 'Pulang';
                     const sessionBadgeClass = session === 'masuk' ? 'text-bg-primary' : 'text-bg-info';
                     const status = item[`status_verifikasi_${session}`];
                     const time = item[`jam_${session}`] || '—';
                     const noteId = `review-note-${item.id}-${session}`;
                     return `<tr>
+                        <td>${attendanceRowNumber}</td>
                         <td>${htmlSafe(item.user?.nama || 'Nama tidak tersedia')}${item.user?.nip ? `<div class="small text-secondary">NIP ${htmlSafe(item.user.nip)}</div>` : ''}</td>
                         <td>${htmlSafe(item.tanggal || '—')}</td>
                         <td><span class="badge ${sessionBadgeClass}">${label}</span></td>
@@ -46,7 +49,8 @@ window.createAksaraModeration = function ({ $, api, htmlSafe, setFeature, showTo
                     </tr>`;
                 }).join('');
             }).join('');
-            const correctionRows = corrections.map((entry) => `<tr>
+            const correctionRows = corrections.map((entry, index) => `<tr>
+                <td>${index + 1}</td>
                 <td>${htmlSafe(entry.user?.nama || 'Nama tidak tersedia')}</td>
                 <td>${htmlSafe(entry.attendance?.tanggal || '—')}</td>
                 <td>${htmlSafe(entry.session === 'masuk' ? 'Masuk' : entry.session === 'pulang' ? 'Pulang' : entry.session)}</td>
@@ -68,9 +72,9 @@ window.createAksaraModeration = function ({ $, api, htmlSafe, setFeature, showTo
 
             setFeature('Moderasi Presensi', `<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><p class="small text-secondary mb-0">Tinjau presensi dan pengajuan koreksi guru.</p><button class="btn btn-outline-secondary btn-sm" type="button" data-refresh-moderation><i class="bi bi-arrow-clockwise"></i> Muat ulang</button></div>
                 <h2 class="h5">Presensi menunggu verifikasi</h2>
-                <div class="table-responsive"><table class="table table-bordered table-hover align-middle"><thead class="table-light"><tr><th>Guru</th><th>Tanggal</th><th>Sesi</th><th>Waktu</th><th>Status</th><th>Bukti</th><th>Aksi</th></tr></thead><tbody>${items.length && records ? records : '<tr><td colspan="7" class="text-center text-secondary py-3">Tidak ada presensi baru yang menunggu.</td></tr>'}</tbody></table></div>${attendancePagination}
+                <div class="table-responsive"><table class="table table-bordered table-hover align-middle"><thead class="table-light"><tr><th>No.</th><th>Guru</th><th>Tanggal</th><th>Sesi</th><th>Waktu</th><th>Status</th><th>Bukti</th><th>Aksi</th></tr></thead><tbody>${items.length && records ? records : '<tr><td colspan="8" class="text-center text-secondary py-3">Tidak ada presensi baru yang menunggu.</td></tr>'}</tbody></table></div>${attendancePagination}
                 <h2 class="h5 mt-4">Pengajuan koreksi dari guru</h2>
-                <div class="table-responsive"><table class="table table-bordered table-hover align-middle"><thead class="table-light"><tr><th>Guru</th><th>Tanggal</th><th>Sesi</th><th>Waktu tercatat</th><th>Alasan</th><th>Bukti</th><th>Aksi</th></tr></thead><tbody>${corrections.length ? correctionRows : '<tr><td colspan="7" class="text-center text-secondary py-3">Tidak ada pengajuan koreksi yang menunggu.</td></tr>'}</tbody></table></div>${correctionPagination}${modal}`);
+                <div class="table-responsive"><table class="table table-bordered table-hover align-middle"><thead class="table-light"><tr><th>No.</th><th>Guru</th><th>Tanggal</th><th>Sesi</th><th>Waktu tercatat</th><th>Alasan</th><th>Bukti</th><th>Aksi</th></tr></thead><tbody>${corrections.length ? correctionRows : '<tr><td colspan="8" class="text-center text-secondary py-3">Tidak ada pengajuan koreksi yang menunggu.</td></tr>'}</tbody></table></div>${correctionPagination}${modal}`);
 
             document.querySelector('[data-refresh-moderation]')?.addEventListener('click', () => openFlagged(currentPage, correctionCurrentPage));
             document.querySelectorAll('[data-page]').forEach((button) => button.addEventListener('click', () => openFlagged(Number(button.dataset.page), correctionCurrentPage)));
