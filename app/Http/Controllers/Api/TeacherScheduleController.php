@@ -94,12 +94,25 @@ class TeacherScheduleController extends Controller
             $scheduleEndsAt = Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
             $finalizationStartsAt = $scheduleEndsAt->copy()->subMinutes(30);
             if ($finalizationStartsAt->lt($journalStartsAt)) $finalizationStartsAt = $journalStartsAt;
-            $hasOpenDraft = $schedule->jurnal_hari_ini?->status_sesi === 'draft';
-            $canFillJournal = $hasOpenDraft || (! $now->lt($journalStartsAt) && ! $now->gt($scheduleEndsAt));
-            $availabilityMessage = $now->lt($journalStartsAt)
-                ? 'Draf jurnal dapat diisi mulai pukul '.$journalStartsAt->format('H:i').'.'
-                : ($now->gt($scheduleEndsAt) && ! $hasOpenDraft ? 'Waktu pengisian draf berakhir pukul '.$scheduleEndsAt->format('H:i').'.' : null);
-            $canFinalizeJournal = $hasOpenDraft || (! $now->lt($finalizationStartsAt) && ! $now->gt($scheduleEndsAt));
+            $journalStatus = $schedule->jurnal_hari_ini?->status_sesi;
+            $hasOpenDraft = $journalStatus === 'draft';
+            $hasJournal = $journalStatus !== null;
+            $insideSession = ! $now->lt($journalStartsAt) && ! $now->gt($scheduleEndsAt);
+            $insideFinalizationWindow = ! $now->lt($finalizationStartsAt) && ! $now->gt($scheduleEndsAt);
+            $canFillJournal = $hasOpenDraft || (! $hasJournal && $insideSession);
+            $availabilityMessage = $hasOpenDraft
+                ? 'Draf jurnal sudah tersimpan dan dapat diperbarui.'
+                : ($hasJournal
+                    ? match ($journalStatus) {
+                        'final' => 'Jurnal sudah difinalisasi.',
+                        'finalisasi_susulan' => 'Jurnal sudah difinalisasi sebagai susulan.',
+                        'kedaluwarsa' => 'Batas 48 jam telah lewat. Jurnal kedaluwarsa.',
+                        default => null,
+                    }
+                    : ($now->lt($journalStartsAt)
+                        ? 'Draf jurnal dapat diisi mulai pukul '.$journalStartsAt->format('H:i').'.'
+                        : ($now->gt($scheduleEndsAt) ? 'Waktu pengisian draf berakhir pukul '.$scheduleEndsAt->format('H:i').'.' : null)));
+            $canFinalizeJournal = $hasOpenDraft || (! $hasJournal && $insideFinalizationWindow);
             if ($hasOpenDraft) {
                 $finalizationMessage = $now->lt($finalizationStartsAt)
                     ? 'Draf aktif. Finalisasi dibuka pukul '.$finalizationStartsAt->format('H:i').'.'
