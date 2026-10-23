@@ -339,7 +339,7 @@ class AdminReportController extends Controller
                     'nip' => $schedule->guru?->nip, 'class_name' => $schedule->kelas?->nama_kelas ?? 'Kelas tidak ditemukan',
                     'subject_name' => $schedule->mataPelajaran?->nama_mapel ?? 'Mata pelajaran',
                     'start' => substr((string) $schedule->jam_mulai, 0, 5), 'end' => substr((string) $schedule->jam_selesai, 0, 5),
-                    'journal_filled' => in_array($journal?->status_sesi, ['final', 'finalisasi_susulan'], true),
+                    'journal_filled' => (bool) $journal,
                     'journal_status' => $journal?->status_sesi ?? 'Belum diisi',
                     'materi' => $journal?->materi_pembahasan, 'catatan' => $journal?->catatan_kejadian_kelas,
                     'has_photo' => (bool) $journal?->foto_kegiatan,
