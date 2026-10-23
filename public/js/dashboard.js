@@ -1114,7 +1114,7 @@ renderStudentPage();
                     </div>
                     <div class="col-sm-12 form-actions">
                         <button class="btn btn-outline-success" type="submit">Terapkan filter</button>
-                        <button class="btn btn-outline-danger ms-2" type="button" id="jmExpireDrafts">Tandai draft kedaluwarsa</button>
+                        ${activeRoleNames.includes('admin') ? '<button class="btn btn-outline-danger ms-2" type="button" id="jmExpireDrafts">Tandai draft kedaluwarsa</button>' : ''}
                     </div>
                 </div>
             </div>
