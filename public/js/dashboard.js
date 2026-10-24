@@ -1637,8 +1637,8 @@ renderStudentPage();
             add('student-attendance', 'kelola-presensi-siswa', 'bi-people', 'Koreksi Presensi Siswa', 'Koreksi status pada sesi jurnal di kelas yang Anda ampu.', Boolean(user.is_wali_kelas));
         }
         if (is('kurikulum')) {
-            add('substitute-approvals', 'view-dashboard-kurikulum', 'bi-person-badge', 'Guru Pengganti', 'Tinjau dan setujui delegasi guru pengganti.');
             add('student-attendance-report', 'view-dashboard-kurikulum', 'bi-people-fill', 'Laporan Presensi Siswa', 'Rekap kehadiran siswa per bulan dan kelas.');
+            add('substitute-approvals', 'view-dashboard-kurikulum', 'bi-person-badge', 'Guru Pengganti', 'Tinjau dan setujui delegasi guru pengganti.');
             add('monitoring', 'view-dashboard-kurikulum', 'bi-bar-chart-line', 'Monitoring Pembelajaran', 'Lihat jumlah jadwal, jurnal, dan presensi hari ini.');
             add('journal-monitoring', 'view-dashboard-kurikulum', 'bi-journal-check', 'Monitoring E-Jurnal', 'Pantau status jurnal mengajar guru berdasarkan tanggal kegiatan.');
             add('discrepancy', 'view-audit-discrepancy', 'bi-clipboard2-data', 'Audit Pembelajaran', 'Tinjau dan tindak lanjuti kasus yang tersedia.');
@@ -1656,8 +1656,8 @@ renderStudentPage();
         }
         if (is('admin')) {
             add('admin-users', 'kelola-master-data', 'bi-person-gear', 'Kelola User & Akses', 'Kelola akun, reset kata sandi, role, dan permission.');
-            add('substitute-approvals', 'kelola-master-data', 'bi-person-badge', 'Guru Pengganti', 'Tinjau dan setujui delegasi guru pengganti.');
             add('student-attendance-report', 'view-dashboard-kurikulum', 'bi-people-fill', 'Laporan Presensi Siswa', 'Rekap kehadiran siswa per bulan dan kelas.');
+            add('substitute-approvals', 'kelola-master-data', 'bi-person-badge', 'Guru Pengganti', 'Tinjau dan setujui delegasi guru pengganti.');
             add('journal-monitoring', 'kelola-master-data', 'bi-journal-check', 'Monitoring E-Jurnal', 'Pantau status jurnal mengajar guru berdasarkan tanggal kegiatan.');
             add('flagged', 'review-absensi-flagged', 'bi-shield-check', 'Moderasi Presensi', 'Tinjau foto presensi masuk dan pulang yang belum diverifikasi.');
             add('academic-master', 'kelola-master-data', 'bi-database', 'Master Data Akademik', 'Kelola kelas, siswa, mapel, materi, dan jadwal.');
@@ -1691,7 +1691,7 @@ renderStudentPage();
             $(elementId).innerHTML = items.map((module) => `<button class="admin-side-link" data-admin-action="${htmlSafe(module.key)}"><i class="bi ${htmlSafe(module.icon)}"></i> ${htmlSafe(module.title)}</button>`).join('');
         };
         const orderedModules = (keys) => keys.map((key) => modules.find((module) => module.key === key)).filter(Boolean);
-        renderSidebarGroup('adminSideOperational', orderedModules(['flagged', 'journal-monitoring', 'monitoring', 'substitute-approvals', 'leave-approvals', 'discrepancy', 'student-attendance-report', 'student-attendance', 'leave-submit']));
+        renderSidebarGroup('adminSideOperational', orderedModules(['flagged', 'journal-monitoring', 'monitoring', 'substitute-approvals', 'leave-approvals', 'discrepancy', 'leave-submit']));
         renderSidebarGroup('adminSideCalendar', orderedModules(['years', 'agendas', 'holidays']));
         renderSidebarGroup('adminSideAdministration', orderedModules(['admin-users', 'settings']));
         ['adminSideOperational', 'adminSideCalendar', 'adminSideAdministration'].forEach((elementId) => {
