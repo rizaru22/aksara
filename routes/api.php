@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\HolidayCalendarController;
 use App\Http\Controllers\Api\JournalMonitoringController;
 use App\Http\Controllers\Api\LessonJournalController;
 use App\Http\Controllers\Api\MasterDataController;
+use App\Http\Controllers\Api\NotificationInboxController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\ProfilePhotoController;
@@ -27,7 +28,11 @@ Route::prefix('v1/auth')->group(function (): void {
     Route::post('/reset-password', [PasswordResetController::class, 'reset'])->middleware('throttle:5,1');
 });
 
-Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {\n    Route::get('/notifications', [NotificationInboxController::class, 'index']);\n    Route::patch('/notifications/read-all', [NotificationInboxController::class, 'markAllRead']);\n    Route::patch('/notifications/{notification}/read', [NotificationInboxController::class, 'markRead']);
+Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
+    Route::get('/notifications', [NotificationInboxController::class, 'index']);
+    Route::patch('/notifications/read-all', [NotificationInboxController::class, 'markAllRead']);
+    Route::patch('/notifications/{notification}/read', [NotificationInboxController::class, 'markRead']);
+
     Route::prefix('auth')->group(function (): void {
         Route::get('/me', [AuthController::class, 'me']);
         Route::post('/logout', [AuthController::class, 'logout']);
