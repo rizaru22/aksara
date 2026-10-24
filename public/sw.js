@@ -42,9 +42,7 @@ async function broadcastUnreadCount() {
 }
 
 self.addEventListener('push', (event) => {
-    console.log('[AKSARA Push] Payload:', payload);
-    console.log('[AKSARA Push] Title:', payload.title);
-    console.log('[AKSARA Push] Body:', payload.body);
+    
     let payload = {};
     try {
         payload = event.data ? event.data.json() : {};
@@ -52,6 +50,9 @@ self.addEventListener('push', (event) => {
         payload = { body: event.data?.text() || '' };
     }
 
+    console.log('[AKSARA Push] Payload:', payload);
+    console.log('[AKSARA Push] Title:', payload.title);
+    console.log('[AKSARA Push] Body:', payload.body);
     const title = payload.title || 'Pengingat AKSARA';
     const options = {
         body: payload.body || 'Anda memiliki pengingat baru.',
