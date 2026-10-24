@@ -68,6 +68,15 @@ self.addEventListener('push', (event) => {
         await setUnreadCount(count);
         console.log('[AKSARA Push] Options:', options);
         await self.registration.showNotification(title, options);
+        const notifications = await self.registration.getNotifications();
+        console.log(
+            '[AKSARA Push] Notifikasi aktif:',
+            notifications.map((n) => ({
+                title: n.title,
+                body: n.body,
+                tag: n.tag,
+            }))
+        );
         console.log('[AKSARA Push] showNotification selesai');
         await broadcastUnreadCount();
     })());
