@@ -520,7 +520,8 @@ body.kepsek-dashboard .module-card .btn { min-height: 42px; padding: 7px 12px; f
 @media (max-width: 575.98px) {
     .hero {
         height: 25vh;
-        padding: 18px 16px 58px;
+        min-height: 120px;
+        padding: 16px 16px 30px;
         border-radius: 0 0 20px 20px;
     }
 
@@ -569,7 +570,7 @@ body.kepsek-dashboard .module-card .btn { min-height: 42px; padding: 7px 12px; f
     }
 
     .main {
-        margin-top: -34px;
+        margin-top: -28px;
     }
 }
 
