@@ -28,8 +28,9 @@ window.createAksaraNotifications = function ({ $, api, htmlSafe }) {
 
     async function loadInbox() {
         const page = $('page-notifications');
-        const emptyCard = page?.querySelector('.empty-state');
+        const emptyCard = page?.querySelector('.notification-inbox-card, .empty-state');
         if (!emptyCard) return;
+        emptyCard.className = 'card notification-inbox-card';
         emptyCard.innerHTML = '<div class="text-center text-secondary py-3"><span class="spin"></span> Memuat notifikasi...</div>';
 
         try {
@@ -40,29 +41,37 @@ window.createAksaraNotifications = function ({ $, api, htmlSafe }) {
             updateBadge(unreadCount);
 
             if (!items.length) {
+                emptyCard.classList.add('is-empty');
                 emptyCard.innerHTML = '<i class="bi bi-bell"></i><strong>Belum ada notifikasi</strong><span>Notifikasi pengingat akan muncul di sini setelah tersedia.</span>';
                 return;
             }
 
             emptyCard.innerHTML = `
-                <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
-                    <span class="small text-secondary">${unreadCount} belum dibaca · ${readCount} sudah dibaca ditampilkan</span>
+                <div class="notification-inbox-toolbar">
+                    <div>
+                        <strong class="notification-inbox-heading">Kotak masuk</strong>
+                        <span class="notification-inbox-summary">${unreadCount} belum dibaca · ${readCount} sudah dibaca ditampilkan</span>
+                    </div>
                     ${unreadCount > 0 ? '<button class="btn btn-sm btn-outline-success" id="markAllNotificationsRead">Tandai semua dibaca</button>' : ''}
                 </div>
-                <div class="list-group" id="notificationInboxList">
+                <div class="notification-inbox-list" id="notificationInboxList">
                     ${items.map((item) => {
                         const data = item.data || {};
                         const title = htmlSafe(data.title || 'Notifikasi AKSARA');
                         const body = htmlSafe(data.body || 'Anda memiliki notifikasi baru.');
                         const unread = !item.read_at;
-                        return `<article class="list-group-item ${unread ? 'border-start border-4 border-success' : ''}">
-                            <div class="d-flex justify-content-between align-items-start gap-2">
-                                <div class="flex-grow-1">
-                                    <strong>${title}</strong>
-                                    <p class="mb-1 mt-1">${body}</p>
-                                    <small class="text-secondary">${htmlSafe(formatDate(item.created_at))}${unread ? ' · Belum dibaca' : ' · Sudah dibaca'}</small>
+                        return `<article class="notification-item ${unread ? 'is-unread' : 'is-read'}">
+                            <span class="notification-item-icon" aria-hidden="true"><i class="bi ${unread ? 'bi-bell-fill' : 'bi-bell'}"></i></span>
+                            <div class="notification-item-content">
+                                <div class="notification-item-title-row">
+                                    <strong class="notification-item-title">${title}</strong>
+                                    <span class="notification-status ${unread ? 'status-unread' : 'status-read'}">${unread ? 'Belum dibaca' : 'Sudah dibaca'}</span>
                                 </div>
-                                ${unread ? `<button type="button" class="btn btn-sm btn-outline-secondary text-nowrap" data-notification-read="${htmlSafe(item.id)}">Tandai dibaca</button>` : ''}
+                                <p class="notification-item-body">${body}</p>
+                                <div class="notification-item-footer">
+                                    <small><i class="bi bi-clock"></i> ${htmlSafe(formatDate(item.created_at))}</small>
+                                    ${unread ? `<button type="button" class="btn btn-sm btn-outline-success" data-notification-read="${htmlSafe(item.id)}">Tandai dibaca</button>` : ''}
+                                </div>
                             </div>
                         </article>`;
                     }).join('')}
