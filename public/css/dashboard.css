@@ -519,9 +519,9 @@ body.kepsek-dashboard .module-card .btn { min-height: 42px; padding: 7px 12px; f
 /* Penyempurnaan header pada layar smartphone */
 @media (max-width: 575.98px) {
     .hero {
-        height: 228px;
+        height: 25vh;
         padding: 18px 16px 58px;
-        border-radius: 0 0 28px 28px;
+        border-radius: 0 0 20px 20px;
     }
 
     .hero-top {
@@ -575,10 +575,10 @@ body.kepsek-dashboard .module-card .btn { min-height: 42px; padding: 7px 12px; f
 
 @media (max-width: 359.98px) {
     .hero {
-        height: 224px;
+        height: 25vh;
         padding-right: 13px;
         padding-left: 13px;
-        border-radius: 0 0 25px 25px;
+        border-radius: 0 0 20px 20px;
     }
 
     .brand-mark {
