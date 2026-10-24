@@ -514,3 +514,91 @@ body.kepsek-dashboard .module-card .btn { min-height: 42px; padding: 7px 12px; f
     .notification-status { display: inline-block; margin-top: 6px; }
     .notification-item-body { font-size: 12px; }
 }
+
+
+/* Penyempurnaan header pada layar smartphone */
+@media (max-width: 575.98px) {
+    .hero {
+        height: 228px;
+        padding: 18px 16px 58px;
+        border-radius: 0 0 28px 28px;
+    }
+
+    .hero-top {
+        display: block;
+    }
+
+    .brand {
+        width: 100%;
+        align-items: center;
+    }
+
+    .brand-mark {
+        width: 40px;
+        height: 42px;
+        font-size: 33px;
+    }
+
+    .brand-name {
+        font-size: 22px;
+    }
+
+    .school-name {
+        font-size: 12px;
+    }
+
+    .brand-sub {
+        margin-top: 2px;
+        font-size: 9px;
+    }
+
+    .today {
+        margin-top: 9px;
+        text-align: left;
+    }
+
+    .today time {
+        font-size: 15px;
+        line-height: 1.3;
+    }
+
+    .today strong {
+        margin-top: 2px;
+        font-size: 24px;
+        line-height: 1.15;
+    }
+
+    .main {
+        margin-top: -34px;
+    }
+}
+
+@media (max-width: 359.98px) {
+    .hero {
+        height: 224px;
+        padding-right: 13px;
+        padding-left: 13px;
+        border-radius: 0 0 25px 25px;
+    }
+
+    .brand-mark {
+        width: 36px;
+        font-size: 30px;
+    }
+
+    .brand-name {
+        font-size: 20px;
+    }
+
+    .school-name {
+        font-size: 11px;
+    }
+
+    .today time {
+        font-size: 14px;
+    }
+
+    .today strong {
+        font-size: 23px;
+    }
+}
