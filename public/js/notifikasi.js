@@ -35,7 +35,10 @@ window.createAksaraNotifications = function ({ $, api, htmlSafe }) {
         try {
             const result = await api('/api/v1/notifications');
             const items = Array.isArray(result.data) ? result.data : [];
-            updateBadge(result.unread_count);
+            const unreadCount = Math.max(0, Number(result.unread_count) || 0);
+            const readCount = items.filter((item) => Boolean(item.read_at)).length;
+            updateBadge(unreadCount);
+
             if (!items.length) {
                 emptyCard.innerHTML = '<i class="bi bi-bell"></i><strong>Belum ada notifikasi</strong><span>Notifikasi pengingat akan muncul di sini setelah tersedia.</span>';
                 return;
@@ -43,8 +46,8 @@ window.createAksaraNotifications = function ({ $, api, htmlSafe }) {
 
             emptyCard.innerHTML = `
                 <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
-                    <span class="small text-secondary">${items.length} notifikasi terbaru</span>
-                    ${Number(result.unread_count) > 0 ? '<button class="btn btn-sm btn-outline-success" id="markAllNotificationsRead">Tandai semua dibaca</button>' : ''}
+                    <span class="small text-secondary">${unreadCount} belum dibaca · ${readCount} sudah dibaca ditampilkan</span>
+                    ${unreadCount > 0 ? '<button class="btn btn-sm btn-outline-success" id="markAllNotificationsRead">Tandai semua dibaca</button>' : ''}
                 </div>
                 <div class="list-group" id="notificationInboxList">
                     ${items.map((item) => {
