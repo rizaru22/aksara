@@ -42,6 +42,9 @@ async function broadcastUnreadCount() {
 }
 
 self.addEventListener('push', (event) => {
+    console.log('[AKSARA Push] Payload:', payload);
+    console.log('[AKSARA Push] Title:', payload.title);
+    console.log('[AKSARA Push] Body:', payload.body);
     let payload = {};
     try {
         payload = event.data ? event.data.json() : {};
