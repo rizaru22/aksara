@@ -23,7 +23,14 @@ class TeacherReminderNotification extends Notification
         return ['database', WebPushChannel::class];
     }
 
-    public function toArray(object $notifiable): array\n    {\n        return [\n            'title' => $this->title,\n            'body' => $this->body,\n            'tag' => $this->tag,\n            'url' => '/dashboard.html',\n        ];\n    }\n\n    public function toWebPush(object $notifiable, object $notification): WebPushMessage
+    public function toArray(object $notifiable): array{
+        return ['title' => $this->title,
+                'body' => $this->body,
+                'tag' => $this->tag,
+                'url' => '/dashboard.html',];
+                }
+        
+    public function toWebPush(object $notifiable, object $notification): WebPushMessage
     {
         return (new WebPushMessage)
             ->title($this->title)
