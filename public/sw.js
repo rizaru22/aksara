@@ -66,7 +66,9 @@ self.addEventListener('push', (event) => {
     event.waitUntil((async () => {
         const count = await getUnreadCount() + 1;
         await setUnreadCount(count);
+        console.log('[AKSARA Push] Options:', options);
         await self.registration.showNotification(title, options);
+        console.log('[AKSARA Push] showNotification selesai');
         await broadcastUnreadCount();
     })());
 });
