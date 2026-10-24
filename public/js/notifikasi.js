@@ -41,7 +41,6 @@ window.createAksaraNotifications = function ({ $, api, htmlSafe }) {
                 return;
             }
 
-            emptyCard.className = 'notification-inbox';
             emptyCard.innerHTML = `
                 <div class="d-flex align-items-center justify-content-between gap-2 mb-3">
                     <span class="small text-secondary">${items.length} notifikasi terbaru</span>
