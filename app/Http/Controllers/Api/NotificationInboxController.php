@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\\Http\\Controllers\\Api;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\Notifications\DatabaseNotification;
+use App\\Http\\Controllers\\Controller;
+use Illuminate\\Http\\Request;
+use Illuminate\\Notifications\\DatabaseNotification;
 
 class NotificationInboxController extends Controller
 {
@@ -12,19 +12,31 @@ class NotificationInboxController extends Controller
     {
         $user = $request->user();
 
+        $unread = $user->unreadNotifications()
+            ->latest()
+            ->get();
+
+        $recentRead = $user->readNotifications()
+            ->latest()
+            ->limit(10)
+            ->get();
+
+        $notifications = $unread
+            ->concat($recentRead)
+            ->sortByDesc('created_at')
+            ->values()
+            ->map(fn (DatabaseNotification $notification) => [
+                'id' => $notification->id,
+                'type' => class_basename($notification->type),
+                'data' => $notification->data,
+                'read_at' => $notification->read_at?->toISOString(),
+                'created_at' => $notification->created_at?->toISOString(),
+            ]);
+
         return response()->json([
-            'data' => $user->notifications()
-                ->latest()
-                ->limit(50)
-                ->get()
-                ->map(fn (DatabaseNotification $notification) => [
-                    'id' => $notification->id,
-                    'type' => class_basename($notification->type),
-                    'data' => $notification->data,
-                    'read_at' => $notification->read_at?->toISOString(),
-                    'created_at' => $notification->created_at?->toISOString(),
-                ]),
+            'data' => $notifications,
             'unread_count' => $user->unreadNotifications()->count(),
+            'read_display_count' => $recentRead->count(),
         ]);
     }
 
