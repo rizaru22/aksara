@@ -13,8 +13,6 @@ use RuntimeException;
 
 class KalenderJamPelajaranController extends Controller
 {
-    private const HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
-
     public function index()
     {
         return response()->json([
@@ -93,9 +91,15 @@ class KalenderJamPelajaranController extends Controller
             'periods.*.hari' => ['required', 'in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu'],
             'periods.*.nomor_periode' => ['required', 'integer', 'min:1', 'max:30'],
             'periods.*.jam_mulai' => ['required', 'date_format:H:i'],
-            'periods.*.jam_selesai' => ['required', 'date_format:H:i', 'after:periods.*.jam_mulai'],
+            'periods.*.jam_selesai' => ['required', 'date_format:H:i'],
             'periods.*.label' => ['nullable', 'string', 'max:50'],
         ]);
+
+        foreach ($validated['periods'] as $period) {
+            if ($period['jam_mulai'] >= $period['jam_selesai']) {
+                throw ValidationException::withMessages(['periods' => 'Jam mulai setiap periode harus lebih awal daripada jam selesai.']);
+            }
+        }
 
         $groups = collect($validated['periods'])->groupBy('hari');
         foreach ($groups as $day => $rows) {
