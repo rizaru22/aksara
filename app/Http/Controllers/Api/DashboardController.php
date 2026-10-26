@@ -141,14 +141,17 @@ class DashboardController extends Controller
                 return [
                     'schedule_id' => $schedule->id,
                     'teacher_id' => $schedule->user_id,
-                    'teacher_name' => $schedule->guru?->nama,
-                    'class_name' => $schedule->kelas?->nama_kelas,
-                    'subject_name' => $schedule->mataPelajaran?->nama_mapel,
+                    'teacher_name' => $schedule->guru?->nama ?? 'Guru tidak ditemukan',
+                    'teacher_nip' => $schedule->guru?->nip,
+                    'class_name' => $schedule->kelas?->nama_kelas ?? 'Kelas tidak ditemukan',
+                    'subject_name' => $schedule->mataPelajaran?->nama_mapel ?? 'Mata pelajaran',
                     'start' => $item['start']->format('H:i'),
                     'end' => $item['end']->format('H:i'),
-                    'journal_status' => $journal?->status_sesi ?? 'belum_diisi',
-                    'students_total' => $expectedStudents,
-                    'students_marked' => $markedStudents,
+                    'journal_filled' => in_array($journal?->status_sesi, ['final', 'finalisasi_susulan'], true),
+                    'journal_status' => $journal?->status_sesi ?? 'Belum diisi',
+                    'expected_students' => $expectedStudents,
+                    'marked_students' => $markedStudents,
+                    'is_in_class' => $journal?->status_sesi === 'final' && $expectedStudents > 0 && $markedStudents >= $expectedStudents,
                 ];
             });
         }
