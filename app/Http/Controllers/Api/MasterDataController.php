@@ -12,6 +12,9 @@ use App\Models\Siswa;
 use App\Models\TahunAjaran;
 use App\Models\User;
 use App\Services\ActiveAcademicYearService;
+use App\Services\CycleScheduleService;
+use App\Services\KalenderJamPelajaranResolver;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -264,10 +267,27 @@ class MasterDataController extends Controller
                 return (int) $periodStart <= $existingPeriodEnd && (int) $periodEnd >= $existingPeriodStart;
             }
 
-            // Mixed legacy/period schedules still use stored clock times until a
-            // common period-based representation exists for both records.
-            return $data['jam_mulai'] < $existing->jam_selesai
-                && $data['jam_selesai'] > $existing->jam_mulai;
+            // Resolve mixed legacy/period schedules to the same school day so a
+            // stale clock value cannot hide or invent a conflict.
+            $date = CarbonImmutable::today(config('app.timezone'));
+            $cycleSchedules = app(CycleScheduleService::class);
+            for ($offset = 0; $offset < 7 && $cycleSchedules->getHariIndo($date) !== $data['hari']; $offset++) {
+                $date = $date->addDay();
+            }
+
+            try {
+                $candidate = new JadwalPelajaran($data);
+                $resolver = app(KalenderJamPelajaranResolver::class);
+                $candidateTime = $resolver->resolve($candidate, $date);
+                $existingTime = $resolver->resolve($existing, $date);
+            } catch (\RuntimeException $exception) {
+                throw ValidationException::withMessages([
+                    'schedule' => 'Konflik jadwal tidak dapat divalidasi: '.$exception->getMessage(),
+                ]);
+            }
+
+            return $candidateTime['jam_mulai'] < $existingTime['jam_selesai']
+                && $candidateTime['jam_selesai'] > $existingTime['jam_mulai'];
         });
 
         if ($conflict) {
