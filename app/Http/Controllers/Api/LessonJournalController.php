@@ -372,13 +372,15 @@ class LessonJournalController extends Controller
             $sessionDate = $jurnalMengajar->tanggal instanceof \Carbon\Carbon
                 ? $jurnalMengajar->tanggal->toDateString()
                 : (string) $jurnalMengajar->tanggal;
-            $sessionEnd = Carbon::parse($sessionDate.' '.$schedule->jam_selesai, config('app.timezone'));
+            $sessionEnd = $jurnalMengajar->waktu_rencana_selesai
+                ? Carbon::parse($jurnalMengajar->waktu_rencana_selesai, config('app.timezone'))
+                : Carbon::parse($sessionDate.' '.$schedule->jam_selesai, config('app.timezone'));
             if ($now->lessThanOrEqualTo($sessionEnd)) {
                 throw new ConflictHttpException('Finalisasi susulan hanya tersedia setelah waktu pembelajaran berakhir.');
             }
         }
         if (! $isLateFinalization) {
-            $this->authorizeSchedule($request, $schedule, $now, $cycles);
+            $this->authorizeSchedule($request, $schedule, $now, $cycles, $calendarResolver);
         }
 
         $expectedIds = DB::table('siswas')->where('kelas_id', $schedule->kelas_id)->pluck('id')->map(fn ($id) => (int) $id)->sort()->values();
@@ -392,7 +394,7 @@ class LessonJournalController extends Controller
         if (! $isLateFinalization) {
             $isEmergency = filter_var($data['darurat'] ?? false, FILTER_VALIDATE_BOOLEAN);
             $distanceMeters = $this->verifyFinalizationLocation($data, $distance);
-            $this->authorizeFinalizationWindow($schedule, $now, $isEmergency);
+            $this->authorizeFinalizationWindow($schedule, $now, $isEmergency, $jurnalMengajar);
             $photoPath = $data['foto_kegiatan']->store('lesson-journals', 'local');
         }
 
@@ -567,10 +569,14 @@ class LessonJournalController extends Controller
      * Jika bukan darurat, sistem hanya menerima pada 30 menit terakhir sesi.
      * Jika darurat, sistem tetap mengizinkan finalisasi selama masih masuk per jangkauan sesi yang valid.
      */
-    private function authorizeFinalizationWindow(JadwalPelajaran $schedule, Carbon $now, bool $isEmergency = false): void
+    private function authorizeFinalizationWindow(JadwalPelajaran $schedule, Carbon $now, bool $isEmergency = false, ?JurnalMengajar $journal = null): void
     {
-        $sessionStart = Carbon::parse($now->toDateString().' '.$schedule->jam_mulai, config('app.timezone'));
-        $sessionEnd = Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
+        $sessionStart = $journal?->waktu_rencana_mulai
+            ? Carbon::parse($journal->waktu_rencana_mulai, config('app.timezone'))
+            : Carbon::parse($now->toDateString().' '.$schedule->jam_mulai, config('app.timezone'));
+        $sessionEnd = $journal?->waktu_rencana_selesai
+            ? Carbon::parse($journal->waktu_rencana_selesai, config('app.timezone'))
+            : Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
         $windowStart = $sessionEnd->copy()->subMinutes(30);
         if ($windowStart->lt($sessionStart)) $windowStart = $sessionStart;
 
