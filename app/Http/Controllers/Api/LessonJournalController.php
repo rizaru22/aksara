@@ -154,7 +154,21 @@ class LessonJournalController extends Controller
                 'jam_mulai_realisasi' => $journal->jam_mulai_realisasi ?? $now,
                 'jam_selesai_realisasi' => null,
                 'status_sesi' => JurnalMengajar::STATUS_DRAFT,
-            ])->save();
+            ]);
+
+            // Snapshot is written only once, when the first draft is created.
+            // Updating an existing draft must never replace its original calendar context.
+            if ($created && $resolved !== null) {
+                $journal->fill([
+                    'kalender_id_snapshot' => $resolved['kalender_id'],
+                    'waktu_rencana_mulai' => $resolved['jam_mulai'],
+                    'waktu_rencana_selesai' => $resolved['jam_selesai'],
+                    'periode_mulai_snapshot' => $resolved['periode_mulai'],
+                    'periode_selesai_snapshot' => $resolved['periode_selesai'],
+                ]);
+            }
+
+            $journal->save();
 
             $studentIds = collect($data['presensi'])->pluck('siswa_id')->map(fn ($id) => (int) $id)->all();
             $journal->presensiSiswas()->whereNotIn('siswa_id', $studentIds)->delete();
