@@ -25,6 +25,8 @@ class JurnalMengajar extends Model
         'tanggal', 'materi_pembahasan', 'catatan_kejadian_kelas', 'foto_kegiatan',
         'lat_finalisasi', 'long_finalisasi', 'gps_accuracy_finalisasi', 'jarak_geofence_finalisasi',
         'jam_mulai_realisasi', 'jam_selesai_realisasi', 'status_sesi', 'catatan_penutupan',
+        'kalender_id_snapshot', 'waktu_rencana_mulai', 'waktu_rencana_selesai',
+        'periode_mulai_snapshot', 'periode_selesai_snapshot',
     ];
 
     /**
