@@ -23,10 +23,8 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             { name: 'mata_pelajaran_id', label: 'Mata pelajaran', type: 'select', options: 'subjects', required: true, value: 'nama_mapel' },
             { name: 'siklus_minggu', label: 'Siklus (kosong = mingguan)', type: 'select', optional: true, options: [['', 'Mingguan'], ['1', 'Siklus 1'], ['2', 'Siklus 2'], ['3', 'Siklus 3']] },
             { name: 'hari', label: 'Hari', type: 'select', required: true, options: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'].map((x) => [x, x]) },
-            { name: 'mode_waktu', label: 'Sumber waktu', type: 'select', options: [['periode', 'Gunakan kalender aktif'], ['legacy', 'Jam manual (jadwal lama)']], required: true },
             { name: 'periode_mulai', label: 'Periode mulai', type: 'period', optional: true },
             { name: 'periode_selesai', label: 'Periode selesai', type: 'period', optional: true },
-            { name: 'jam_mulai', label: 'Jam mulai', type: 'time', optional: true }, { name: 'jam_selesai', label: 'Jam selesai', type: 'time', optional: true },
         ] },
         agendas: { title: 'Agenda Sekolah', columns: ['nama_agenda', 'tanggal', 'jam_mulai', 'jam_selesai', 'override_kbm'], columnLabels: { nama_agenda: 'Nama Agenda', tanggal: 'Tanggal', jam_mulai: 'Jam Mulai', jam_selesai: 'Jam Selesai', override_kbm: 'Override KBM' }, fields: [
             { name: 'nama_agenda', label: 'Nama agenda', required: true }, { name: 'tanggal', label: 'Tanggal', type: 'date', required: true },
@@ -77,14 +75,13 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
         for (const field of definition.fields) if (field.options && typeof field.options === 'string') references[field.options] = await loadOptions(field.options);
         const fieldMarkup = definition.fields.map((field) => {
             let oldValue = current ? nestedValue(current, field.name) ?? current[field.name] ?? '' : '';
-            if (resource === 'schedules' && field.name === 'mode_waktu') oldValue = current ? (current.periode_mulai != null && current.periode_selesai != null ? 'periode' : 'legacy') : (activeCalendar ? 'periode' : 'legacy');
             if (field.type === 'time' && oldValue) oldValue = String(oldValue).slice(0, 5);
             if (field.name === 'override_kbm') oldValue = oldValue ? '1' : '0';
             const required = field.required ? 'required' : '';
             let control;
             if (field.type === 'select' || field.type === 'period') {
                 const options = field.type === 'period'
-                    ? Array.from({ length: Math.max(0, ...((references.periods || []).map((period) => Number(period.nomor_periode)))) }, (_, index) => [String(index + 1), `Jam ke-${index + 1}`])
+                    ? []
                     : typeof field.options === 'string'
                     ? (references[field.options] || []).map((item) => [item.id, item[field.value || 'nama']])
                     : field.options;
@@ -100,7 +97,7 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
                         : '';
                 control = `<input class="form-control" name="${field.name}" type="${field.type || 'text'}" value="${htmlSafe(oldValue)}" ${required} ${coordinateAttrs}>`;
             }
-            const wrapperId = resource === 'schedules' && ['mode_waktu', 'periode_mulai', 'periode_selesai', 'jam_mulai', 'jam_selesai'].includes(field.name) ? ` data-schedule-field="${field.name}"` : '';
+            const wrapperId = resource === 'schedules' && ['periode_mulai', 'periode_selesai'].includes(field.name) ? ` data-schedule-field="${field.name}"` : '';
             return `<div class="col-sm-12"${wrapperId}><label class="form-label">${htmlSafe(field.label)}</label>${control}</div>`;
         }).join('');
         const heading = current ? `Ubah ${definition.title}` : `Tambah ${definition.title}`;
@@ -110,7 +107,7 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             ? `<div><label class="form-label small mb-1" for="studentImportClass">Kelas tujuan impor</label><select class="form-select" id="studentImportClass" ${studentClasses.length ? '' : 'disabled'}><option value="">${studentClasses.length ? 'Pilih kelas' : 'Belum ada kelas tersedia'}</option>${studentClasses.map((item) => `<option value="${htmlSafe(item.id)}">${htmlSafe(item.nama_kelas)}</option>`).join('')}</select></div>`
             : '';
         const importActions = importable ? `${studentImportClassSelect}<button class="btn btn-outline-success align-self-end" type="button" id="masterImportButton"><i class="bi bi-upload"></i> Import Excel</button><button class="btn btn-outline-primary align-self-end" type="button" id="masterTemplateButton"><i class="bi bi-download"></i> Template Excel</button><input class="d-none" type="file" id="masterImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">` : '';
-        const calendarNotice = resource === 'schedules' ? (activeCalendar ? `<div class="alert alert-info small">Kalender aktif: <strong>${htmlSafe(activeCalendar.nama)}</strong>. Waktu jadwal berbasis periode dihitung otomatis dari periode awal hingga periode akhir.</div>` : '<div class="alert alert-warning small">Belum ada kalender jam pelajaran aktif. Jadwal baru hanya dapat memakai jam manual sampai kalender dibuat dan diaktifkan.</div>') : '';
+        const calendarNotice = resource === 'schedules' ? (activeCalendar ? `<div class="alert alert-info small">Kalender aktif: <strong>${htmlSafe(activeCalendar.nama)}</strong>. Pilih hari, lalu tentukan periode mulai dan selesai. Jam jadwal dihitung otomatis dari detail kalender.</div>` : '<div class="alert alert-warning small">Belum ada kalender jam pelajaran aktif. Aktifkan kalender terlebih dahulu sebelum menambahkan jadwal.</div>') : '';
         setFeature(definition.title, `${calendarNotice}<div class="d-flex flex-wrap align-items-end gap-2 mb-3"><button class="btn btn-success align-self-end" id="showMasterForm" ${current ? 'hidden' : ''}><i class="bi bi-plus-lg"></i> Tambah data</button>${importActions}</div>${resource === 'students' ? '<div class="form-text mb-3">Semua siswa dalam file akan dimasukkan ke kelas yang dipilih.</div>' : ''}<div id="masterImportResult" class="mb-3"></div><form class="card mb-4 admin-form-card" id="masterForm" ${current ? `data-id="${current.id}"` : ''} ${current ? '' : 'hidden'}><div class="card-body"><h3 class="h6 mb-3">${heading}</h3><div class="row g-3 admin-form-grid">${fieldMarkup}<div class="col-sm-12 d-flex gap-2 form-actions"><button class="btn btn-primary" type="submit">Simpan</button><button class="btn btn-outline-secondary" type="button" id="cancelMasterForm">Batal</button></div></div></div></form><div class="table-responsive"><table class="table table-sm align-middle mobile-table"><thead><tr><th>No.</th>${definition.columns.map((column) => `<th>${htmlSafe(definition.columnLabels?.[column] || column.split('.').pop().replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase()))}</th>`).join('')}<th>Aksi</th></tr></thead><tbody>${items.map((item, index) => `<tr><td>${index + 1}</td>${definition.columns.map((column) => `<td>${htmlSafe((resource === 'schedules' && column === 'jam_mulai' ? (item.jam_mulai_resolved ?? 'Tidak tersedia') : resource === 'schedules' && column === 'jam_selesai' ? (item.jam_selesai_resolved ?? 'Tidak tersedia') : nestedValue(item, column) ?? item[column] ?? '—'))}</td>`).join('')}<td class="d-flex gap-1">${resource === 'academic-years' ? `<button class="btn btn-sm btn-outline-success" data-activate="${item.id}" ${item.is_active ? 'disabled' : ''}>${item.is_active ? 'Aktif' : 'Aktifkan'}</button>` : ''}<button class="btn btn-sm btn-outline-primary" data-edit="${item.id}">Ubah</button><button class="btn btn-sm btn-outline-danger" data-delete="${item.id}">Hapus</button></td></tr>`).join('') || `<tr><td colspan="${definition.columns.length + 2}" class="text-center text-secondary py-4">Belum ada data.</td></tr>`}</tbody></table></div>${resource === 'agendas' ? '<div class="alert alert-warning small">Scope tingkat/kelas belum tersedia karena skema tidak memiliki target kelas/tingkat.</div>' : ''}`);
         $('masterImportButton')?.addEventListener('click', () => {
             if (resource === 'students' && !$('studentImportClass')?.value) {
@@ -145,48 +142,39 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             }
         });
         if (resource === 'schedules') {
-            const mode = $('masterForm').querySelector('[name="mode_waktu"]');
             const startPeriod = $('masterForm').querySelector('[name="periode_mulai"]');
             const endPeriod = $('masterForm').querySelector('[name="periode_selesai"]');
-            const startTime = $('masterForm').querySelector('[name="jam_mulai"]');
-            const endTime = $('masterForm').querySelector('[name="jam_selesai"]');
             const day = $('masterForm').querySelector('[name="hari"]');
-            const toggleScheduleFields = () => {
-                const usePeriods = mode?.value === 'periode' && Boolean(activeCalendar);
-                $('masterForm').querySelectorAll('[data-schedule-field="periode_mulai"], [data-schedule-field="periode_selesai"]').forEach((el) => { el.hidden = !usePeriods; });
-                $('masterForm').querySelectorAll('[data-schedule-field="jam_mulai"], [data-schedule-field="jam_selesai"]').forEach((el) => { el.hidden = false; });
-                if (startPeriod) startPeriod.required = usePeriods;
-                if (endPeriod) endPeriod.required = usePeriods;
-                if (startTime) { startTime.required = !usePeriods; startTime.readOnly = usePeriods; }
-                if (endTime) { endTime.required = !usePeriods; endTime.readOnly = usePeriods; }
-                if (!usePeriods && mode && mode.value === 'periode') mode.value = 'legacy';
-                updatePeriodPreview();
-            };
-            const updatePeriodPreview = () => {
-                if (!activeCalendar || mode?.value !== 'periode' || !day || !startPeriod?.value || !endPeriod?.value) return;
-                const periods = (activeCalendar.detail_periode || []).filter((period) => period.hari === day.value);
-                const first = periods.find((period) => Number(period.nomor_periode) === Number(startPeriod.value));
-                const last = periods.find((period) => Number(period.nomor_periode) === Number(endPeriod.value));
-                if (!first || !last || Number(startPeriod.value) > Number(endPeriod.value)) {
-                    startTime.value = '';
-                    endTime.value = '';
-                    return;
+            const renderPeriodOptions = () => {
+                const selectedStart = startPeriod?.value || '';
+                const selectedEnd = endPeriod?.value || '';
+                const periods = (activeCalendar?.detail_periode || [])
+                    .filter((period) => period.hari === day?.value)
+                    .sort((a, b) => Number(a.nomor_periode) - Number(b.nomor_periode));
+                const options = periods.map((period) => {
+                    const start = String(period.jam_mulai || '').slice(0, 5);
+                    const end = String(period.jam_selesai || '').slice(0, 5);
+                    const label = `Periode ${period.nomor_periode} (${start}–${end})`;
+                    return `<option value="${htmlSafe(period.nomor_periode)}">${htmlSafe(label)}</option>`;
+                }).join('');
+                for (const [select, value] of [[startPeriod, selectedStart], [endPeriod, selectedEnd]]) {
+                    if (!select) continue;
+                    select.innerHTML = `<option value="">Pilih periode…</option>${options}`;
+                    if (periods.some((period) => String(period.nomor_periode) === String(value))) select.value = value;
+                    select.disabled = !activeCalendar || !day?.value || periods.length === 0;
+                    select.required = Boolean(activeCalendar);
                 }
-                const sequence = [];
-                for (let n = Number(startPeriod.value); n <= Number(endPeriod.value); n++) sequence.push(periods.find((period) => Number(period.nomor_periode) === n));
-                if (sequence.some((period) => !period)) {
-                    startTime.value = '';
-                    endTime.value = '';
-                    return;
+                if (startPeriod && endPeriod && startPeriod.value && endPeriod.value && Number(endPeriod.value) < Number(startPeriod.value)) {
+                    endPeriod.setCustomValidity('Periode selesai harus sama dengan atau setelah periode mulai.');
+                } else {
+                    endPeriod?.setCustomValidity('');
                 }
-                startTime.value = String(first.jam_mulai).slice(0, 5);
-                endTime.value = String(last.jam_selesai).slice(0, 5);
             };
-            mode?.addEventListener('change', toggleScheduleFields);
-            day?.addEventListener('change', updatePeriodPreview);
-            startPeriod?.addEventListener('change', updatePeriodPreview);
-            endPeriod?.addEventListener('change', updatePeriodPreview);
-            toggleScheduleFields();
+            if (day && current?.hari) day.value = current.hari;
+            day?.addEventListener('change', renderPeriodOptions);
+            startPeriod?.addEventListener('change', renderPeriodOptions);
+            endPeriod?.addEventListener('change', renderPeriodOptions);
+            renderPeriodOptions();
         }
         $('showMasterForm').addEventListener('click', () => { $('masterForm').hidden = false; });
         $('cancelMasterForm').addEventListener('click', () => {
