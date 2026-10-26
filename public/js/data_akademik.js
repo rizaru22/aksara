@@ -77,7 +77,7 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
         for (const field of definition.fields) if (field.options && typeof field.options === 'string') references[field.options] = await loadOptions(field.options);
         const fieldMarkup = definition.fields.map((field) => {
             let oldValue = current ? nestedValue(current, field.name) ?? current[field.name] ?? '' : '';
-            if (resource === 'schedules' && field.name === 'mode_waktu') oldValue = current && current.periode_mulai != null && current.periode_selesai != null ? 'periode' : (activeCalendar ? 'periode' : 'legacy');
+            if (resource === 'schedules' && field.name === 'mode_waktu') oldValue = current ? (current.periode_mulai != null && current.periode_selesai != null ? 'periode' : 'legacy') : (activeCalendar ? 'periode' : 'legacy');
             if (field.type === 'time' && oldValue) oldValue = String(oldValue).slice(0, 5);
             if (field.name === 'override_kbm') oldValue = oldValue ? '1' : '0';
             const required = field.required ? 'required' : '';
