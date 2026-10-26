@@ -283,10 +283,11 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
         });
         $('calendarImportExcel')?.addEventListener('click', () => $('calendarImportFile')?.click());
         $('calendarImportFile')?.addEventListener('change', async (event) => {
-            const file = event.currentTarget.files?.[0];
+            const input = event.currentTarget;
+            const file = input.files?.[0];
             if (!file) return;
             if (!confirm('Impor Excel akan mengganti seluruh detail periode pada kalender ini. Lanjutkan?')) {
-                event.currentTarget.value = '';
+                input.value = '';
                 return;
             }
             const formData = new FormData();
@@ -305,7 +306,7 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
                 showToast(result.message || 'Detail kalender berhasil diimpor.');
                 openCalendars(selected.id);
             } catch (error) { setFeatureError(error); }
-            finally { event.currentTarget.value = ''; }
+            finally { input.value = ''; }
         });
         $('calendarAddPeriod')?.addEventListener('click', () => {
             const rows = $('calendarPeriodRows');
