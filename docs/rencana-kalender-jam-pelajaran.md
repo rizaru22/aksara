@@ -111,3 +111,34 @@ Pada branch `feature/kalender-jam-pelajaran` tersedia `App\\Services\\KalenderJa
 Layanan `App\\Services\\KalenderJamPelajaranService` juga telah ditambahkan untuk aktivasi kalender dalam transaksi. Layanan mengunci baris kalender yang ada, memvalidasi bahwa detail periode tersedia, nomor periode berurutan mulai dari 1 per hari, jam valid, dan periode tidak bertumpang tindih; kemudian menonaktifkan kalender aktif dan mengaktifkan pilihan.
 
 `LessonJournalController` kini menggunakan resolver untuk memeriksa waktu pengisian ketika belum ada draft terbuka. Saat draft baru dibuat, resolver dijalankan lagi di dalam transaksi dan snapshot kalender, waktu rencana, serta rentang periode disimpan bersama draft dan presensi. Pembaruan draft yang sudah ada tidak menimpa snapshot. Jendela finalisasi dan finalisasi susulan menggunakan waktu snapshot apabila tersedia. Review tambahan memperbaiki pemeriksaan agenda sekolah agar tetap dijalankan saat draft baru dibuat maupun saat draft lama diperbarui; pemeriksaan menggunakan waktu snapshot jika ada, tanpa menimpa snapshot. Integrasi ini belum diuji ulang setelah perubahan controller. Tes integrasi database sengaja ditunda sesuai keputusan pemilik proyek. Endpoint `TeacherScheduleController::today` juga telah diperbarui: dashboard menggunakan snapshot jurnal bila tersedia dan resolver untuk jadwal tanpa snapshot, menghitung bentrok agenda dengan rentang waktu hasil resolusi, menonaktifkan aksi jurnal jika waktu tidak dapat diselesaikan, dan mengurutkan jadwal berdasarkan waktu hasil resolusi. Perubahan ini belum diuji ulang. Pengingat push kini memakai waktu hasil resolver atau snapshot jurnal, pemeriksaan agenda membandingkan rentang waktu yang sama, kunci deduplikasi mencakup jenis/tanggal/jadwal/penerima dan direservasi atomik sebelum notifikasi dikirim. Pengingat juga diarahkan ke guru pengganti yang memiliki penugasan APPROVED untuk tanggal tersebut. Kebijakan ini mencegah pengiriman ganda oleh eksekusi scheduler bersamaan, tetapi bersifat at-most-once: bila pengiriman gagal setelah reservasi, pengiriman tidak otomatis dicoba ulang. Belum ada tes baru yang dijalankan. Laporan, impor, validasi bentrok, endpoint daftar jadwal lain, dan audit lengkap alur guru pengganti masih perlu ditinjau.
+
+
+## Progres audit Tahap 4 — daftar jadwal, laporan, agenda, dan penerimaan
+
+- [x] Dashboard admin live menyelesaikan waktu sesi melalui resolver atau snapshot jurnal, lalu menerapkan filter sesi berjalan dan agenda pada waktu hasil resolusi.
+- [x] Mempertahankan kontrak respons dashboard admin (teacher_nip, journal_filled, expected_students, marked_students, dan is_in_class) saat mengubah sumber waktu.
+- [x] Laporan kelas harian/mingguan memakai waktu snapshot jika ada, atau resolver pada tanggal laporan; kegagalan resolusi ditampilkan melalui time_resolution_error dan tidak diganti diam-diam dengan waktu lama.
+- [x] Monitoring jurnal admin menampilkan waktu rencana dan rentang periode snapshot jika tersedia.
+- [x] CRUD jadwal master menerima periode_mulai/periode_selesai opsional, memvalidasi pasangan rentang, dan membandingkan konflik periode jika kedua jadwal menggunakan periode.
+- [ ] Audit lebih lanjut konflik campuran jadwal berbasis periode dan legacy: fallback saat ini tetap membandingkan waktu tersimpan, sehingga nilai jam legacy yang hanya menjadi placeholder untuk jadwal periode dapat memengaruhi konflik campuran.
+- [ ] Uji regresi end-to-end pada environment Laravel/PHP 8.3 dan database uji. Belum ada tes yang dijalankan setelah perubahan controller di tahap ini; percobaan mengambil clone repo untuk menjalankan tes lokal gagal karena environment eksekusi tidak dapat menjangkau GitHub.
+- [ ] Uji skenario penerimaan di bawah ini; daftar ini adalah rencana uji, bukan klaim hasil tes.
+
+### Matriks skenario penerimaan
+
+| ID | Skenario | Hasil yang diharapkan | Status |
+|---|---|---|---|
+| AT-01 | Jadwal legacy tanpa nomor periode | Resolver memakai jam_mulai/jam_selesai tersimpan | Tes unit legacy sebelumnya lulus; belum diulang |
+| AT-02 | Jadwal berbasis periode dengan kalender aktif | Dashboard, pengingat, dan laporan memakai rentang waktu hasil kalender | Belum diuji |
+| AT-03 | Draft memiliki snapshot lalu kalender aktif diganti | Dashboard, pengingat, laporan, dan monitoring jurnal tetap memakai snapshot lama | Belum diuji |
+| AT-04 | Kalender aktif tidak memiliki rentang periode yang diperlukan | Aksi jurnal dinonaktifkan; pengingat dilewati dan kesalahan dicatat; laporan memberi indikator resolusi gagal | Belum diuji |
+| AT-05 | Agenda sekolah menimpa KBM dan beririsan dengan sesi berbasis periode | Sesi dikecualikan dari dashboard live, laporan sesi kelas, dan pengingat; pembuatan/pembaruan draft ditolak | Belum diuji |
+| AT-06 | Agenda tidak beririsan dengan sesi | Sesi tetap tersedia | Belum diuji |
+| AT-07 | Dua proses scheduler mengirim jenis pengingat yang sama untuk penerima/jadwal/tanggal yang sama | Hanya satu proses memperoleh kunci unik dan mengirim | Belum diuji |
+| AT-08 | Dua guru memiliki jadwal berbeda pada waktu sama | Kunci pengingat masing-masing penerima tidak saling menekan | Belum diuji |
+| AT-09 | Guru pengganti disetujui pada tanggal sesi | Pengingat sesi diarahkan ke guru pengganti untuk jadwal tersebut | Belum diuji |
+| AT-10 | Kegagalan provider setelah kunci didaftarkan | Tidak ada retry otomatis; kegagalan dicatat, tanpa risiko duplikasi otomatis | Belum diuji |
+| AT-11 | Jadwal baru berbasis periode bentrok dengan jadwal periode lain untuk guru/kelas sama | Konflik rentang nomor periode ditolak | Belum diuji |
+| AT-12 | Jadwal campuran periode dan legacy | Perlu pengujian tambahan dan peninjauan aturan konflik berbasis waktu kalender | Belum diuji |
+
+Catatan: pemeriksaan dashboard dan laporan di atas adalah integrasi kode. Status “belum diuji” harus tetap dipertahankan sampai tes dijalankan di environment proyek; jangan menyimpulkan kelulusan dari inspeksi kode saja.
