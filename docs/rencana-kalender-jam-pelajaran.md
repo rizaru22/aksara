@@ -13,7 +13,7 @@ Menyediakan kalender jam pelajaran sekolah yang dapat dikonfigurasi per hari, te
 - Waktu pelajaran dapat berbeda menurut hari.
 - Satu jurnal dapat mencakup rentang beberapa periode berurutan.
 - Perubahan kalender dapat dilakukan sewaktu-waktu.
-- Kalender baru langsung berlaku untuk jadwal yang belum dimulai.
+- Kalender yang diaktifkan menjadi acuan jadwal/sesi mendatang yang belum memiliki snapshot.
 - Sesi yang sudah dimulai harus mempertahankan waktu yang telah dipakai saat sesi dimulai.
 - Jurnal historis tidak boleh berubah hanya karena kalender diperbarui.
 - Perubahan ini tidak boleh mengirim ulang notifikasi yang sudah dikirim untuk sesi yang sama.
@@ -29,7 +29,7 @@ Menyediakan kalender jam pelajaran sekolah yang dapat dikonfigurasi per hari, te
 
 ## Prinsip desain yang wajib dipenuhi
 
-1. **Versi kalender**: perubahan tidak boleh menimpa definisi kalender yang diperlukan untuk menjelaskan sesi sebelumnya.
+1. **Status aktif/nonaktif**: sekolah mengaktifkan satu kalender pada satu waktu. Kalender yang dinonaktifkan tetap disimpan agar bisa diaktifkan kembali; snapshot jurnal menjaga riwayat waktu.
 2. **Batas berlaku yang jelas**: kalender baru dipakai untuk sesi yang belum dimulai; sesi berjalan mempertahankan waktu yang telah ditetapkan saat dimulai.
 3. **Riwayat stabil**: perubahan kalender tidak mengubah waktu historis yang ditampilkan untuk jurnal lama.
 4. **Sumber waktu konsisten**: dashboard, validasi jurnal, finalisasi, agenda, dan pengingat harus menggunakan resolver waktu yang sama.
@@ -48,7 +48,7 @@ Menyediakan kalender jam pelajaran sekolah yang dapat dikonfigurasi per hari, te
 
 ### Tahap 2 — Spesifikasi skema dan migrasi
 
-- Tentukan entitas kalender, versi/masa berlaku, dan detail periode.
+- Tentukan entitas kalender dengan status aktif/nonaktif dan detail periode.
 - Tentukan bagaimana jadwal lama dipetakan ke periode baru.
 - Tentukan apakah snapshot waktu rencana disimpan pada jurnal atau entitas sesi.
 - Sajikan spesifikasi lengkap untuk ditinjau sebelum menulis migrasi.
@@ -77,7 +77,7 @@ Menyediakan kalender jam pelajaran sekolah yang dapat dikonfigurasi per hari, te
 
 1. Kalender hari Senin dapat berbeda dari Selasa.
 2. Satu sesi yang memakai periode 1–3 dihitung sebagai satu sesi jurnal.
-3. Kalender yang diaktifkan saat sesi belum dimulai berlaku untuk sesi mendatang.
+3. Kalender yang diaktifkan menjadi acuan untuk sesi mendatang yang belum memiliki snapshot.
 4. Sesi yang sudah dimulai tetap memakai waktu mulai/selesai yang telah ditetapkan untuk sesi tersebut.
 5. Jurnal lama menampilkan waktu rencana dan realisasi yang tidak berubah akibat pembaruan kalender.
 6. Pengingat dihitung berdasarkan waktu sesi yang sama dengan yang digunakan dashboard dan validasi jurnal.
