@@ -154,11 +154,11 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             const toggleScheduleFields = () => {
                 const usePeriods = mode?.value === 'periode' && Boolean(activeCalendar);
                 $('masterForm').querySelectorAll('[data-schedule-field="periode_mulai"], [data-schedule-field="periode_selesai"]').forEach((el) => { el.hidden = !usePeriods; });
-                $('masterForm').querySelectorAll('[data-schedule-field="jam_mulai"], [data-schedule-field="jam_selesai"]').forEach((el) => { el.hidden = usePeriods; });
+                $('masterForm').querySelectorAll('[data-schedule-field="jam_mulai"], [data-schedule-field="jam_selesai"]').forEach((el) => { el.hidden = false; });
                 if (startPeriod) startPeriod.required = usePeriods;
                 if (endPeriod) endPeriod.required = usePeriods;
-                if (startTime) startTime.required = !usePeriods;
-                if (endTime) endTime.required = !usePeriods;
+                if (startTime) { startTime.required = !usePeriods; startTime.readOnly = usePeriods; }
+                if (endTime) { endTime.required = !usePeriods; endTime.readOnly = usePeriods; }
                 if (!usePeriods && mode && mode.value === 'periode') mode.value = 'legacy';
                 updatePeriodPreview();
             };
