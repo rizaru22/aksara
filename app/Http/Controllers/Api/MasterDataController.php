@@ -14,7 +14,6 @@ use App\Models\User;
 use App\Services\ActiveAcademicYearService;
 use App\Services\CycleScheduleService;
 use App\Services\KalenderJamPelajaranResolver;
-use Carbon\CarbonInterface;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
