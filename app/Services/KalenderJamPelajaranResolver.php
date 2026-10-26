@@ -1,21 +1,18 @@
 <?php
 
-namespace App\\Services;
+namespace App\Services;
 
-use App\\Models\\JadwalPelajaran;
-use App\\Models\\KalenderJamPelajaran;
-use Carbon\\CarbonImmutable;
-use Carbon\\CarbonInterface;
-use Illuminate\\Support\\Facades\\DB;
+use App\Models\JadwalPelajaran;
+use App\Models\KalenderJamPelajaran;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 class KalenderJamPelajaranResolver
 {
     /**
      * Resolve planned session time for a schedule on a concrete date.
-     *
-     * Legacy schedules without period numbers continue to use their stored
-     * times. Period-based schedules always use the single active calendar.
      *
      * @return array{
      *   kalender_id: int|null,
@@ -76,9 +73,8 @@ class KalenderJamPelajaranResolver
 
             for ($i = 0; $i < $detail->count(); $i++) {
                 $periode = $detail[$i];
-                $nomorDiharapkan = $periodeMulai + $i;
 
-                if ((int) $periode->nomor_periode !== $nomorDiharapkan) {
+                if ((int) $periode->nomor_periode !== $periodeMulai + $i) {
                     throw new RuntimeException('Nomor periode kalender harus berurutan tanpa celah.');
                 }
 
@@ -91,14 +87,11 @@ class KalenderJamPelajaranResolver
                 }
             }
 
-            $jamMulai = $detail->first()->jam_mulai;
-            $jamSelesai = $detail->last()->jam_selesai;
-
             return [
                 'kalender_id' => (int) $kalenderAktif->id,
                 'tanggal' => $date->toDateString(),
-                'jam_mulai' => $date->setTimeFromTimeString($jamMulai),
-                'jam_selesai' => $date->setTimeFromTimeString($jamSelesai),
+                'jam_mulai' => $date->setTimeFromTimeString($detail->first()->jam_mulai),
+                'jam_selesai' => $date->setTimeFromTimeString($detail->last()->jam_selesai),
                 'periode_mulai' => $periodeMulai,
                 'periode_selesai' => $periodeSelesai,
                 'sumber' => 'kalender_aktif',
