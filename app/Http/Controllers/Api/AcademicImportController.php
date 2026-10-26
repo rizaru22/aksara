@@ -11,6 +11,9 @@ use App\Models\Siswa;
 use App\Models\TahunAjaran;
 use App\Models\User;
 use App\Services\SimpleXlsx;
+use App\Services\CycleScheduleService;
+use App\Services\KalenderJamPelajaranResolver;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -223,10 +226,47 @@ class AcademicImportController extends Controller
             && ($record['siklus_minggu'] === null || $other['siklus_minggu'] === null || (string) $record['siklus_minggu'] === (string) $other['siklus_minggu'])
             && $record['jam_mulai'] < $other['jam_selesai'] && $record['jam_selesai'] > $other['jam_mulai']
             && ($record['user_id'] === $other['user_id'] || $record['kelas_id'] === $other['kelas_id']);
-        $existing = JadwalPelajaran::query()->where('tahun_ajaran_id', $record['tahun_ajaran_id'])->where('semester', $record['semester'])
-            ->where('hari', $record['hari'])->where('jam_mulai', '<', $record['jam_selesai'])->where('jam_selesai', '>', $record['jam_mulai'])
-            ->where(fn ($query) => $query->where('user_id', $record['user_id'])->orWhere('kelas_id', $record['kelas_id']))->get()->toArray();
-        if (collect($existing)->contains(fn ($other) => $conflicts($other)) || collect($previous)->contains($conflicts)) {
+
+        if (collect($previous)->contains($conflicts)) {
+            throw ValidationException::withMessages(['jadwal' => 'bertabrakan dengan jadwal guru atau kelas yang lain']);
+        }
+
+        $existing = JadwalPelajaran::query()
+            ->where('tahun_ajaran_id', $record['tahun_ajaran_id'])
+            ->where('semester', $record['semester'])
+            ->where('hari', $record['hari'])
+            ->where(fn ($query) => $query->whereNull('siklus_minggu')
+                ->orWhereNull('siklus_minggu')
+                ->orWhere('siklus_minggu', $record['siklus_minggu']))
+            ->where(fn ($query) => $query->where('user_id', $record['user_id'])->orWhere('kelas_id', $record['kelas_id']))
+            ->get();
+
+        if ($existing->isEmpty()) {
+            return;
+        }
+
+        $date = CarbonImmutable::today(config('app.timezone'));
+        $cycles = app(CycleScheduleService::class);
+        for ($offset = 0; $offset < 7 && $cycles->getHariIndo($date) !== $record['hari']; $offset++) {
+            $date = $date->addDay();
+        }
+
+        try {
+            $resolver = app(KalenderJamPelajaranResolver::class);
+            $candidateTime = $resolver->resolve(new JadwalPelajaran($record), $date);
+            $hasConflict = $existing->contains(function (JadwalPelajaran $schedule) use ($resolver, $date, $candidateTime): bool {
+                $existingTime = $resolver->resolve($schedule, $date);
+
+                return $candidateTime['jam_mulai'] < $existingTime['jam_selesai']
+                    && $candidateTime['jam_selesai'] > $existingTime['jam_mulai'];
+            });
+        } catch (RuntimeException $exception) {
+            throw ValidationException::withMessages([
+                'jadwal' => 'Konflik jadwal tidak dapat divalidasi: '.$exception->getMessage(),
+            ]);
+        }
+
+        if ($hasConflict) {
             throw ValidationException::withMessages(['jadwal' => 'bertabrakan dengan jadwal guru atau kelas yang lain']);
         }
     }
