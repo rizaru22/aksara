@@ -1329,8 +1329,8 @@ renderStudentPage();
         const guruName = htmlSafe(journal.guru?.nama || '—');
         const guruNip = journal.guru?.nip ? `<span class="text-secondary"> · ${htmlSafe(journal.guru.nip)}</span>` : '';
         const gpName = journal.guru_pengganti ? htmlSafe(journal.guru_pengganti.nama) : null;
-        const kelasName = htmlSafe(journal.jadwal_pelajaran?.kelas?.nama_kelas || '—');
-        const mapelName = htmlSafe(journal.jadwal_pelajaran?.mata_pelajaran?.nama_mapel || '—');
+        const kelasName = htmlSafe(journal.kelas?.nama_kelas || '—');
+        const mapelName = htmlSafe(journal.mata_pelajaran?.nama_mapel || '—');
         const jadwalWaktu = journal.jam_mulai && journal.jam_selesai
             ? `${htmlSafe(journal.jam_mulai)}–${htmlSafe(journal.jam_selesai)}`
             : '—';
