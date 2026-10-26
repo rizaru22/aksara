@@ -78,6 +78,81 @@ class KalenderJamPelajaranController extends Controller
         ]);
     }
 
+    public function periodsTemplate(SimpleXlsx $xlsx)
+    {
+        if (! class_exists(\\ZipArchive::class)) {
+            return response()->json(['message' => 'Aktifkan ekstensi PHP zip untuk membuat template Excel.'], 503);
+        }
+
+        $content = $xlsx->write(['hari', 'nomor_periode', 'jam_mulai', 'jam_selesai', 'label'], 'Detail_Kalender');
+        return response($content, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => 'attachment; filename="template_detail_kalender.xlsx"',
+            'Cache-Control' => 'private, no-store',
+        ]);
+    }
+
+    public function importPeriods(Request $request, KalenderJamPelajaran $calendar, SimpleXlsx $xlsx)
+    {
+        if ($calendar->status === KalenderJamPelajaran::STATUS_AKTIF) {
+            throw ValidationException::withMessages([
+                'file' => 'Nonaktifkan kalender sebelum mengimpor detail periode.',
+            ]);
+        }
+
+        $request->validate(['file' => 'required|file|mimes:xlsx|max:10240']);
+        if (! class_exists(\\ZipArchive::class)) {
+            return response()->json(['message' => 'Aktifkan ekstensi PHP zip untuk mengimpor file Excel.'], 503);
+        }
+
+        $rows = $xlsx->read($request->file('file')->getRealPath());
+        if (count($rows) > 2000) {
+            throw ValidationException::withMessages(['file' => 'Maksimum 2.000 baris data per impor.']);
+        }
+
+        $expected = ['hari', 'nomor_periode', 'jam_mulai', 'jam_selesai', 'label'];
+        $missing = array_values(array_diff($expected, array_keys($rows[0] ?? [])));
+        if ($missing) {
+            throw ValidationException::withMessages(['file' => 'Kolom template tidak lengkap: '.implode(', ', $missing).'. Unduh template terbaru.']);
+        }
+
+        $periods = [];
+        foreach ($rows as $index => $row) {
+            $line = $index + 2;
+            $start = $this->excelTimeValue((string) ($row['jam_mulai'] ?? ''));
+            $end = $this->excelTimeValue((string) ($row['jam_selesai'] ?? ''));
+            $periods[] = [
+                'hari' => ucfirst(strtolower(trim((string) ($row['hari'] ?? '')))),
+                'nomor_periode' => trim((string) ($row['nomor_periode'] ?? '')),
+                'jam_mulai' => $start,
+                'jam_selesai' => $end,
+                'label' => trim((string) ($row['label'] ?? '')) ?: null,
+            ];
+            if ($start === '' || $end === '') {
+                throw ValidationException::withMessages(['file' => "Baris {$line}: jam_mulai dan jam_selesai wajib diisi dengan format HH:MM."]);
+            }
+        }
+
+        $request->merge(['periods' => $periods]);
+        $response = $this->savePeriods($request, $calendar);
+        $payload = $response->getData(true);
+        $payload['message'] = count($periods).' baris detail kalender berhasil diimpor.';
+        return response()->json($payload);
+    }
+
+    private function excelTimeValue(string $value): string
+    {
+        $value = trim($value);
+        if (is_numeric($value) && (float) $value >= 0 && (float) $value < 1) {
+            $minutes = (int) round((float) $value * 1440);
+            return sprintf('%02d:%02d', intdiv($minutes, 60) % 24, $minutes % 60);
+        }
+        if (preg_match('/^(\\d{1,2}):(\\d{2})(?::\\d{2})?$/', $value, $match)) {
+            return sprintf('%02d:%02d', (int) $match[1], (int) $match[2]);
+        }
+        return $value;
+    }
+
     public function savePeriods(Request $request, KalenderJamPelajaran $calendar)
     {
         if ($calendar->status === KalenderJamPelajaran::STATUS_AKTIF) {
