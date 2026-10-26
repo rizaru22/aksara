@@ -265,11 +265,6 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
         });
         $('calendarPeriodsForm')?.addEventListener('submit', async (event) => {
             event.preventDefault();
-            const rows = Array.from(event.currentTarget.querySelectorAll('#calendarPeriodRows tr'));
-            const periods = rows.map((row) => Object.fromEntries(new FormData(new FormDataRow(row)).entries()));
-        });
-        $('calendarPeriodsForm')?.addEventListener('submit', async (event) => {
-            event.preventDefault();
             const periods = Array.from(event.currentTarget.querySelectorAll('#calendarPeriodRows tr')).map((row) => ({
                 hari: row.querySelector('[name="hari"]').value,
                 nomor_periode: Number(row.querySelector('[name="nomor_periode"]').value),
