@@ -236,6 +236,19 @@ Hal-hal berikut wajib diperiksa sebelum migration:
 
 `berlaku_sampai` bersifat inklusif. Kalender tanpa tanggal akhir menggunakan `NULL`. Validasi overlap harus dilakukan dalam transaksi dan dilindungi dari aktivasi bersamaan; index tanggal membantu pencarian tetapi tidak dengan sendirinya mencegah overlap.
 
-## 11. Status
+## 11. Status implementasi tahap database
 
-Belum ada migration runtime, model, controller, service, UI, atau test yang dibuat/diubah sebagai bagian dari fitur kalender. Dokumen ini juga mengusulkan konsolidasi migration baseline development, tetapi belum ada file migration yang diubah atau dihapus. Tunggu pemeriksaan dan persetujuan pemilik produk sebelum implementasi.
+Persetujuan pemilik produk telah diberikan untuk mengabaikan data uji lama dan merapikan baseline migration development. Pada branch `feature/kalender-jam-pelajaran`, perubahan database awal berikut sudah dibuat:
+
+- Menambahkan migration create-table untuk `kalender_jam_pelajaran` dan `kalender_jam_pelajaran_detail` sebelum migration domain.
+- Menambahkan kolom periode pada `jadwal_pelajarans` langsung di migration pembuat tabel.
+- Menambahkan kolom snapshot kalender/waktu rencana pada `jurnal_mengajars` langsung di migration pembuat tabel.
+- Mengubah `status_sesi` menjadi string dengan default `draft` langsung di migration pembuat tabel.
+- Menghapus migration status jurnal lama yang kini redundant.
+- Menghapus migration pengaturan GPS yang hanya menyisipkan data; nilai pengaturan sudah dikelola oleh `SettingSeeder`.
+- Menghapus DML role/permission dari migration struktur; pengaturan role/permission dikelola `RoleAndPermissionSeeder`.
+- Menghapus guard `hasTable` dan membuat `down()` migration notifikasi menghapus tabel yang dibuatnya agar baseline fresh lebih deterministik.
+- Mengubah timestamp migration `attendance_corrections` agar tidak berbagi timestamp dengan migration data setting yang dihapus.
+- Menambahkan model `KalenderJamPelajaran` dan `KalenderJamPelajaranDetail`, serta memperbarui fillable/casts snapshot pada model terkait.
+
+Belum ada migration yang dijalankan terhadap database hosting atau database lokal. Pengujian `php artisan migrate:fresh --seed` dan pemeriksaan sintaks belum dapat diklaim selesai dari sesi ini; perlu dijalankan pada checkout branch ini di lingkungan development yang benar. Perintah `migrate:fresh` menghapus seluruh tabel pada koneksi yang dipilih, jadi pastikan `.env` menunjuk ke database development/test sebelum menjalankannya.
