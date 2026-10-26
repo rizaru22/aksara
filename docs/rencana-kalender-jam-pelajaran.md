@@ -1,6 +1,6 @@
 # Rencana Implementasi Kalender Jam Pelajaran AKSARA
 
-Status: Tahap 1 — rancangan dan batasan implementasi  
+Status: Tahap 3 — implementasi awal lapisan resolusi waktu  
 Branch: `feature/kalender-jam-pelajaran`
 
 ## Tujuan
@@ -55,11 +55,14 @@ Menyediakan kalender jam pelajaran sekolah yang dapat dikonfigurasi per hari, te
 
 ### Tahap 3 — Lapisan resolusi waktu
 
-- Implementasikan satu service untuk menyelesaikan waktu sesi berdasarkan tanggal, jadwal, dan kalender aktif.
-- Jadwal tanpa rentang periode tetap memakai `jam_mulai`/`jam_selesai` lama.
-- Jadwal berbasis periode harus memiliki kedua batas periode, rentang lengkap tanpa celah, dan waktu tiap periode yang valid serta tidak tumpang tindih.
-- Tambahkan pengujian untuk jalur jadwal lama dan validasi rentang periode; pengujian integrasi DB untuk kalender aktif masih perlu dilengkapi.
-- Jangan ubah semua controller sekaligus.
+- [x] Implementasikan resolver waktu sesi berdasarkan jadwal, tanggal, dan kalender aktif.
+- [x] Pertahankan kompatibilitas jadwal tanpa rentang periode melalui `jam_mulai`/`jam_selesai` lama.
+- [x] Tolak rentang periode tidak lengkap/tidak valid dan detail periode yang hilang atau bertumpang tindih pada rentang yang diminta.
+- [x] Tambahkan tes unit untuk jalur legacy dan validasi input dasar; tes lokal yang dilaporkan pemilik proyek: 3 tes lulus, 6 assertions.
+- [x] Tambahkan layanan aktivasi kalender transaksional yang memvalidasi detail periode, menonaktifkan kalender aktif lain, lalu mengaktifkan kalender pilihan.
+- [ ] Integrasikan pembuatan snapshot secara atomik saat draft jurnal pertama dibuat.
+- [ ] Integrasikan resolver ke alur aplikasi secara bertahap; jangan ubah semua controller sekaligus.
+- Catatan: tes integrasi database ditunda sesuai keputusan pemilik proyek dan akan diuji melalui interface saat tersedia.
 
 ### Tahap 4 — Integrasi bertahap
 
@@ -93,6 +96,6 @@ Dokumen ini adalah rancangan awal berdasarkan pemeriksaan kode pada branch `main
 
 ## Catatan progres Tahap 3
 
-Pada branch `feature/kalender-jam-pelajaran`, service `App\\Services\\KalenderJamPelajaranResolver` telah ditambahkan. Service menerima jadwal dan tanggal sesi, mempertahankan jalur kompatibilitas untuk jadwal lama, atau mengambil jam mulai/selesai dari rentang periode pada kalender berstatus `AKTIF`. Service menolak konfigurasi periode yang tidak lengkap, rentang tidak valid, periode hilang, jam periode tidak valid, atau periode bertumpang tindih.
+Pada branch `feature/kalender-jam-pelajaran` tersedia `App\\Services\\KalenderJamPelajaranResolver` untuk menyelesaikan waktu berdasarkan jadwal dan tanggal. Jadwal legacy tetap memakai waktu tersimpan; jadwal berbasis periode menggunakan kalender aktif. Unit test awal telah dijalankan oleh pemilik proyek: 3 tes lulus dengan 6 assertions.
 
-Unit test awal ditambahkan untuk jalur jadwal lama dan validasi input periode. Pengujian belum dijalankan pada lingkungan PHP proyek ini. Integrasi controller, snapshot atomik ketika draft pertama dibuat, layanan aktivasi transaksional yang menjamin hanya satu kalender aktif, serta tes database untuk periode kalender masih belum selesai. Jangan menganggap Tahap 3 sudah terverifikasi hanya karena berkas telah dibuat.
+Layanan `App\\Services\\KalenderJamPelajaranService` juga telah ditambahkan untuk aktivasi kalender dalam transaksi. Layanan mengunci baris kalender yang ada, memvalidasi bahwa detail periode tersedia, nomor periode berurutan mulai dari 1 per hari, jam valid, dan periode tidak bertumpang tindih; kemudian menonaktifkan kalender aktif dan mengaktifkan pilihan. Implementasi ini belum diverifikasi lewat tes database atau interface. Integrasi snapshot atomik saat draft pertama dibuat dan integrasi resolver ke controller masih belum selesai. Tes integrasi database sengaja ditunda sampai pengujian interface.
