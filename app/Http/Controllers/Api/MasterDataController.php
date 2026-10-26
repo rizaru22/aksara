@@ -160,6 +160,15 @@ class MasterDataController extends Controller
             }
         }
 
+        if ($cycles->getHariIndo($date) !== $schedule->hari) {
+            $schedule->setAttribute('jam_mulai_resolved', null);
+            $schedule->setAttribute('jam_selesai_resolved', null);
+            $schedule->setAttribute('sumber_waktu_rencana', null);
+            $schedule->setAttribute('tanggal_resolusi', $date->toDateString());
+            $schedule->setAttribute('kesalahan_resolusi_waktu', 'Tanggal tidak sesuai dengan hari jadwal.');
+            return $schedule;
+        }
+
         try {
             $resolved = $calendarResolver->resolve($schedule, $date);
             $schedule->setAttribute('jam_mulai_resolved', $resolved['jam_mulai']->format('H:i:s'));
