@@ -177,10 +177,10 @@ class TeacherPushReminderService
             if (! $journal && $this->within($now, $start->addMinutes(15), $end)) {
                 $sent += $this->sendOnce(
                     $teacher,
-                    "journal:{$now->toDateString()}:{$schedule->id}",
+                    "journal:{$now->toDateString()}:{$schedule->id}:{$teacher->id}",
                     'Pengingat jurnal dan presensi siswa',
                     'Pelajaran sudah berjalan 15 menit. Silakan isi jurnal mengajar dan presensi siswa.',
-                    "journal-{$now->toDateString()}-{$schedule->id}",
+                    "journal-{$now->toDateString()}-{$schedule->id}-{$teacher->id}",
                     $now,
                 );
             }
@@ -189,10 +189,10 @@ class TeacherPushReminderService
                 && $this->within($now, $start->addMinutes(15), $end)) {
                 $sent += $this->sendOnce(
                     $teacher,
-                    "student-attendance:{$now->toDateString()}:{$schedule->id}",
+                    "student-attendance:{$now->toDateString()}:{$schedule->id}:{$teacher->id}",
                     'Pengingat presensi siswa',
                     'Pelajaran sudah berjalan 15 menit. Presensi siswa pada sesi ini belum diisi.',
-                    "student-attendance-{$now->toDateString()}-{$schedule->id}",
+                    "student-attendance-{$now->toDateString()}-{$schedule->id}-{$teacher->id}",
                     $now,
                 );
             }
@@ -205,10 +205,10 @@ class TeacherPushReminderService
                 if ($this->within($now, $end->subMinutes(5), $end->addMinutes(5))) {
                     $sent += $this->sendOnce(
                         $teacher,
-                        "lesson-photo:{$now->toDateString()}:{$schedule->id}",
+                        "lesson-photo:{$now->toDateString()}:{$schedule->id}:{$teacher->id}",
                         'Pengingat foto kegiatan',
                         $body,
-                        "lesson-photo-{$now->toDateString()}-{$schedule->id}",
+                        "lesson-photo-{$now->toDateString()}-{$schedule->id}-{$teacher->id}",
                         $now,
                     );
                 }
