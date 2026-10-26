@@ -252,7 +252,7 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             <div class="alert alert-info small">Atur jam tiap periode per hari. Jeda istirahat cukup dibuat sebagai selisih waktu antarkolom periode; tidak perlu dibuat sebagai periode tersendiri. Jadwal periode 1–3 otomatis menggunakan jam mulai periode 1 dan jam selesai periode 3.</div>
             <form id="calendarCreateForm" class="card mb-3"><div class="card-body"><h2 class="h6">Buat kalender</h2><div class="row g-2"><div class="col-md-4"><label class="form-label">Nama kalender</label><input class="form-control" name="nama" maxlength="100" required></div><div class="col-md-6"><label class="form-label">Catatan (opsional)</label><input class="form-control" name="catatan"></div><div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100">Buat</button></div></div></div></form>
             ${selected ? `
-                <form id="calendarPeriodsForm" class="card mb-3"><div class="card-body"><div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><div><h2 class="h6 mb-1">Periode: ${htmlSafe(selected.nama)}</h2><div class="small text-secondary">Status: ${htmlSafe(selected.status)}. Kalender aktif harus dinonaktifkan sebelum periode diubah.</div></div><div class="d-flex gap-2"><button class="btn btn-outline-secondary btn-sm" type="button" id="calendarAddPeriod" ${selected.status === 'AKTIF' ? 'disabled' : ''}>Tambah periode</button><button class="btn btn-primary btn-sm" type="submit" ${selected.status === 'AKTIF' ? 'disabled' : ''}>Simpan periode</button></div></div><div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Hari</th><th>Nomor periode</th><th>Jam mulai</th><th>Jam selesai</th><th>Label (opsional)</th><th></th></tr></thead><tbody id="calendarPeriodRows">${periodRows || calendarPeriodRow({hari:'Senin',nomor_periode:1,jam_mulai:'07:30',jam_selesai:'08:15',label:''},0)}</tbody></table></div></div></form>
+                <form id="calendarPeriodsForm" class="card mb-3"><div class="card-body"><div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><div><h2 class="h6 mb-1">Periode: ${htmlSafe(selected.nama)}</h2><div class="small text-secondary">Status: ${htmlSafe(selected.status)}. Kalender aktif harus dinonaktifkan sebelum periode diubah.</div></div><div class="d-flex flex-wrap gap-2"><button class="btn btn-outline-success btn-sm" type="button" id="calendarImportTemplate">Unduh template Excel</button><button class="btn btn-outline-success btn-sm" type="button" id="calendarImportExcel" ${selected.status === 'AKTIF' ? 'disabled' : ''}>Impor Excel</button><input class="d-none" type="file" id="calendarImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><button class="btn btn-outline-secondary btn-sm" type="button" id="calendarAddPeriod" ${selected.status === 'AKTIF' ? 'disabled' : ''}>Tambah periode</button><button class="btn btn-primary btn-sm" type="submit" ${selected.status === 'AKTIF' ? 'disabled' : ''}>Simpan periode</button></div></div><div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Hari</th><th>Nomor periode</th><th>Jam mulai</th><th>Jam selesai</th><th>Label (opsional)</th><th></th></tr></thead><tbody id="calendarPeriodRows">${periodRows || calendarPeriodRow({hari:'Senin',nomor_periode:1,jam_mulai:'07:30',jam_selesai:'08:15',label:''},0)}</tbody></table></div></div></form>
             ` : '' }
             <div class="card"><div class="card-header"><strong>Daftar kalender</strong></div><div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th>Nama</th><th>Status</th><th>Jumlah detail periode</th><th>Aksi</th></tr></thead><tbody>${list || '<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada kalender. Buat kalender di atas.</td></tr>'}</tbody></table></div></div>
         `);
@@ -262,6 +262,50 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             const values = Object.fromEntries(new FormData(event.currentTarget).entries());
             try { const created = await api('/api/v1/academic/calendars', {method:'POST', body:values}); showToast(created.message); openCalendars(created.data.id); }
             catch (error) { setFeatureError(error); }
+        });
+        $('calendarImportTemplate')?.addEventListener('click', async () => {
+            try {
+                const response = await fetch(window.aksaraApiUrl('/api/v1/academic/calendars/periods/template'), {
+                    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+                });
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+                    throw new Error(error.message || `Template gagal diunduh (${response.status}).`);
+                }
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'template_detail_kalender.xlsx';
+                link.click();
+                URL.revokeObjectURL(url);
+            } catch (error) { setFeatureError(error); }
+        });
+        $('calendarImportExcel')?.addEventListener('click', () => $('calendarImportFile')?.click());
+        $('calendarImportFile')?.addEventListener('change', async (event) => {
+            const file = event.currentTarget.files?.[0];
+            if (!file) return;
+            if (!confirm('Impor Excel akan mengganti seluruh detail periode pada kalender ini. Lanjutkan?')) {
+                event.currentTarget.value = '';
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const response = await fetch(window.aksaraApiUrl(`/api/v1/academic/calendars/${selected.id}/periods/import`), {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+                    body: formData,
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    const details = result.errors ? Object.values(result.errors).flat().join(' ') : '';
+                    throw new Error(details || result.message || `Impor gagal (${response.status}).`);
+                }
+                showToast(result.message || 'Detail kalender berhasil diimpor.');
+                openCalendars(selected.id);
+            } catch (error) { setFeatureError(error); }
+            finally { event.currentTarget.value = ''; }
         });
         $('calendarAddPeriod')?.addEventListener('click', () => {
             const rows = $('calendarPeriodRows');
