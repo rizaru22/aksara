@@ -60,8 +60,10 @@ Menyediakan kalender jam pelajaran sekolah yang dapat dikonfigurasi per hari, te
 - [x] Tolak rentang periode tidak lengkap/tidak valid dan detail periode yang hilang atau bertumpang tindih pada rentang yang diminta.
 - [x] Tambahkan tes unit untuk jalur legacy dan validasi input dasar; tes lokal yang dilaporkan pemilik proyek: 3 tes lulus, 6 assertions.
 - [x] Tambahkan layanan aktivasi kalender transaksional yang memvalidasi detail periode, menonaktifkan kalender aktif lain, lalu mengaktifkan kalender pilihan.
-- [ ] Integrasikan pembuatan snapshot secara atomik saat draft jurnal pertama dibuat.
-- [ ] Integrasikan resolver ke alur aplikasi secara bertahap; jangan ubah semua controller sekaligus.
+- [x] Integrasikan resolver ke pemeriksaan jendela pengisian jurnal pada `LessonJournalController`.
+- [x] Saat draft jurnal pertama dibuat, simpan snapshot kalender, waktu rencana, dan rentang periode dalam transaksi yang sama dengan draft serta presensi siswa.
+- [x] Gunakan waktu snapshot untuk jendela finalisasi dan finalisasi susulan jika snapshot tersedia.
+- [ ] Audit dan integrasikan resolver ke dashboard, daftar jadwal, pengingat push, agenda, laporan, impor, dan alur guru pengganti.
 - Catatan: tes integrasi database ditunda sesuai keputusan pemilik proyek dan akan diuji melalui interface saat tersedia.
 
 ### Tahap 4 — Integrasi bertahap
@@ -98,4 +100,6 @@ Dokumen ini adalah rancangan awal berdasarkan pemeriksaan kode pada branch `main
 
 Pada branch `feature/kalender-jam-pelajaran` tersedia `App\\Services\\KalenderJamPelajaranResolver` untuk menyelesaikan waktu berdasarkan jadwal dan tanggal. Jadwal legacy tetap memakai waktu tersimpan; jadwal berbasis periode menggunakan kalender aktif. Unit test awal telah dijalankan oleh pemilik proyek: 3 tes lulus dengan 6 assertions.
 
-Layanan `App\\Services\\KalenderJamPelajaranService` juga telah ditambahkan untuk aktivasi kalender dalam transaksi. Layanan mengunci baris kalender yang ada, memvalidasi bahwa detail periode tersedia, nomor periode berurutan mulai dari 1 per hari, jam valid, dan periode tidak bertumpang tindih; kemudian menonaktifkan kalender aktif dan mengaktifkan pilihan. Implementasi ini belum diverifikasi lewat tes database atau interface. Integrasi snapshot atomik saat draft pertama dibuat dan integrasi resolver ke controller masih belum selesai. Tes integrasi database sengaja ditunda sampai pengujian interface.
+Layanan `App\\Services\\KalenderJamPelajaranService` juga telah ditambahkan untuk aktivasi kalender dalam transaksi. Layanan mengunci baris kalender yang ada, memvalidasi bahwa detail periode tersedia, nomor periode berurutan mulai dari 1 per hari, jam valid, dan periode tidak bertumpang tindih; kemudian menonaktifkan kalender aktif dan mengaktifkan pilihan.
+
+`LessonJournalController` kini menggunakan resolver untuk memeriksa waktu pengisian ketika belum ada draft terbuka. Saat draft baru dibuat, resolver dijalankan lagi di dalam transaksi dan snapshot kalender, waktu rencana, serta rentang periode disimpan bersama draft dan presensi. Pembaruan draft yang sudah ada tidak menimpa snapshot. Jendela finalisasi dan finalisasi susulan menggunakan waktu snapshot apabila tersedia. Integrasi ini belum diuji melalui interface; tes integrasi database sengaja ditunda sesuai keputusan pemilik proyek. Controller lain, pengingat push, dashboard, laporan, impor, dan alur guru pengganti belum seluruhnya terintegrasi.
