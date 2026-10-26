@@ -209,6 +209,8 @@ class MasterDataController extends Controller
                 'hari' => $prefix.'required|in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu',
                 'jam_mulai' => $prefix.'required|date_format:H:i',
                 'jam_selesai' => $prefix.'required|date_format:H:i|after:jam_mulai',
+                'periode_mulai' => $prefix.'nullable|integer|min:1',
+                'periode_selesai' => $prefix.'nullable|integer|min:1|gte:periode_mulai',
             ],
             'agendas' => [
                 'nama_agenda' => $prefix.'required|string|max:255',
@@ -231,16 +233,22 @@ class MasterDataController extends Controller
     private function validateScheduleConflict(string $resource, array $data, ?int $ignoreId = null): void
     {
         if ($resource !== 'schedules') return;
-        if ($data['jam_mulai'] >= $data['jam_selesai']) {
+        $periodStart = $data['periode_mulai'] ?? null;
+        $periodEnd = $data['periode_selesai'] ?? null;
+        if (($periodStart === null) !== ($periodEnd === null)) {
+            throw ValidationException::withMessages(['periode_mulai' => 'Periode mulai dan selesai harus diisi bersamaan.']);
+        }
+        if ($periodStart !== null && ((int) $periodStart < 1 || (int) $periodEnd < (int) $periodStart)) {
+            throw ValidationException::withMessages(['periode_mulai' => 'Rentang periode jadwal tidak valid.']);
+        }
+        if ($periodStart === null && $data['jam_mulai'] >= $data['jam_selesai']) {
             throw ValidationException::withMessages(['jam_mulai' => 'Jam mulai harus sebelum jam selesai.']);
         }
 
         $query = JadwalPelajaran::query()
             ->where('tahun_ajaran_id', $data['tahun_ajaran_id'])
             ->where('semester', $data['semester'])
-            ->where('hari', $data['hari'])
-            ->where('jam_mulai', '<', $data['jam_selesai'])
-            ->where('jam_selesai', '>', $data['jam_mulai']);
+            ->where('hari', $data['hari']);
         $cycle = $data['siklus_minggu'] ?? null;
         if ($cycle !== null) {
             $query->where(fn ($q) => $q->whereNull('siklus_minggu')->orWhere('siklus_minggu', $cycle));
@@ -248,7 +256,21 @@ class MasterDataController extends Controller
         if ($ignoreId) $query->where('id', '<>', $ignoreId);
         $query->where(fn ($q) => $q->where('user_id', $data['user_id'])->orWhere('kelas_id', $data['kelas_id']));
 
-        if ($query->exists()) {
+        $conflict = $query->get()->contains(function (JadwalPelajaran $existing) use ($data, $periodStart, $periodEnd): bool {
+            $existingPeriodStart = $existing->periode_mulai !== null ? (int) $existing->periode_mulai : null;
+            $existingPeriodEnd = $existing->periode_selesai !== null ? (int) $existing->periode_selesai : null;
+
+            if ($periodStart !== null && $periodEnd !== null && $existingPeriodStart !== null && $existingPeriodEnd !== null) {
+                return (int) $periodStart <= $existingPeriodEnd && (int) $periodEnd >= $existingPeriodStart;
+            }
+
+            // Mixed legacy/period schedules still use stored clock times until a
+            // common period-based representation exists for both records.
+            return $data['jam_mulai'] < $existing->jam_selesai
+                && $data['jam_selesai'] > $existing->jam_mulai;
+        });
+
+        if ($conflict) {
             throw ValidationException::withMessages(['schedule' => 'Jadwal bertabrakan dengan jadwal guru atau kelas yang sudah ada.']);
         }
     }
