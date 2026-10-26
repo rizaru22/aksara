@@ -11,6 +11,7 @@ use App\Models\Setting;
 use App\Models\TahunAjaran;
 use App\Services\ActiveAcademicYearService;
 use App\Services\CycleScheduleService;
+use App\Services\KalenderJamPelajaranResolver;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -22,7 +23,7 @@ class TeacherScheduleController extends Controller
      * Mengambil jadwal hari ini milik guru yang sedang login, termasuk status KBM, hari libur, siklus aktif, dan ketersediaan jurnal.
      * Data ini dipakai oleh dashboard untuk menampilkan tombol isi jurnal atau finalisasi dengan pesan yang tepat.
      */
-    public function today(Request $request, CycleScheduleService $cycles, ActiveAcademicYearService $academicYears)
+    public function today(Request $request, CycleScheduleService $cycles, ActiveAcademicYearService $academicYears, KalenderJamPelajaranResolver $calendarResolver)
     {
         $now = now(config('app.timezone'));
         $sync = $academicYears->consistency();
@@ -69,7 +70,7 @@ class TeacherScheduleController extends Controller
             ->where('override_kbm', true)
             ->get();
 
-        $data = $schedules->map(function (JadwalPelajaran $schedule) use ($agendas, $now) {
+        $data = $schedules->map(function (JadwalPelajaran $schedule) use ($agendas, $now, $calendarResolver) {
             $substituteRequest = PengajuanGuruPengganti::query()
                 ->where('jadwal_pelajaran_id', $schedule->id)
                 ->whereDate('tanggal', $now->toDateString())
@@ -87,20 +88,50 @@ class TeacherScheduleController extends Controller
             ] : null);
             $schedule->setAttribute('substitute_request_id', $substituteRequest?->id);
             $schedule->setAttribute('jurnal_hari_ini', $schedule->jurnalMengajars->first());
-            $agenda = $agendas->first(fn (AgendaSekolah $item) => $item->jam_mulai < $schedule->jam_selesai && $item->jam_selesai > $schedule->jam_mulai);
+            $journal = $schedule->jurnal_hari_ini;
+            $timeSource = 'jadwal_legacy';
+            $timeResolutionError = null;
+
+            // An existing journal snapshot is authoritative after calendar changes.
+            if ($journal?->waktu_rencana_mulai && $journal?->waktu_rencana_selesai) {
+                $journalStartsAt = Carbon::parse($journal->waktu_rencana_mulai, config('app.timezone'));
+                $scheduleEndsAt = Carbon::parse($journal->waktu_rencana_selesai, config('app.timezone'));
+                $timeSource = 'snapshot_jurnal';
+            } else {
+                try {
+                    $resolved = $calendarResolver->resolve($schedule, $now);
+                    $journalStartsAt = Carbon::parse($resolved['jam_mulai'], config('app.timezone'));
+                    $scheduleEndsAt = Carbon::parse($resolved['jam_selesai'], config('app.timezone'));
+                    $timeSource = $resolved['sumber'];
+                } catch (\RuntimeException $exception) {
+                    // Do not silently fall back to stale stored times for period-based schedules.
+                    $journalStartsAt = null;
+                    $scheduleEndsAt = null;
+                    $timeResolutionError = $exception->getMessage();
+                }
+            }
+
+            $schedule->setAttribute('waktu_rencana_mulai_resolved', $journalStartsAt?->toDateTimeString());
+            $schedule->setAttribute('waktu_rencana_selesai_resolved', $scheduleEndsAt?->toDateTimeString());
+            $schedule->setAttribute('sumber_waktu_rencana', $timeSource);
+            $schedule->setAttribute('kesalahan_resolusi_waktu', $timeResolutionError);
+
+            $agenda = $journalStartsAt && $scheduleEndsAt
+                ? $agendas->first(fn (AgendaSekolah $item) => $item->jam_mulai < $scheduleEndsAt->format('H:i:s') && $item->jam_selesai > $journalStartsAt->format('H:i:s'))
+                : null;
             $schedule->setAttribute('kbm_ditangguhkan', (bool) $agenda);
             $schedule->setAttribute('agenda_pengganti', $agenda?->nama_agenda);
-            $journalStartsAt = Carbon::parse($now->toDateString().' '.$schedule->jam_mulai, config('app.timezone'));
-            $scheduleEndsAt = Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
-            $finalizationStartsAt = $scheduleEndsAt->copy()->subMinutes(30);
-            if ($finalizationStartsAt->lt($journalStartsAt)) $finalizationStartsAt = $journalStartsAt;
+            $finalizationStartsAt = $scheduleEndsAt?->copy()->subMinutes(30);
+            if ($finalizationStartsAt && $journalStartsAt && $finalizationStartsAt->lt($journalStartsAt)) $finalizationStartsAt = $journalStartsAt;
             $journalStatus = $schedule->jurnal_hari_ini?->status_sesi;
             $hasOpenDraft = $journalStatus === 'draft';
             $hasJournal = $journalStatus !== null;
-            $insideSession = ! $now->lt($journalStartsAt) && ! $now->gt($scheduleEndsAt);
-            $insideFinalizationWindow = ! $now->lt($finalizationStartsAt) && ! $now->gt($scheduleEndsAt);
-            $canFillJournal = $hasOpenDraft || (! $hasJournal && $insideSession);
-            $availabilityMessage = $hasOpenDraft
+            $insideSession = $journalStartsAt && $scheduleEndsAt && ! $now->lt($journalStartsAt) && ! $now->gt($scheduleEndsAt);
+            $insideFinalizationWindow = $finalizationStartsAt && $scheduleEndsAt && ! $now->lt($finalizationStartsAt) && ! $now->gt($scheduleEndsAt);
+            $canFillJournal = $hasOpenDraft || (! $hasJournal && $insideSession && ! $timeResolutionError);
+            $availabilityMessage = $timeResolutionError
+                ? 'Waktu jadwal belum dapat ditentukan: '.$timeResolutionError
+                : ($hasOpenDraft
                 ? 'Draf jurnal sudah tersimpan dan dapat diperbarui.'
                 : ($hasJournal
                     ? match ($journalStatus) {
@@ -111,9 +142,11 @@ class TeacherScheduleController extends Controller
                     }
                     : ($now->lt($journalStartsAt)
                         ? 'Draf jurnal dapat diisi mulai pukul '.$journalStartsAt->format('H:i').'.'
-                        : ($now->gt($scheduleEndsAt) ? 'Waktu pengisian draf berakhir pukul '.$scheduleEndsAt->format('H:i').'.' : null)));
-            $canFinalizeJournal = $hasOpenDraft || (! $hasJournal && $insideFinalizationWindow);
-            if ($hasOpenDraft) {
+                        : ($now->gt($scheduleEndsAt) ? 'Waktu pengisian draf berakhir pukul '.$scheduleEndsAt->format('H:i').'.' : null))));
+            $canFinalizeJournal = $hasOpenDraft || (! $hasJournal && $insideFinalizationWindow && ! $timeResolutionError);
+            if ($timeResolutionError) {
+                $finalizationMessage = 'Finalisasi tidak tersedia karena waktu jadwal belum dapat ditentukan.';
+            } elseif ($hasOpenDraft) {
                 $finalizationMessage = $now->lt($finalizationStartsAt)
                     ? 'Draf aktif. Finalisasi dibuka pukul '.$finalizationStartsAt->format('H:i').'.'
                     : 'Draf aktif. Finalisasi masih dapat dilakukan.';
