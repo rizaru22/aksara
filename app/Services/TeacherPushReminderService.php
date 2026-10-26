@@ -12,6 +12,7 @@ use App\Models\PengajuanIzin;
 use App\Models\Setting;
 use App\Models\TahunAjaran;
 use App\Models\User;
+use App\Services\KalenderJamPelajaranResolver;
 use App\Notifications\TeacherReminderNotification;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -144,16 +145,34 @@ class TeacherPushReminderService
                 continue;
             }
 
+            $journal = $schedule->jurnalMengajars->first();
+
+            // Existing journal snapshots must survive calendar activation changes.
+            // Future sessions without snapshots resolve against the currently active calendar.
+            try {
+                if ($journal?->waktu_rencana_mulai && $journal?->waktu_rencana_selesai) {
+                    $start = CarbonImmutable::parse($journal->waktu_rencana_mulai, config('app.timezone'));
+                    $end = CarbonImmutable::parse($journal->waktu_rencana_selesai, config('app.timezone'));
+                } else {
+                    $resolved = app(KalenderJamPelajaranResolver::class)->resolve($schedule, $now);
+                    $start = CarbonImmutable::parse($resolved['jam_mulai'], config('app.timezone'));
+                    $end = CarbonImmutable::parse($resolved['jam_selesai'], config('app.timezone'));
+                }
+            } catch (\RuntimeException $exception) {
+                Log::warning('Lesson reminder skipped because schedule time could not be resolved.', [
+                    'schedule_id' => $schedule->id,
+                    'date' => $now->toDateString(),
+                    'exception' => $exception->getMessage(),
+                ]);
+                continue;
+            }
+
             $cancelledSession = $cancelled->contains(fn (AgendaSekolah $agenda) =>
-                $agenda->jam_mulai < $schedule->jam_selesai && $agenda->jam_selesai > $schedule->jam_mulai
+                $agenda->jam_mulai < $end->format('H:i:s') && $agenda->jam_selesai > $start->format('H:i:s')
             );
             if ($cancelledSession) {
                 continue;
             }
-
-            $start = $this->atTime($now, $schedule->jam_mulai);
-            $end = $this->atTime($now, $schedule->jam_selesai);
-            $journal = $schedule->jurnalMengajars->first();
 
             if (! $journal && $this->within($now, $start->addMinutes(15), $end)) {
                 $sent += $this->sendOnce(
@@ -199,22 +218,28 @@ class TeacherPushReminderService
 
     private function sendOnce(User $teacher, string $key, string $title, string $body, string $tag, CarbonImmutable $now): int
     {
-        if (DB::table('push_reminder_dispatches')->where('reminder_key', $key)->exists()) {
+        // Reserve the unique reminder key before sending so overlapping scheduler
+        // runs cannot both pass an exists() check and dispatch the same reminder.
+        $reserved = DB::table('push_reminder_dispatches')->insertOrIgnore([
+            'reminder_key' => $key,
+            'sent_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        if ($reserved !== 1) {
             return 0;
         }
 
         try {
             $teacher->notify(new TeacherReminderNotification($title, $body, $tag));
-            DB::table('push_reminder_dispatches')->insertOrIgnore([
-                'reminder_key' => $key,
-                'sent_at' => $now,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
 
             return 1;
         } catch (Throwable $exception) {
-            Log::warning('Web push reminder failed.', [
+            // Keep the reservation (at-most-once delivery) because the provider may
+            // have accepted a push before an exception occurred; deleting it could
+            // cause a duplicate on the next scheduler tick.
+            Log::warning('Web push reminder dispatch failed after reservation.', [
                 'reminder_key' => $key,
                 'user_id' => $teacher->id,
                 'exception' => $exception->getMessage(),
