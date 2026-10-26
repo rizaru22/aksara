@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\ActiveAcademicYearService;
 use App\Services\CycleScheduleService;
 use App\Services\KalenderJamPelajaranResolver;
+use Carbon\CarbonInterface;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -47,26 +48,38 @@ class MasterDataController extends Controller
      * Endpoint GET /api/v1/master-data/{resource}.
      * Mengambil daftar record untuk satu resource master, seperti kelas, siswa, mapel, jadwal, atau agenda sekolah.
      */
-    public function index(Request $request, string $resource)
+    public function index(Request $request, string $resource, KalenderJamPelajaranResolver $calendarResolver, CycleScheduleService $cycles)
     {
         $this->authorizeResource($request, $resource);
         $query = $this->query($resource);
         $this->withRelations($resource, $query);
+        $page = $query->latest()->paginate(30);
 
-        return response()->json($query->latest()->paginate(30));
+        if ($resource === 'schedules') {
+            $requestedDate = $request->validate(['tanggal' => ['nullable', 'date']])['tanggal'] ?? null;
+            $page->getCollection()->transform(fn (JadwalPelajaran $schedule) => $this->appendResolvedScheduleTimes($schedule, $requestedDate, $calendarResolver, $cycles));
+        }
+
+        return response()->json($page);
     }
 
     /**
      * Endpoint GET /api/v1/master-data/{resource}/{id}.
      * Menampilkan satu record master beserta relasi yang dibutuhkan untuk edit atau detail view.
      */
-    public function show(Request $request, string $resource, int $id)
+    public function show(Request $request, string $resource, int $id, KalenderJamPelajaranResolver $calendarResolver, CycleScheduleService $cycles)
     {
         $this->authorizeResource($request, $resource);
         $query = $this->query($resource);
         $this->withRelations($resource, $query);
+        $model = $query->findOrFail($id);
 
-        return response()->json(['data' => $query->findOrFail($id)]);
+        if ($resource === 'schedules') {
+            $requestedDate = $request->validate(['tanggal' => ['nullable', 'date']])['tanggal'] ?? null;
+            $model = $this->appendResolvedScheduleTimes($model, $requestedDate, $calendarResolver, $cycles);
+        }
+
+        return response()->json(['data' => $model]);
     }
 
     /**
@@ -127,6 +140,43 @@ class MasterDataController extends Controller
         $active = $service->activate($tahunAjaran->id);
 
         return response()->json(['message' => 'Tahun ajaran aktif berhasil disinkronkan.', 'data' => $active]);
+    }
+
+    /**
+     * Append date-specific calendar times without overwriting legacy clock columns used by edit forms.
+     */
+    private function appendResolvedScheduleTimes(
+        JadwalPelajaran $schedule,
+        ?string $requestedDate,
+        KalenderJamPelajaranResolver $calendarResolver,
+        CycleScheduleService $cycles
+    ): JadwalPelajaran {
+        $date = $requestedDate
+            ? \Carbon\CarbonImmutable::parse($requestedDate, config('app.timezone'))->startOfDay()
+            : \Carbon\CarbonImmutable::today(config('app.timezone'));
+
+        if (! $requestedDate) {
+            for ($offset = 0; $offset < 7 && $cycles->getHariIndo($date) !== $schedule->hari; $offset++) {
+                $date = $date->addDay();
+            }
+        }
+
+        try {
+            $resolved = $calendarResolver->resolve($schedule, $date);
+            $schedule->setAttribute('jam_mulai_resolved', $resolved['jam_mulai']->format('H:i:s'));
+            $schedule->setAttribute('jam_selesai_resolved', $resolved['jam_selesai']->format('H:i:s'));
+            $schedule->setAttribute('sumber_waktu_rencana', $resolved['sumber']);
+            $schedule->setAttribute('tanggal_resolusi', $resolved['tanggal']);
+            $schedule->setAttribute('kesalahan_resolusi_waktu', null);
+        } catch (\RuntimeException $exception) {
+            $schedule->setAttribute('jam_mulai_resolved', null);
+            $schedule->setAttribute('jam_selesai_resolved', null);
+            $schedule->setAttribute('sumber_waktu_rencana', null);
+            $schedule->setAttribute('tanggal_resolusi', $date->toDateString());
+            $schedule->setAttribute('kesalahan_resolusi_waktu', $exception->getMessage());
+        }
+
+        return $schedule;
     }
 
     /**
