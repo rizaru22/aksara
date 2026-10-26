@@ -309,6 +309,7 @@
         if (action === 'class-attendance-report') return adminReports.open('daily', { dedicatedClass: true });
         if (action === 'student-attendance-report') return adminReports.open('student-monthly', { dedicatedStudent: true });
         if (action === 'substitute-approvals') return openSubstituteApprovals();
+        if (action === 'lesson-calendar') return academicData.openCalendars();
         if (['classes', 'students', 'subjects', 'materials', 'schedules'].includes(action)) return academicData.openMaster(action);
         if (module) return openModule(module);
     }
@@ -1644,6 +1645,7 @@ renderStudentPage();
             add('discrepancy', 'view-audit-discrepancy', 'bi-clipboard2-data', 'Audit Pembelajaran', 'Tinjau dan tindak lanjuti kasus yang tersedia.');
             add('academic-master', 'kelola-master-data', 'bi-database', 'Master Data Akademik', 'Kelola kelas, siswa, mapel, materi, dan jadwal.');
             add('years', 'kelola-tahun-ajaran', 'bi-calendar3', 'Tahun Ajaran', 'Buat tahun ajaran dan aktifkan melalui sinkronisasi.');
+            add('lesson-calendar', 'kelola-master-data', 'bi-calendar2-week', 'Kalender Jam Pelajaran', 'Atur periode waktu pelajaran dan aktifkan kalender sekolah.');
             add('agendas', 'kelola-agenda-sekolah', 'bi-calendar-event', 'Agenda Sekolah', 'Kelola agenda sekolah dan override KBM.');
             add('holidays', 'kelola-agenda-sekolah', 'bi-calendar2-x', 'Kalender Hari Libur', 'Atur libur nasional, cuti bersama, dan libur sekolah.');
         }
@@ -1662,6 +1664,7 @@ renderStudentPage();
             add('flagged', 'review-absensi-flagged', 'bi-shield-check', 'Moderasi Presensi', 'Tinjau foto presensi masuk dan pulang yang belum diverifikasi.');
             add('academic-master', 'kelola-master-data', 'bi-database', 'Master Data Akademik', 'Kelola kelas, siswa, mapel, materi, dan jadwal.');
             add('years', 'kelola-tahun-ajaran', 'bi-calendar3', 'Tahun Ajaran', 'Buat tahun ajaran dan aktivasi tersinkron.');
+            add('lesson-calendar', 'kelola-master-data', 'bi-calendar2-week', 'Kalender Jam Pelajaran', 'Atur periode waktu pelajaran dan aktifkan kalender sekolah.');
             add('agendas', 'kelola-agenda-sekolah', 'bi-calendar-event', 'Agenda Sekolah', 'Kelola agenda sekolah dan override KBM.');
             add('holidays', 'kelola-agenda-sekolah', 'bi-calendar2-x', 'Kalender Hari Libur', 'Atur libur nasional, cuti bersama, dan libur sekolah.');
             add('monitoring', 'view-dashboard-kurikulum', 'bi-bar-chart-line', 'Monitoring Pembelajaran', 'Lihat jumlah jadwal, jurnal, dan presensi hari ini.');
@@ -1684,7 +1687,7 @@ renderStudentPage();
         $('roleModules').hidden = hideRoleDashboard;
         const sidebarGroups = {
             operational: new Set(['student-attendance', 'student-attendance-report', 'substitute-approvals', 'monitoring', 'journal-monitoring', 'discrepancy', 'flagged', 'leave-approvals', 'leave-submit']),
-            calendar: new Set(['years', 'agendas', 'holidays']),
+            calendar: new Set(['years', 'lesson-calendar', 'agendas', 'holidays']),
             administration: new Set(['admin-users', 'settings'])
         };
         const renderSidebarGroup = (elementId, items) => {
@@ -1692,7 +1695,7 @@ renderStudentPage();
         };
         const orderedModules = (keys) => keys.map((key) => modules.find((module) => module.key === key)).filter(Boolean);
         renderSidebarGroup('adminSideOperational', orderedModules(['flagged', 'journal-monitoring', 'monitoring', 'substitute-approvals', 'leave-approvals', 'discrepancy', 'leave-submit']));
-        renderSidebarGroup('adminSideCalendar', orderedModules(['years', 'agendas', 'holidays']));
+        renderSidebarGroup('adminSideCalendar', orderedModules(['years', 'lesson-calendar', 'agendas', 'holidays']));
         renderSidebarGroup('adminSideAdministration', orderedModules(['admin-users', 'settings']));
         ['adminSideOperational', 'adminSideCalendar', 'adminSideAdministration'].forEach((elementId) => {
             $(elementId).querySelectorAll('[data-admin-action]').forEach((button) => button.addEventListener('click', () => {
