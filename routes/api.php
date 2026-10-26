@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DiscrepancyController;
 use App\Http\Controllers\Api\LeaveRequestController;
 use App\Http\Controllers\Api\HolidayCalendarController;
+use App\Http\Controllers\Api\KalenderJamPelajaranController;
 use App\Http\Controllers\Api\JournalMonitoringController;
 use App\Http\Controllers\Api\LessonJournalController;
 use App\Http\Controllers\Api\MasterDataController;
