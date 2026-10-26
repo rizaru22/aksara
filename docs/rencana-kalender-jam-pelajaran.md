@@ -119,8 +119,8 @@ Layanan `App\\Services\\KalenderJamPelajaranService` juga telah ditambahkan untu
 - [x] Mempertahankan kontrak respons dashboard admin (teacher_nip, journal_filled, expected_students, marked_students, dan is_in_class) saat mengubah sumber waktu.
 - [x] Laporan kelas harian/mingguan memakai waktu snapshot jika ada, atau resolver pada tanggal laporan; kegagalan resolusi ditampilkan melalui time_resolution_error dan tidak diganti diam-diam dengan waktu lama.
 - [x] Monitoring jurnal admin menampilkan waktu rencana dan rentang periode snapshot jika tersedia.
-- [x] CRUD jadwal master menerima periode_mulai/periode_selesai opsional, memvalidasi pasangan rentang, dan membandingkan konflik periode jika kedua jadwal menggunakan periode.
-- [ ] Audit lebih lanjut konflik campuran jadwal berbasis periode dan legacy: fallback saat ini tetap membandingkan waktu tersimpan, sehingga nilai jam legacy yang hanya menjadi placeholder untuk jadwal periode dapat memengaruhi konflik campuran.
+- [x] Endpoint daftar/detail jadwal master menyertakan jam_mulai_resolved, jam_selesai_resolved, sumber_waktu_rencana, tanggal_resolusi, dan kesalahan resolusi tanpa menimpa kolom jam legacy; parameter tanggal opsional dapat menentukan tanggal resolusi.
+- [x] CRUD jadwal master menerima periode_mulai/periode_selesai opsional, memvalidasi pasangan rentang, membandingkan rentang periode jika kedua jadwal berbasis periode, dan menggunakan resolver untuk membandingkan jadwal campuran periode/legacy pada tanggal representatif hari yang sama.
 - [ ] Uji regresi end-to-end pada environment Laravel/PHP 8.3 dan database uji. Belum ada tes yang dijalankan setelah perubahan controller di tahap ini; percobaan mengambil clone repo untuk menjalankan tes lokal gagal karena environment eksekusi tidak dapat menjangkau GitHub.
 - [ ] Uji skenario penerimaan di bawah ini; daftar ini adalah rencana uji, bukan klaim hasil tes.
 
@@ -138,7 +138,7 @@ Layanan `App\\Services\\KalenderJamPelajaranService` juga telah ditambahkan untu
 | AT-08 | Dua guru memiliki jadwal berbeda pada waktu sama | Kunci pengingat masing-masing penerima tidak saling menekan | Belum diuji |
 | AT-09 | Guru pengganti disetujui pada tanggal sesi | Pengingat sesi diarahkan ke guru pengganti untuk jadwal tersebut | Belum diuji |
 | AT-10 | Kegagalan provider setelah kunci didaftarkan | Tidak ada retry otomatis; kegagalan dicatat, tanpa risiko duplikasi otomatis | Belum diuji |
-| AT-11 | Jadwal baru berbasis periode bentrok dengan jadwal periode lain untuk guru/kelas sama | Konflik rentang nomor periode ditolak | Belum diuji |
-| AT-12 | Jadwal campuran periode dan legacy | Perlu pengujian tambahan dan peninjauan aturan konflik berbasis waktu kalender | Belum diuji |
+| AT-11 | Jadwal baru berbasis periode bentrok dengan jadwal periode lain untuk guru/kelas sama | Konflik rentang nomor periode ditolak | Implementasi tersedia; belum diuji |
+| AT-12 | Jadwal campuran periode dan legacy | Konflik dibandingkan dengan waktu hasil resolver pada hari sekolah yang sama | Implementasi tersedia; belum diuji |
 
 Catatan: pemeriksaan dashboard dan laporan di atas adalah integrasi kode. Status “belum diuji” harus tetap dipertahankan sampai tes dijalankan di environment proyek; jangan menyimpulkan kelulusan dari inspeksi kode saja.
