@@ -160,4 +160,8 @@ Pada branch `feature/kalender-jam-pelajaran`, implementasi awal pengelolaan kale
 
 Contoh: periode 1 07.30–08.15, periode 2 08.15–09.00, periode 3 09.00–09.45. Jadwal periode 1–3 menghasilkan 07.30–09.45 dan tetap dihitung sebagai satu jadwal/jurnal. Jeda di antara periode dapat berupa selisih waktu dan tidak perlu direpresentasikan sebagai periode tersendiri.
 
+
+- Impor detail kalender dari file Excel `.xlsx` melalui template yang dapat diunduh. Kolom wajib: `hari`, `nomor_periode`, `jam_mulai`, `jam_selesai`; kolom `label` opsional.
+- Impor hanya diizinkan ketika kalender nonaktif. Sebelum unggah, UI meminta konfirmasi bahwa seluruh detail periode lama akan diganti; validasi dilakukan melalui alur penyimpanan periode yang sama, termasuk nomor berurutan, waktu valid, dan larangan tumpang tindih.
+
 **Status validasi:** kode telah ditulis ke branch, tetapi PHP lint, JavaScript syntax check, PHPUnit/feature tests, dan uji browser belum dijalankan. Implementasi ini belum boleh dianggap lulus penerimaan sebelum seluruh pemeriksaan tersebut berhasil.
