@@ -109,18 +109,8 @@ class LessonJournalController extends Controller
             throw ValidationException::withMessages(['presensi' => 'Daftar presensi harus mencakup seluruh siswa kelas dan tidak boleh memuat siswa dari kelas lain.']);
         }
 
-        [$journal, $created] = DB::transaction(function () use ($request, $data, $schedule, $now, $activeSubstitute): array {
+        [$journal, $created] = DB::transaction(function () use ($request, $data, $schedule, $now, $activeSubstitute, $calendarResolver): array {
             $lockedSchedule = JadwalPelajaran::query()->lockForUpdate()->findOrFail($schedule->id);
-            if (AgendaSekolah::query()
-                ->whereDate('tanggal', $now->toDateString())
-                ->where('scope', 'SEKOLAH')
-                ->where('override_kbm', true)
-                ->where('jam_mulai', '<', $lockedSchedule->jam_selesai)
-                ->where('jam_selesai', '>', $lockedSchedule->jam_mulai)
-                ->exists()) {
-                throw new ConflictHttpException('KBM pada waktu sesi ini ditangguhkan oleh agenda sekolah.');
-            }
-
             $journal = JurnalMengajar::query()
                 ->where('jadwal_pelajaran_id', $lockedSchedule->id)
                 ->whereDate('tanggal', $now->toDateString())
@@ -130,6 +120,28 @@ class LessonJournalController extends Controller
                 throw new ConflictHttpException('Jurnal sesi ini sudah selesai dan tidak dapat diubah.');
             }
             $created = ! $journal;
+            $resolved = null;
+
+            if ($created) {
+                try {
+                    // Resolve inside the transaction so the snapshot matches the calendar
+                    // state observed when the new draft is committed.
+                    $resolved = $calendarResolver->resolve($lockedSchedule, $now);
+                } catch (\RuntimeException $exception) {
+                    throw new ConflictHttpException($exception->getMessage(), $exception);
+                }
+
+                if (AgendaSekolah::query()
+                    ->whereDate('tanggal', $now->toDateString())
+                    ->where('scope', 'SEKOLAH')
+                    ->where('override_kbm', true)
+                    ->where('jam_mulai', '<', $resolved['jam_selesai']->format('H:i:s'))
+                    ->where('jam_selesai', '>', $resolved['jam_mulai']->format('H:i:s'))
+                    ->exists()) {
+                    throw new ConflictHttpException('KBM pada waktu sesi ini ditangguhkan oleh agenda sekolah.');
+                }
+            }
+
             $journal ??= new JurnalMengajar;
             $journal->fill([
                 'user_id' => $lockedSchedule->user_id,
