@@ -12,6 +12,7 @@ use App\Models\Setting;
 use App\Models\TahunAjaran;
 use App\Services\CycleScheduleService;
 use App\Services\HaversineService;
+use App\Services\KalenderJamPelajaranResolver;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,11 +39,11 @@ class LessonJournalController extends Controller
      * Mengambil daftar siswa satu kelas untuk dimunculkan di modal jurnal.
      * Endpoint ini juga memastikan jadwal yang dibuka benar-benar milik guru saat ini dan aktif di siklus yang berlaku.
      */
-    public function students(Request $request, JadwalPelajaran $jadwalPelajaran, CycleScheduleService $cycles)
+    public function students(Request $request, JadwalPelajaran $jadwalPelajaran, CycleScheduleService $cycles, KalenderJamPelajaranResolver $calendarResolver)
     {
         abort_unless($request->user()->can('isi-ejurnal'), 403);
         $now = now(config('app.timezone'));
-        $this->authorizeSchedule($request, $jadwalPelajaran, $now, $cycles);
+        $this->authorizeSchedule($request, $jadwalPelajaran, $now, $cycles, $calendarResolver);
 
         $draft = JurnalMengajar::query()->with('presensiSiswas')
             ->where('jadwal_pelajaran_id', $jadwalPelajaran->id)
@@ -62,7 +63,7 @@ class LessonJournalController extends Controller
      * Menyimpan atau memperbarui draft jurnal yang masih berlangsung.
      * Flow ini memastikan seluruh siswa kelas masuk dalam presensi dan data tidak dibuat secara parsial.
      */
-    public function store(Request $request, CycleScheduleService $cycles)
+    public function store(Request $request, CycleScheduleService $cycles, KalenderJamPelajaranResolver $calendarResolver)
     {
         abort_unless($request->user()->can('isi-ejurnal'), 403);
         $data = $request->validate([
@@ -78,7 +79,7 @@ class LessonJournalController extends Controller
 
         $now = now(config('app.timezone'));
         $schedule = JadwalPelajaran::query()->with('kelas')->findOrFail($data['jadwal_pelajaran_id']);
-        $this->authorizeSchedule($request, $schedule, $now, $cycles);
+        $this->authorizeSchedule($request, $schedule, $now, $cycles, $calendarResolver);
         $activeSubstitute = $this->activeSubstituteForSchedule($schedule, $now);
         $existingDraft = JurnalMengajar::query()
             ->where('jadwal_pelajaran_id', $schedule->id)
@@ -300,7 +301,7 @@ class LessonJournalController extends Controller
      * Proses finalisasi bertahap: validasi foto + GPS + geofence + waktu + kelengkapan daftar presensi.
      * Jika kondisi darurat, sistem memperbolehkan finalisasi lewat mode emergency dengan catatan penutupan.
      */
-    public function finalize(Request $request, JurnalMengajar $jurnalMengajar, CycleScheduleService $cycles, HaversineService $distance)
+    public function finalize(Request $request, JurnalMengajar $jurnalMengajar, CycleScheduleService $cycles, HaversineService $distance, KalenderJamPelajaranResolver $calendarResolver)
     {
         abort_unless($request->user()->can('isi-ejurnal'), 403);
         abort_unless(
@@ -488,7 +489,7 @@ class LessonJournalController extends Controller
      * aktif pada hari/siklus/semester yang berlaku, dan masih dalam jendela pengisian jurnal.
      * Jika draf sudah dibuka, akses lanjutan tetap diperbolehkan.
      */
-    private function authorizeSchedule(Request $request, JadwalPelajaran $schedule, Carbon $now, CycleScheduleService $cycles): void
+    private function authorizeSchedule(Request $request, JadwalPelajaran $schedule, Carbon $now, CycleScheduleService $cycles, KalenderJamPelajaranResolver $calendarResolver): void
     {
         $activeSubstitute = $this->activeSubstituteForSchedule($schedule, $now);
         $allowedUserIds = [$schedule->user_id];
