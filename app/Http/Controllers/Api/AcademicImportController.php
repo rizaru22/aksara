@@ -28,7 +28,7 @@ class AcademicImportController extends Controller
         'students' => ['Siswa', ['nisn', 'nama', 'jenis_kelamin']],
         'subjects' => ['Mata_Pelajaran', ['kode_mapel', 'nama_mapel']],
         'materials' => ['Materi_Pelajaran', ['kode_mapel', 'urutan_bab', 'judul_bab', 'target_jjp']],
-        'schedules' => ['Jadwal_Pelajaran', ['tahun_ajaran', 'semester', 'nip_guru', 'nama_kelas', 'kode_mapel', 'siklus_minggu', 'hari', 'jam_mulai', 'jam_selesai']],
+        'schedules' => ['Jadwal_Pelajaran', ['tahun_ajaran', 'semester', 'nip_guru', 'nama_kelas', 'kode_mapel', 'siklus_minggu', 'hari', 'periode_mulai', 'periode_selesai']],
     ];
 
     /**
@@ -165,13 +165,29 @@ class AcademicImportController extends Controller
         if (! $teacher) throw new RuntimeException('Guru dengan NIP tersebut tidak ditemukan.');
         if (! $class) throw new RuntimeException('Kelas tidak ditemukan.');
         if (! $subject) throw new RuntimeException('Mata pelajaran tidak ditemukan.');
-        return [
+        $periodeMulai = filter_var($row['periode_mulai'] ?? null, FILTER_VALIDATE_INT);
+        $periodeSelesai = filter_var($row['periode_selesai'] ?? null, FILTER_VALIDATE_INT);
+        if ($periodeMulai === false || $periodeSelesai === false || $periodeMulai === null || $periodeSelesai === null) {
+            throw new RuntimeException('Periode mulai dan periode selesai wajib diisi dengan nomor periode pada kalender aktif.');
+        }
+        if ($periodeMulai < 1 || $periodeSelesai < $periodeMulai) {
+            throw new RuntimeException('Rentang periode tidak valid. Periode selesai harus sama dengan atau lebih besar dari periode mulai.');
+        }
+        $record = [
             'tahun_ajaran_id' => $year->id, 'semester' => $row['semester'] ?? '', 'user_id' => $teacher->id,
             'kelas_id' => $class->id, 'mata_pelajaran_id' => $subject->id,
             'siklus_minggu' => ($row['siklus_minggu'] ?? '') === '' ? null : $row['siklus_minggu'],
             'hari' => ucfirst(strtolower($row['hari'] ?? '')),
-            'jam_mulai' => $this->timeValue($row['jam_mulai'] ?? ''), 'jam_selesai' => $this->timeValue($row['jam_selesai'] ?? ''),
+            'periode_mulai' => $periodeMulai, 'periode_selesai' => $periodeSelesai,
+            'jam_mulai' => null, 'jam_selesai' => null,
         ];
+        $date = CarbonImmutable::today(config('app.timezone'));
+        $cycles = app(CycleScheduleService::class);
+        for ($offset = 0; $offset < 7 && $cycles->getHariIndo($date) !== $record['hari']; $offset++) {
+            $date = $date->addDay();
+        }
+        app(KalenderJamPelajaranResolver::class)->resolve(new JadwalPelajaran($record), $date);
+        return $record;
     }
 
     private function optionalTeacher(string $nip): ?User
@@ -198,7 +214,7 @@ class AcademicImportController extends Controller
             'students' => ['nisn' => 'required|string|max:255|unique:siswas,nisn', 'nama' => 'required|string|max:255', 'kelas_id' => 'required|exists:kelas,id', 'jenis_kelamin' => 'required|in:L,P'],
             'subjects' => ['kode_mapel' => 'required|string|max:255|unique:mata_pelajarans,kode_mapel', 'nama_mapel' => 'required|string|max:255'],
             'materials' => ['mata_pelajaran_id' => 'required|exists:mata_pelajarans,id', 'urutan_bab' => 'required|integer|min:1', 'judul_bab' => 'required|string|max:255', 'target_jjp' => 'required|integer|min:1'],
-            'schedules' => ['tahun_ajaran_id' => 'required|exists:tahun_ajarans,id', 'semester' => 'required|in:Ganjil,Genap', 'user_id' => 'required|exists:users,id', 'kelas_id' => 'required|exists:kelas,id', 'mata_pelajaran_id' => 'required|exists:mata_pelajarans,id', 'siklus_minggu' => 'nullable|integer|in:1,2,3', 'hari' => 'required|in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu', 'jam_mulai' => 'required|date_format:H:i', 'jam_selesai' => 'required|date_format:H:i|after:jam_mulai'],
+            'schedules' => ['tahun_ajaran_id' => 'required|exists:tahun_ajarans,id', 'semester' => 'required|in:Ganjil,Genap', 'user_id' => 'required|exists:users,id', 'kelas_id' => 'required|exists:kelas,id', 'mata_pelajaran_id' => 'required|exists:mata_pelajarans,id', 'siklus_minggu' => 'nullable|integer|in:1,2,3', 'hari' => 'required|in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu', 'periode_mulai' => 'required|integer|min:1', 'periode_selesai' => 'required|integer|gte:periode_mulai'],
         };
     }
 
@@ -221,55 +237,54 @@ class AcademicImportController extends Controller
 
     private function validateScheduleCollision(array $record, array $previous): void
     {
-        $conflicts = fn (array $other): bool => $record['tahun_ajaran_id'] === $other['tahun_ajaran_id']
-            && $record['semester'] === $other['semester'] && $record['hari'] === $other['hari']
-            && ($record['siklus_minggu'] === null || $other['siklus_minggu'] === null || (string) $record['siklus_minggu'] === (string) $other['siklus_minggu'])
-            && $record['jam_mulai'] < $other['jam_selesai'] && $record['jam_selesai'] > $other['jam_mulai']
-            && ($record['user_id'] === $other['user_id'] || $record['kelas_id'] === $other['kelas_id']);
-
-        if (collect($previous)->contains($conflicts)) {
-            throw ValidationException::withMessages(['jadwal' => 'bertabrakan dengan jadwal guru atau kelas yang lain']);
-        }
-
-        $existing = JadwalPelajaran::query()
-            ->where('tahun_ajaran_id', $record['tahun_ajaran_id'])
-            ->where('semester', $record['semester'])
-            ->where('hari', $record['hari'])
-            ->where(function ($query) use ($record): void {
-                if ($record['siklus_minggu'] !== null) {
-                    $query->whereNull('siklus_minggu')->orWhere('siklus_minggu', $record['siklus_minggu']);
-                }
-            })
-            ->where(fn ($query) => $query->where('user_id', $record['user_id'])->orWhere('kelas_id', $record['kelas_id']))
-            ->get();
-
-        if ($existing->isEmpty()) {
-            return;
-        }
-
         $date = CarbonImmutable::today(config('app.timezone'));
         $cycles = app(CycleScheduleService::class);
         for ($offset = 0; $offset < 7 && $cycles->getHariIndo($date) !== $record['hari']; $offset++) {
             $date = $date->addDay();
         }
 
+        $resolver = app(KalenderJamPelajaranResolver::class);
         try {
-            $resolver = app(KalenderJamPelajaranResolver::class);
             $candidateTime = $resolver->resolve(new JadwalPelajaran($record), $date);
-            $hasConflict = $existing->contains(function (JadwalPelajaran $schedule) use ($resolver, $date, $candidateTime): bool {
-                $existingTime = $resolver->resolve($schedule, $date);
+            $conflicts = function (JadwalPelajaran $other) use ($record, $candidateTime, $resolver, $date): bool {
+                if ($record['tahun_ajaran_id'] !== $other->tahun_ajaran_id
+                    || $record['semester'] !== $other->semester
+                    || $record['hari'] !== $other->hari
+                    || ($record['siklus_minggu'] !== null && $other->siklus_minggu !== null
+                        && (string) $record['siklus_minggu'] !== (string) $other->siklus_minggu)) {
+                    return false;
+                }
+                if ($record['user_id'] !== $other->user_id && $record['kelas_id'] !== $other->kelas_id) {
+                    return false;
+                }
+                $otherTime = $resolver->resolve($other, $date);
+                return $candidateTime['jam_mulai'] < $otherTime['jam_selesai']
+                    && $candidateTime['jam_selesai'] > $otherTime['jam_mulai'];
+            };
 
-                return $candidateTime['jam_mulai'] < $existingTime['jam_selesai']
-                    && $candidateTime['jam_selesai'] > $existingTime['jam_mulai'];
-            });
+            foreach ($previous as $otherRecord) {
+                if ($conflicts(new JadwalPelajaran($otherRecord))) {
+                    throw ValidationException::withMessages(['jadwal' => 'bertabrakan dengan jadwal guru atau kelas yang lain']);
+                }
+            }
+
+            $existing = JadwalPelajaran::query()
+                ->where('tahun_ajaran_id', $record['tahun_ajaran_id'])
+                ->where('semester', $record['semester'])
+                ->where('hari', $record['hari'])
+                ->where(function ($query) use ($record): void {
+                    if ($record['siklus_minggu'] !== null) {
+                        $query->whereNull('siklus_minggu')->orWhere('siklus_minggu', $record['siklus_minggu']);
+                    }
+                })
+                ->where(fn ($query) => $query->where('user_id', $record['user_id'])->orWhere('kelas_id', $record['kelas_id']))
+                ->get();
+
+            if ($existing->contains($conflicts)) {
+                throw ValidationException::withMessages(['jadwal' => 'bertabrakan dengan jadwal guru atau kelas yang lain']);
+            }
         } catch (RuntimeException $exception) {
-            throw ValidationException::withMessages([
-                'jadwal' => 'Konflik jadwal tidak dapat divalidasi: '.$exception->getMessage(),
-            ]);
-        }
-
-        if ($hasConflict) {
-            throw ValidationException::withMessages(['jadwal' => 'bertabrakan dengan jadwal guru atau kelas yang lain']);
+            throw ValidationException::withMessages(['jadwal' => 'Konflik jadwal tidak dapat divalidasi: '.$exception->getMessage()]);
         }
     }
 }
