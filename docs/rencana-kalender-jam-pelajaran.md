@@ -63,12 +63,15 @@ Menyediakan kalender jam pelajaran sekolah yang dapat dikonfigurasi per hari, te
 - [x] Integrasikan resolver ke pemeriksaan jendela pengisian jurnal pada `LessonJournalController`.
 - [x] Saat draft jurnal pertama dibuat, simpan snapshot kalender, waktu rencana, dan rentang periode dalam transaksi yang sama dengan draft serta presensi siswa.
 - [x] Gunakan waktu snapshot untuk jendela finalisasi dan finalisasi susulan jika snapshot tersedia.
-- [ ] Audit dan integrasikan resolver ke dashboard, daftar jadwal, pengingat push, agenda, laporan, impor, dan alur guru pengganti.
+- [x] Integrasikan resolver/snapshot ke endpoint dashboard jadwal hari ini: waktu tampilan dan jendela aksi memakai snapshot jurnal jika tersedia, atau resolver untuk sesi yang belum memiliki snapshot; urutan jadwal mengikuti waktu hasil resolusi.
+- [ ] Integrasikan pengingat push dan deduplikasi.
+- [ ] Audit dan integrasikan laporan, impor, validasi bentrok, dan alur guru pengganti.
 - Catatan: tes integrasi database ditunda sesuai keputusan pemilik proyek dan akan diuji melalui interface saat tersedia.
 
 ### Tahap 4 — Integrasi bertahap
 
-- Integrasikan baca jadwal dan dashboard.
+- [x] Integrasikan baca jadwal dan dashboard (endpoint jadwal hari ini).
+- [ ] Audit endpoint daftar jadwal lain agar waktu yang ditampilkan konsisten dengan resolver/snapshot.
 - Integrasikan pembuatan/pembaruan jurnal dan validasi finalisasi.
 - Integrasikan pengingat push dan deduplikasi.
 - Integrasikan impor, validasi bentrok, agenda, laporan, guru pengganti, dan UI admin.
@@ -102,4 +105,4 @@ Pada branch `feature/kalender-jam-pelajaran` tersedia `App\\Services\\KalenderJa
 
 Layanan `App\\Services\\KalenderJamPelajaranService` juga telah ditambahkan untuk aktivasi kalender dalam transaksi. Layanan mengunci baris kalender yang ada, memvalidasi bahwa detail periode tersedia, nomor periode berurutan mulai dari 1 per hari, jam valid, dan periode tidak bertumpang tindih; kemudian menonaktifkan kalender aktif dan mengaktifkan pilihan.
 
-`LessonJournalController` kini menggunakan resolver untuk memeriksa waktu pengisian ketika belum ada draft terbuka. Saat draft baru dibuat, resolver dijalankan lagi di dalam transaksi dan snapshot kalender, waktu rencana, serta rentang periode disimpan bersama draft dan presensi. Pembaruan draft yang sudah ada tidak menimpa snapshot. Jendela finalisasi dan finalisasi susulan menggunakan waktu snapshot apabila tersedia. Review tambahan memperbaiki pemeriksaan agenda sekolah agar tetap dijalankan saat draft baru dibuat maupun saat draft lama diperbarui; pemeriksaan menggunakan waktu snapshot jika ada, tanpa menimpa snapshot. Integrasi ini belum diuji ulang setelah perubahan controller. Tes integrasi database sengaja ditunda sesuai keputusan pemilik proyek. Controller lain, pengingat push, dashboard, laporan, impor, dan alur guru pengganti belum seluruhnya terintegrasi.
+`LessonJournalController` kini menggunakan resolver untuk memeriksa waktu pengisian ketika belum ada draft terbuka. Saat draft baru dibuat, resolver dijalankan lagi di dalam transaksi dan snapshot kalender, waktu rencana, serta rentang periode disimpan bersama draft dan presensi. Pembaruan draft yang sudah ada tidak menimpa snapshot. Jendela finalisasi dan finalisasi susulan menggunakan waktu snapshot apabila tersedia. Review tambahan memperbaiki pemeriksaan agenda sekolah agar tetap dijalankan saat draft baru dibuat maupun saat draft lama diperbarui; pemeriksaan menggunakan waktu snapshot jika ada, tanpa menimpa snapshot. Integrasi ini belum diuji ulang setelah perubahan controller. Tes integrasi database sengaja ditunda sesuai keputusan pemilik proyek. Endpoint `TeacherScheduleController::today` juga telah diperbarui: dashboard menggunakan snapshot jurnal bila tersedia dan resolver untuk jadwal tanpa snapshot, menghitung bentrok agenda dengan rentang waktu hasil resolusi, menonaktifkan aksi jurnal jika waktu tidak dapat diselesaikan, dan mengurutkan jadwal berdasarkan waktu hasil resolusi. Perubahan ini belum diuji ulang. Pengingat push/deduplikasi, laporan, impor, validasi bentrok, endpoint daftar jadwal lain, dan alur guru pengganti masih perlu diaudit.
