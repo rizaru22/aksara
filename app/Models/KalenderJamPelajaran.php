@@ -8,26 +8,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class KalenderJamPelajaran extends Model
 {
-    public const STATUS_DRAFT = 'DRAFT';
     public const STATUS_AKTIF = 'AKTIF';
-    public const STATUS_ARSIP = 'ARSIP';
+    public const STATUS_NONAKTIF = 'NONAKTIF';
 
     protected $fillable = [
         'nama',
-        'berlaku_mulai',
-        'berlaku_sampai',
         'status',
         'catatan',
         'dibuat_oleh',
     ];
-
-    protected function casts(): array
-    {
-        return [
-            'berlaku_mulai' => 'date',
-            'berlaku_sampai' => 'date',
-        ];
-    }
 
     public function pembuat(): BelongsTo
     {
