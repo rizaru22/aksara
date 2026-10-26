@@ -232,7 +232,14 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
         }));
     }
     async function openCalendars(calendarId = null) {
-        const response = await api(calendarId ? `/api/v1/academic/calendars/${calendarId}` : '/api/v1/academic/calendars');
+        let response;
+        try {
+            response = await api(calendarId ? `/api/v1/academic/calendars/${calendarId}` : '/api/v1/academic/calendars');
+        } catch (error) {
+            setFeature('Kalender Jam Pelajaran', `<div class="alert alert-danger"><h2 class="h6">Kalender gagal dimuat</h2><p class="mb-2">${htmlSafe(error.message || 'Terjadi kesalahan saat memuat kalender.')}</p><button type="button" class="btn btn-outline-primary btn-sm" id="calendarRetry">Coba lagi</button></div>`);
+            $('calendarRetry')?.addEventListener('click', () => openCalendars(calendarId));
+            return;
+        }
         const selected = calendarId ? response.data : null;
         if (calendarId && !selected) throw new Error('Kalender tidak ditemukan.');
         const calendars = calendarId ? [selected] : (response.data || []);
