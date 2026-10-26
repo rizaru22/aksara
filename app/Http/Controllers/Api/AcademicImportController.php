@@ -186,7 +186,14 @@ class AcademicImportController extends Controller
         for ($offset = 0; $offset < 7 && $cycles->getHariIndo($date) !== $record['hari']; $offset++) {
             $date = $date->addDay();
         }
-        app(KalenderJamPelajaranResolver::class)->resolve(new JadwalPelajaran($record), $date);
+        $resolved = app(KalenderJamPelajaranResolver::class)->resolve(new JadwalPelajaran($record), $date);
+
+        // Kolom waktu masih NOT NULL pada database lama maupun saat ini.
+        // Simpan waktu hasil resolusi kalender untuk kompatibilitas skema;
+        // periode tetap menjadi sumber waktu utama ketika jadwal dibaca.
+        $record['jam_mulai'] = $resolved['jam_mulai']->format('H:i:s');
+        $record['jam_selesai'] = $resolved['jam_selesai']->format('H:i:s');
+
         return $record;
     }
 
