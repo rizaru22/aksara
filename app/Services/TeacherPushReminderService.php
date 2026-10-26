@@ -9,6 +9,7 @@ use App\Models\JadwalPelajaran;
 use App\Models\JadwalPresensiHarian;
 use App\Models\JurnalMengajar;
 use App\Models\PengajuanIzin;
+use App\Models\PengajuanGuruPengganti;
 use App\Models\Setting;
 use App\Models\TahunAjaran;
 use App\Models\User;
@@ -121,11 +122,23 @@ class TeacherPushReminderService
             Setting::value('semester_start_date', config('aksara.academic.semester_start_date')),
         );
 
+        $approvedSubstitutions = PengajuanGuruPengganti::query()
+            ->where('status_approval', 'APPROVED')
+            ->whereDate('tanggal', $now->toDateString())
+            ->whereIn('guru_pengganti_id', $teachers->modelKeys())
+            ->get()
+            ->keyBy('jadwal_pelajaran_id');
+
         $schedules = JadwalPelajaran::query()
             ->with(['jurnalMengajars' => fn ($query) => $query
                 ->with('presensiSiswas')
                 ->whereDate('tanggal', $now->toDateString())])
-            ->whereIn('user_id', $teachers->modelKeys())
+            ->where(function ($query) use ($teachers, $approvedSubstitutions) {
+                $query->whereIn('user_id', $teachers->modelKeys());
+                if ($approvedSubstitutions->isNotEmpty()) {
+                    $query->orWhereIn('id', $approvedSubstitutions->keys());
+                }
+            })
             ->where('tahun_ajaran_id', $year->id)
             ->where('semester', $semester)
             ->where('hari', $weekday)
@@ -140,7 +153,10 @@ class TeacherPushReminderService
 
         $teachersById = $teachers->keyBy('id');
         foreach ($schedules as $schedule) {
-            $teacher = $teachersById->get($schedule->user_id);
+            $substitution = $approvedSubstitutions->get($schedule->id);
+            $teacher = $substitution
+                ? $teachersById->get($substitution->guru_pengganti_id)
+                : $teachersById->get($schedule->user_id);
             if (! $teacher || in_array((int) $teacher->id, $onLeave, true)) {
                 continue;
             }
