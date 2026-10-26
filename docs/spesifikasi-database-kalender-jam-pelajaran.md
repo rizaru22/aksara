@@ -1,6 +1,6 @@
 # Spesifikasi Database — Kalender Jam Pelajaran AKSARA
 
-Status: Tahap 2 — rancangan untuk ditinjau, belum disetujui untuk implementasi  
+Status: Tahap 2 — spesifikasi untuk pemeriksaan pemilik produk; belum disetujui untuk implementasi  
 Branch: `feature/kalender-jam-pelajaran`
 
 ## 1. Tujuan dan batasan
@@ -18,7 +18,20 @@ Kebutuhan yang menjadi dasar:
 
 Dokumen ini adalah usulan desain, bukan perintah migrasi. Tidak ada migration runtime yang dibuat atau dijalankan oleh dokumen ini.
 
-## 2. Keputusan desain yang diusulkan
+## 2. Keputusan yang telah dikonfirmasi
+
+Keputusan pemilik produk:
+1. **Istirahat berupa jeda antarperiode**, bukan entitas periode tersendiri.
+2. **Aktivasi kalender berdasarkan tanggal efektif** (`berlaku_mulai`), bukan jam-menit. Kalender baru tidak mengubah snapshot sesi/jurnal yang sudah dibuat.
+3. **Snapshot dibuat saat draft jurnal pertama kali dibuat**. Draft yang sudah memiliki snapshot mempertahankan konteks kalender dan waktu tersebut walaupun kalender baru kemudian diaktifkan.
+
+Keputusan teknis dalam rancangan ini:
+- Rentang periode pada satu jadwal harus **kontinu**. Nomor periode awal tidak boleh lebih besar dari nomor akhir, dan seluruh nomor dalam rentang harus tersedia pada hari itu.
+- Kalender dipilih menurut tanggal sesi. Aktivasi ditolak jika rentang tanggal kalender aktif bertumpang tindih.
+- Riwayat jurnal lama yang tidak memiliki snapshot dibiarkan `NULL`; sistem tidak mengarang waktu rencana historis.
+- Jadwal lama tetap kompatibel melalui `jam_mulai`/`jam_selesai` sampai proses pemetaan dan migrasi data disetujui.
+
+## 3. Keputusan desain teknis
 
 ### 2.1 Kalender berversi
 
@@ -67,9 +80,9 @@ Snapshot tidak boleh diperbarui ketika kalender baru diaktifkan. Kolom waktu rea
 
 Catatan: keputusan apakah snapshot disimpan langsung di `jurnal_mengajars` atau di tabel sesi tersendiri harus ditetapkan setelah memeriksa seluruh alur pembuatan jurnal, substitusi guru, laporan, dan aturan unik jurnal. Usulan awal untuk implementasi paling kecil adalah snapshot di jurnal, kecuali audit menunjukkan perlunya entitas sesi independen.
 
-## 3. Entitas/tabel yang diusulkan
+## 4. Entitas/tabel yang diusulkan
 
-Nama berikut bersifat usulan dan belum final.
+Nama tabel/kolom berikut merupakan rancangan yang diajukan untuk pemeriksaan; belum diterapkan.
 
 ### A. `kalender_jam_pelajaran`
 
@@ -81,14 +94,17 @@ Mewakili versi kalender sekolah.
 | `nama` | varchar(100) | Label versi, wajib |
 | `berlaku_mulai` | date | Tanggal awal versi berlaku, wajib |
 | `berlaku_sampai` | date nullable | Tanggal akhir inklusif; null berarti belum ditutup |
-| `status` | varchar/enum | DRAFT, AKTIF, ARSIP |
+| `status` | varchar(16) | `DRAFT`, `AKTIF`, `ARSIP`; validasi nilai di aplikasi |
 | `catatan` | text nullable | Alasan perubahan |
 | `dibuat_oleh` | foreignId nullable | FK ke users, nullOnDelete |
 | `created_at/updated_at` | timestamps | Audit waktu |
 
 Index yang diusulkan:
-- index `(berlaku_mulai, berlaku_sampai)`;
-- index `status`.
+- index `(berlaku_mulai, berlaku_sampai)` untuk pencarian versi berdasarkan tanggal;
+- index `status`;
+- FK `dibuat_oleh` ke PK `users` dengan `SET NULL`/`nullOnDelete`, setelah tipe PK diverifikasi.
+
+`berlaku_mulai` tidak perlu unique: beberapa draft boleh memiliki tanggal yang sama, tetapi hanya boleh ada satu kalender aktif yang cocok untuk satu tanggal. Aturan rentang aktif dijaga layanan aktivasi dalam transaksi.
 
 Aturan: kalender draft dapat diedit. Kalender yang pernah aktif tidak diedit isinya; buat versi baru. Saat versi baru diaktifkan, tutup versi sebelumnya pada tanggal sebelum tanggal mulai versi baru. Aplikasi harus mencegah rentang berlaku bertumpang tindih. Karena unique constraint sederhana tidak dapat menjamin tidak ada overlap rentang tanggal pada semua DB yang dipakai, validasi dilakukan dalam transaksi dengan penguncian yang sesuai.
 
@@ -99,7 +115,7 @@ Menyimpan periode per hari untuk versi kalender.
 | Kolom | Usulan tipe | Aturan |
 |---|---|---|
 | `id` | bigint unsigned | Primary key |
-| `kalender_id` | foreignId | FK ke kalender, cascadeOnDelete hanya untuk draft; versi aktif/arsip harus dilindungi dari penghapusan |
+| `kalender_id` | bigint unsigned | FK ke `kalender_jam_pelajaran.id`; rekomendasi `RESTRICT` pada FK |
 | `hari` | varchar(16) | Senin–Sabtu |
 | `nomor_periode` | unsigned smallint | Dimulai dari 1 |
 | `jam_mulai` | time | Wajib |
@@ -111,15 +127,17 @@ Constraint/index:
 - unique `(kalender_id, hari, nomor_periode)`;
 - index `(kalender_id, hari, jam_mulai)`.
 
-Catatan FK: kebijakan cascade untuk detail hanya aman jika kalender draft dihapus. Untuk versi yang sudah pernah aktif, larang penghapusan kalender dan detail melalui aplikasi. Jika diperlukan jaminan pada tingkat DB, pertimbangkan soft delete atau aturan FK yang lebih ketat setelah versi MariaDB dan kebijakan penghapusan dipastikan.
+Kebijakan penghapusan: kalender yang pernah aktif tidak boleh dihapus. Penghapusan draft harus dilakukan melalui layanan transaksional yang menghapus detail draft terlebih dahulu; FK detail sebaiknya `RESTRICT` agar aturan bisnis tidak bergantung pada cascade yang dapat menghapus detail kalender yang sudah digunakan.
 
-## 4. Usulan perubahan kolom pada tabel yang ada
+## 5. Usulan perubahan kolom pada tabel yang ada
 
 ### `jadwal_pelajarans`
 
 Tambahan usulan:
-- `periode_mulai` — unsigned smallint nullable pada masa transisi;
-- `periode_selesai` — unsigned smallint nullable pada masa transisi.
+- `periode_mulai` — `unsignedSmallInteger`, nullable selama masa transisi;
+- `periode_selesai` — `unsignedSmallInteger`, nullable selama masa transisi.
+
+Keduanya harus `NULL` untuk jadwal legacy, atau keduanya terisi untuk jadwal berbasis periode. Terapkan validasi aplikasi bahwa periode awal tidak melebihi periode akhir dan semua periode dalam rentang tersedia secara berurutan pada hari jadwal. Jangan membuat FK dari nomor periode langsung ke detail kalender karena kalender dipilih menurut tanggal sesi.
 
 Kolom lama `jam_mulai` dan `jam_selesai` tetap dipertahankan sementara. Saat fase migrasi:
 - jadwal lama tanpa periode tetap dibaca melalui jalur kompatibilitas waktu lama;
@@ -131,17 +149,19 @@ Perlu keputusan tambahan apakah `kalender_id` disimpan pada jadwal sebagai versi
 ### `jurnal_mengajars`
 
 Tambahan snapshot yang diusulkan:
-- `kalender_id_snapshot` nullable FK ke versi kalender, delete restrict/no action;
-- `waktu_rencana_mulai` nullable timestamp;
-- `waktu_rencana_selesai` nullable timestamp;
-- `periode_mulai_snapshot` nullable unsigned smallint;
-- `periode_selesai_snapshot` nullable unsigned smallint.
+- `kalender_id_snapshot` — `unsignedBigInteger`, nullable FK ke `kalender_jam_pelajaran.id`, dengan `RESTRICT`/no action;
+- `waktu_rencana_mulai` — `dateTime`, nullable;
+- `waktu_rencana_selesai` — `dateTime`, nullable;
+- `periode_mulai_snapshot` — `unsignedSmallInteger`, nullable;
+- `periode_selesai_snapshot` — `unsignedSmallInteger`, nullable.
 
-Nama final perlu diselaraskan dengan konvensi proyek. Kolom nullable dibutuhkan agar jurnal lama tetap valid tanpa backfill yang mengarang data. Jurnal baru menyimpan snapshot saat sesi pertama kali dimulai, dan snapshot tidak berubah saat jurnal diperbarui/finalisasi.
+Gunakan `dateTime` jika konsisten dengan penyimpanan waktu lokal proyek. Finalisasi tipe mengikuti konvensi kolom waktu yang ada setelah audit schema lengkap; jangan memilih `timestamp` secara otomatis tanpa memeriksa perilaku timezone.
+
+Nama final perlu diselaraskan dengan konvensi proyek. Kolom nullable dibutuhkan agar jurnal lama tetap valid tanpa backfill yang mengarang data. Snapshot dibuat atomik ketika draft jurnal pertama kali berhasil dibuat, bukan saat finalisasi atau saat kalender diaktifkan. Snapshot kalender dan waktu rencana harus berasal dari resolusi yang sama. Snapshot tidak berubah saat jurnal diperbarui/finalisasi; pembuatan draft gagal tidak boleh meninggalkan snapshot parsial.
 
 Perlu audit tambahan untuk memastikan tipe/status jurnal di branch saat ini konsisten dengan migration dan controller; jangan membuat perubahan status enum dalam lingkup kalender ini tanpa alasan terpisah.
 
-## 5. Tabel yang tidak diusulkan untuk diubah pada tahap awal
+## 6. Tabel yang tidak diusulkan untuk diubah pada tahap awal
 
 - `jadwal_presensi_harians`: tetap mengatur jendela presensi masuk/pulang harian guru; bukan sumber periode pelajaran.
 - `settings`: `jam_masuk_batas` tetap sebagai fallback kompatibilitas presensi.
@@ -150,7 +170,7 @@ Perlu audit tambahan untuk memastikan tipe/status jurnal di branch saat ini kons
 
 Tidak ada perubahan tabel di atas yang diwajibkan hanya karena kalender diperkenalkan.
 
-## 6. Dampak aplikasi yang wajib ditangani
+## 7. Dampak aplikasi yang wajib ditangani
 
 Satu service resolver waktu harus menjadi sumber logika bagi:
 - `TeacherScheduleController`;
@@ -166,9 +186,9 @@ Satu service resolver waktu harus menjadi sumber logika bagi:
 
 Hindari menyalin logika perhitungan periode di setiap controller.
 
-## 7. Strategi migrasi aman yang diusulkan
+## 8. Strategi migrasi aman yang diusulkan
 
-1. Buat tabel kalender dan detail, serta kolom periode/snapshot yang nullable.
+1. Setelah spesifikasi ini disetujui, buat tabel kalender dan detail, serta kolom periode/snapshot yang nullable melalui migration additive.
 2. Seed atau buat satu kalender awal dari konfigurasi yang telah diverifikasi admin; jangan menebak pemetaan periode dari waktu jadwal.
 3. Buat laporan validasi yang menunjukkan jadwal mana yang dapat dipetakan dan mana yang memerlukan keputusan manual.
 4. Jalankan kompatibilitas baca: jadwal lama tetap menggunakan waktu lama; jadwal yang telah dipetakan menggunakan resolver kalender.
@@ -177,14 +197,29 @@ Hindari menyalin logika perhitungan periode di setiap controller.
 7. Tidak ada backfill jurnal historis dengan waktu yang tidak dapat dibuktikan.
 8. Rollback harus dapat mengembalikan aplikasi ke jalur waktu lama tanpa kehilangan data kalender yang baru dibuat.
 
-## 8. Pertanyaan yang harus diputuskan sebelum migration
+## 9. Detail yang masih perlu diverifikasi saat audit implementasi
 
-1. Apakah periode istirahat dicatat sebagai entitas sendiri, atau cukup berupa jeda waktu antarperiode?
-2. Apakah kalender berlaku menurut tanggal mulai (tanggal efektif) atau perlu jam-menit efektif untuk perubahan darurat di tengah hari? Rekomendasi: gunakan tanggal efektif untuk perubahan normal, dan definisikan aturan eksplisit jika perubahan darurat dapat diaktifkan di tengah hari.
-3. Untuk sesi yang belum dimulai tetapi sudah memiliki jurnal draft, apakah snapshot waktu diambil ketika draft dibuat atau ketika sesi mulai? Rekomendasi: ambil snapshot saat draft pertama dibuat agar semua operasi atas draft memakai konteks waktu yang sama; kalender baru tidak mengubah draft yang sudah dibuat.
-4. Apakah satu jadwal dapat memiliki periode terputus (misalnya periode 1 dan 3 tetapi bukan 2)? Rekomendasi: rentang harus kontinu.
-5. Apakah perlu menyimpan waktu rencana snapshot pada jurnal lama yang sudah ada? Rekomendasi: jangan mengarang; biarkan null dan tampilkan waktu historis yang tersedia dari jadwal saat ini dengan penanda bahwa itu bukan snapshot.
+Hal-hal berikut wajib diperiksa sebelum migration:
 
-## 9. Status
+1. **Tipe FK dan aturan penghapusan.** Pastikan tipe PK `users` dan konvensi FK pada skema aktual. Kalender yang pernah aktif tidak boleh dihapus.
+2. **Cakupan hari.** Rancangan awal memakai Senin–Sabtu. Verifikasi apakah Minggu perlu didukung sebagai konfigurasi.
+3. **Jurnal unik dan guru pengganti.** Audit constraint unik dan alur pembuatan draft/substitusi agar snapshot terikat pada sesi yang benar dan tidak membuat jurnal duplikat.
+4. **Waktu dan zona waktu.** Detail kalender memakai `TIME`; snapshot menyimpan tanggal dan jam. Gunakan tipe yang konsisten dengan konvensi proyek dan waktu lokal sekolah.
+5. **Deduplikasi notifikasi.** Tentukan identitas stabil untuk sesi pengingat. Perubahan kalender tidak boleh mengirim notifikasi duplikat; jangan ubah `reminder_key` sebelum seluruh pemanggil dan data lama diaudit.
+6. **Konsistensi skema/status jurnal.** Verifikasi seluruh migration dan skema aktual terhadap model/controller. Jangan mengubah status jurnal atau enum sesi sebagai bagian dari fitur kalender tanpa kebutuhan terpisah.
+7. **Kalender awal dan pemetaan jadwal.** Admin harus memverifikasi jam tiap periode. Laporan dry-run harus menunjukkan jadwal cocok, tidak cocok, bentrok, atau perlu pemetaan manual.
+
+### Aturan operasional tanggal efektif
+
+- Kalender versi baru memiliki `berlaku_mulai` eksplisit.
+- Saat aktivasi, versi sebelumnya ditutup pada tanggal sebelum tanggal mulai versi baru.
+- Kalender baru dipakai untuk sesi yang belum memiliki snapshot dan tanggal sesinya berada dalam rentang versi baru.
+- Draft yang sudah dibuat mempertahankan snapshot lama, meskipun tanggal efektif kalender baru tiba. Sesi yang belum memiliki draft memakai versi yang berlaku pada tanggal sesi.
+- Sesi yang sudah dimulai tidak berubah waktu rencananya di tengah jalan karena snapshot sudah dibuat.
+- Untuk perubahan darurat pada hari yang sama, sesi/draft yang sudah memiliki snapshot tidak berubah; sesi yang belum memiliki draft dapat memakai kalender yang berlaku pada tanggal tersebut. UI harus memperingatkan dampak ini sebelum aktivasi.
+
+`berlaku_sampai` bersifat inklusif. Kalender tanpa tanggal akhir menggunakan `NULL`. Validasi overlap harus dilakukan dalam transaksi dan dilindungi dari aktivasi bersamaan; index tanggal membantu pencarian tetapi tidak dengan sendirinya mencegah overlap.
+
+## 10. Status
 
 Belum ada migration runtime, model, controller, service, UI, atau test yang dibuat/diubah pada tahap ini. Dokumen ini meminta review terhadap struktur, batasan, dan pertanyaan di atas sebelum implementasi.
