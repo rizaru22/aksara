@@ -186,18 +186,34 @@ Satu service resolver waktu harus menjadi sumber logika bagi:
 
 Hindari menyalin logika perhitungan periode di setiap controller.
 
-## 8. Strategi migrasi aman yang diusulkan
+## 8. Strategi database untuk lingkungan development
 
-1. Setelah spesifikasi ini disetujui, buat tabel kalender dan detail, serta kolom periode/snapshot yang nullable melalui migration additive.
-2. Seed atau buat satu kalender awal dari konfigurasi yang telah diverifikasi admin; jangan menebak pemetaan periode dari waktu jadwal.
-3. Buat laporan validasi yang menunjukkan jadwal mana yang dapat dipetakan dan mana yang memerlukan keputusan manual.
-4. Jalankan kompatibilitas baca: jadwal lama tetap menggunakan waktu lama; jadwal yang telah dipetakan menggunakan resolver kalender.
-5. Setelah seluruh data dan jalur aplikasi tervalidasi, baru pertimbangkan mewajibkan periode untuk jadwal baru.
-6. Jangan menghapus kolom lama dalam rilis awal.
-7. Tidak ada backfill jurnal historis dengan waktu yang tidak dapat dibuktikan.
-8. Rollback harus dapat mengembalikan aplikasi ke jalur waktu lama tanpa kehilangan data kalender yang baru dibuat.
+Pemilik produk mengonfirmasi bahwa AKSARA masih dalam tahap development dan data di hosting hanya untuk pengujian HTTPS. Karena itu, rancangan boleh merapikan ulang baseline migrasi tanpa mempertahankan kompatibilitas terhadap data uji lama. **Namun, tidak boleh menjalankan migration atau mengubah file migration sebelum dokumen final ini diperiksa dan disetujui.**
 
-## 9. Detail yang masih perlu diverifikasi saat audit implementasi
+Prinsip konsolidasi:
+1. Jadikan migration `create table` sebagai satu-satunya sumber definisi struktur awal setiap tabel. Kolom, tipe, default, nullable, index, unique constraint, dan foreign key harus didefinisikan langsung di migration pembuatan tabelnya.
+2. Jika migration `create table` yang ada sudah lebih dulu membuat tabel, gabungkan perubahan struktur berikutnya ke migration pembuat tabel itu, lalu hapus migration alter/expand yang menjadi redundan dalam baseline development.
+3. Pertahankan pemisahan file berdasarkan tabel atau kelompok domain yang jelas; jangan membuat satu file raksasa untuk seluruh skema. Urutan nama migration harus mencerminkan dependensi foreign key.
+4. Migration framework/infra seperti users, cache, jobs, permission tables, dan personal access tokens boleh tetap menjadi migration terpisah. Yang penting setiap tabel memiliki satu definisi baseline yang lengkap dan tidak ada perubahan struktur tabel yang tersebar ke migration alter lanjutan.
+5. Data awal/default aplikasi seperti pengaturan GPS adalah **data**, bukan struktur tabel. Pindahkan nilai awal tersebut ke seeder yang idempoten, bukan ke migration perubahan skema.
+6. `jurnal_mengajars.status_sesi` harus langsung didefinisikan dengan tipe string dan default status workflow saat ini (`draft`) di migration `create jurnal_mengajars`; migration ekspansi status lama tidak diperlukan dalam baseline development.
+7. Struktur kalender baru (dua tabel kalender dan kolom periode/snapshot pada `jadwal_pelajarans` serta `jurnal_mengajars`) harus langsung masuk ke migration create-table masing-masing, bukan dibuat melalui migration alter terpisah.
+8. Setelah baseline konsolidasi disetujui, uji fresh database dengan `migrate:fresh` dan seeder; pastikan urutan FK benar, skema berhasil dibangun dari nol, serta seluruh migration dan seeder lolos pengujian. Ini akan menghapus data pada database target, jadi hanya boleh dijalankan di database development/test yang dipastikan aman.
+9. Karena tidak perlu mempertahankan data uji lama, tidak diperlukan backfill historis. Data lama tidak dijadikan alasan untuk mempertahankan kolom/migration legacy yang sudah tidak relevan. Tetap jangan menjalankan migration atau `migrate:fresh` sebelum persetujuan eksplisit atas spesifikasi final.
+
+## 9. Inventaris migration yang ditemukan
+
+Pada branch `feature/kalender-jam-pelajaran`, direktori `database/migrations` memuat migration inti Laravel, migration permission, satu migration domain besar, dan beberapa migration lanjutan. Contoh yang perlu dikonsolidasikan ke baseline development:
+
+- `2026_08_12_114718_create_aksara_domain_tables.php` — sudah membuat banyak tabel domain, tetapi `jurnal_mengajars.status_sesi` masih memakai enum status lama.
+- `2026_10_12_000001_add_attendance_gps_accuracy_setting.php` dan `2026_10_12_000002_add_journal_gps_accuracy_setting.php` — menambahkan data default ke tabel `settings`, bukan mengubah struktur tabel; pindahkan ke seeder idempoten.
+- `2026_10_12_000001_create_attendance_corrections_table.php` dan `2026_10_12_120000_create_pengajuan_guru_penggantis_table.php` — tabel domain tambahan yang dapat tetap memiliki migration create-table tersendiri.
+- `2026_10_23_000001_expand_jurnal_status_sesi_for_four_stage_workflow.php` — perubahan tipe/status yang harus dilipat ke migration create `jurnal_mengajars` pada baseline development.
+- `2026_10_24_000000_create_notifications_table.php` — tabel infra notifikasi dengan guard `hasTable`; perlu diputuskan apakah tabel ini dijamin hanya dikelola oleh migration aplikasi atau dapat dibuat oleh mekanisme lain sebelum membuat migration baseline yang deterministik.
+
+Ada dua file dengan timestamp prefix `2026_10_12_000001` (`add_attendance_gps_accuracy_setting` dan `create_attendance_corrections_table`). Walaupun Laravel biasanya mengurutkan nama file, timestamp yang sama membuat urutan kurang jelas; rapikan timestamp baseline agar dependensi dan urutan migration deterministik.
+
+
 
 Hal-hal berikut wajib diperiksa sebelum migration:
 
@@ -220,6 +236,6 @@ Hal-hal berikut wajib diperiksa sebelum migration:
 
 `berlaku_sampai` bersifat inklusif. Kalender tanpa tanggal akhir menggunakan `NULL`. Validasi overlap harus dilakukan dalam transaksi dan dilindungi dari aktivasi bersamaan; index tanggal membantu pencarian tetapi tidak dengan sendirinya mencegah overlap.
 
-## 10. Status
+## 11. Status
 
-Belum ada migration runtime, model, controller, service, UI, atau test yang dibuat/diubah pada tahap ini. Dokumen ini meminta review terhadap struktur, batasan, dan pertanyaan di atas sebelum implementasi.
+Belum ada migration runtime, model, controller, service, UI, atau test yang dibuat/diubah sebagai bagian dari fitur kalender. Dokumen ini juga mengusulkan konsolidasi migration baseline development, tetapi belum ada file migration yang diubah atau dihapus. Tunggu pemeriksaan dan persetujuan pemilik produk sebelum implementasi.
