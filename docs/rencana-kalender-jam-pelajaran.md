@@ -55,8 +55,10 @@ Menyediakan kalender jam pelajaran sekolah yang dapat dikonfigurasi per hari, te
 
 ### Tahap 3 — Lapisan resolusi waktu
 
-- Implementasikan satu service untuk menyelesaikan waktu sesi berdasarkan tanggal, jadwal, dan kalender yang berlaku.
-- Tambahkan pengujian unit untuk pergantian kalender, sesi berjalan, hari berbeda, dan jadwal multi-periode.
+- Implementasikan satu service untuk menyelesaikan waktu sesi berdasarkan tanggal, jadwal, dan kalender aktif.
+- Jadwal tanpa rentang periode tetap memakai `jam_mulai`/`jam_selesai` lama.
+- Jadwal berbasis periode harus memiliki kedua batas periode, rentang lengkap tanpa celah, dan waktu tiap periode yang valid serta tidak tumpang tindih.
+- Tambahkan pengujian untuk jalur jadwal lama dan validasi rentang periode; pengujian integrasi DB untuk kalender aktif masih perlu dilengkapi.
 - Jangan ubah semua controller sekaligus.
 
 ### Tahap 4 — Integrasi bertahap
@@ -87,3 +89,10 @@ Menyediakan kalender jam pelajaran sekolah yang dapat dikonfigurasi per hari, te
 ## Catatan
 
 Dokumen ini adalah rancangan awal berdasarkan pemeriksaan kode pada branch `main`. Struktur tabel final, strategi backfill, dan detail kompatibilitas belum diputuskan. Tidak ada migration atau perubahan kode runtime pada tahap ini.
+
+
+## Catatan progres Tahap 3
+
+Pada branch `feature/kalender-jam-pelajaran`, service `App\\Services\\KalenderJamPelajaranResolver` telah ditambahkan. Service menerima jadwal dan tanggal sesi, mempertahankan jalur kompatibilitas untuk jadwal lama, atau mengambil jam mulai/selesai dari rentang periode pada kalender berstatus `AKTIF`. Service menolak konfigurasi periode yang tidak lengkap, rentang tidak valid, periode hilang, jam periode tidak valid, atau periode bertumpang tindih.
+
+Unit test awal ditambahkan untuk jalur jadwal lama dan validasi input periode. Pengujian belum dijalankan pada lingkungan PHP proyek ini. Integrasi controller, snapshot atomik ketika draft pertama dibuat, layanan aktivasi transaksional yang menjamin hanya satu kalender aktif, serta tes database untuk periode kalender masih belum selesai. Jangan menganggap Tahap 3 sudah terverifikasi hanya karena berkas telah dibuat.
