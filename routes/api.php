@@ -119,6 +119,8 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
         Route::post('/', [KalenderJamPelajaranController::class, 'store']);
         Route::get('/{calendar}', [KalenderJamPelajaranController::class, 'show'])->whereNumber('calendar');
         Route::patch('/{calendar}', [KalenderJamPelajaranController::class, 'update'])->whereNumber('calendar');
+        Route::get('/periods/template', [KalenderJamPelajaranController::class, 'periodsTemplate']);
+        Route::post('/{calendar}/periods/import', [KalenderJamPelajaranController::class, 'importPeriods'])->whereNumber('calendar');
         Route::put('/{calendar}/periods', [KalenderJamPelajaranController::class, 'savePeriods'])->whereNumber('calendar');
         Route::post('/{calendar}/activate', [KalenderJamPelajaranController::class, 'activate'])->whereNumber('calendar');
         Route::post('/{calendar}/deactivate', [KalenderJamPelajaranController::class, 'deactivate'])->whereNumber('calendar');
