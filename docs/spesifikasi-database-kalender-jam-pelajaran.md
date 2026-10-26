@@ -1,6 +1,6 @@
 # Spesifikasi Database — Kalender Jam Pelajaran AKSARA
 
-Status: Tahap 2 — spesifikasi untuk pemeriksaan pemilik produk; belum disetujui untuk implementasi  
+Status: Revisi desain berdasarkan masukan pemilik produk — model aktif/nonaktif  
 Branch: `feature/kalender-jam-pelajaran`
 
 ## 1. Tujuan dan batasan
@@ -22,30 +22,24 @@ Dokumen ini adalah usulan desain, bukan perintah migrasi. Tidak ada migration ru
 
 Keputusan pemilik produk:
 1. **Istirahat berupa jeda antarperiode**, bukan entitas periode tersendiri.
-2. **Aktivasi kalender berdasarkan tanggal efektif** (`berlaku_mulai`), bukan jam-menit. Kalender baru tidak mengubah snapshot sesi/jurnal yang sudah dibuat.
+2. **Aktivasi kalender melalui status aktif/nonaktif**. Hanya satu kalender aktif untuk sekolah pada satu waktu; perubahan status tidak mengubah snapshot sesi/jurnal yang sudah dibuat.
 3. **Snapshot dibuat saat draft jurnal pertama kali dibuat**. Draft yang sudah memiliki snapshot mempertahankan konteks kalender dan waktu tersebut walaupun kalender baru kemudian diaktifkan.
 
 Keputusan teknis dalam rancangan ini:
 - Rentang periode pada satu jadwal harus **kontinu**. Nomor periode awal tidak boleh lebih besar dari nomor akhir, dan seluruh nomor dalam rentang harus tersedia pada hari itu.
-- Kalender dipilih menurut tanggal sesi. Aktivasi ditolak jika rentang tanggal kalender aktif bertumpang tindih.
+- Kalender aktif menjadi acuan untuk sesi yang belum memiliki snapshot. Aktivasi kalender baru harus menonaktifkan kalender aktif sebelumnya dalam satu transaksi.
 - Riwayat jurnal lama yang tidak memiliki snapshot dibiarkan `NULL`; sistem tidak mengarang waktu rencana historis.
 - Jadwal lama tetap kompatibel melalui `jam_mulai`/`jam_selesai` sampai proses pemetaan dan migrasi data disetujui.
 
 ## 3. Keputusan desain teknis
 
-### 2.1 Kalender berversi
+### 2.1 Kalender aktif/nonaktif
 
-Jangan mengubah isi kalender yang telah berlaku. Setiap perubahan jadwal waktu menghasilkan versi kalender baru dengan:
-- nama/label;
-- status;
-- tanggal dan waktu mulai berlaku;
-- metadata pembuat dan waktu pembuatan.
-
-Hanya satu versi yang boleh berlaku pada satu tanggal/waktu untuk satu lingkup sekolah. Kalender yang telah digunakan tidak dihapus secara fisik.
+Kalender memiliki status `AKTIF` atau `NONAKTIF`, tanpa tanggal mulai/akhir berlaku. Hanya satu kalender boleh berstatus `AKTIF` untuk sekolah pada satu waktu. Kalender nonaktif tetap tersimpan dan dapat diaktifkan kembali. Saat mengaktifkan kalender lain, aplikasi harus menonaktifkan kalender aktif sebelumnya dan mengaktifkan kalender pilihan dalam satu transaksi. Kalender yang telah digunakan tidak dihapus secara fisik; snapshot jurnal mempertahankan waktu yang telah dipakai.
 
 ### 2.2 Periode kalender
 
-Setiap versi mempunyai detail periode per hari:
+Setiap kalender mempunyai detail periode per hari:
 - nama hari;
 - nomor periode;
 - jam mulai;
@@ -86,27 +80,22 @@ Nama tabel/kolom berikut merupakan rancangan yang diajukan untuk pemeriksaan; be
 
 ### A. `kalender_jam_pelajaran`
 
-Mewakili versi kalender sekolah.
+Mewakili konfigurasi kalender sekolah.
 
 | Kolom | Usulan tipe | Aturan |
 |---|---|---|
 | `id` | bigint unsigned | Primary key |
 | `nama` | varchar(100) | Label versi, wajib |
-| `berlaku_mulai` | date | Tanggal awal versi berlaku, wajib |
-| `berlaku_sampai` | date nullable | Tanggal akhir inklusif; null berarti belum ditutup |
-| `status` | varchar(16) | `DRAFT`, `AKTIF`, `ARSIP`; validasi nilai di aplikasi |
+| `status` | varchar(16) | `AKTIF` atau `NONAKTIF`; default `NONAKTIF` |
 | `catatan` | text nullable | Alasan perubahan |
 | `dibuat_oleh` | foreignId nullable | FK ke users, nullOnDelete |
 | `created_at/updated_at` | timestamps | Audit waktu |
 
 Index yang diusulkan:
-- index `(berlaku_mulai, berlaku_sampai)` untuk pencarian versi berdasarkan tanggal;
 - index `status`;
 - FK `dibuat_oleh` ke PK `users` dengan `SET NULL`/`nullOnDelete`, setelah tipe PK diverifikasi.
 
-`berlaku_mulai` tidak perlu unique: beberapa draft boleh memiliki tanggal yang sama, tetapi hanya boleh ada satu kalender aktif yang cocok untuk satu tanggal. Aturan rentang aktif dijaga layanan aktivasi dalam transaksi.
-
-Aturan: kalender draft dapat diedit. Kalender yang pernah aktif tidak diedit isinya; buat versi baru. Saat versi baru diaktifkan, tutup versi sebelumnya pada tanggal sebelum tanggal mulai versi baru. Aplikasi harus mencegah rentang berlaku bertumpang tindih. Karena unique constraint sederhana tidak dapat menjamin tidak ada overlap rentang tanggal pada semua DB yang dipakai, validasi dilakukan dalam transaksi dengan penguncian yang sesuai.
+Kalender nonaktif dapat diedit. Saat kalender baru diaktifkan, layanan harus menonaktifkan kalender aktif sebelumnya dan mengaktifkan kalender pilihan dalam satu transaksi. Jadwal yang belum memiliki snapshot menggunakan kalender aktif saat waktu sesi diselesaikan; jurnal yang sudah memiliki snapshot tidak berubah.
 
 ### B. `kalender_jam_pelajaran_detail`
 
@@ -144,7 +133,7 @@ Kolom lama `jam_mulai` dan `jam_selesai` tetap dipertahankan sementara. Saat fas
 - jadwal baru berbasis periode menggunakan kalender yang berlaku untuk tanggal sesi;
 - jangan mengasumsikan semua data lama bisa dipetakan otomatis ke periode tanpa pengecekan bentrok dan kecocokan waktu.
 
-Perlu keputusan tambahan apakah `kalender_id` disimpan pada jadwal sebagai versi tetap atau kalender dipilih menurut tanggal sesi. Rekomendasi awal: jadwal mingguan menyimpan rentang nomor periode, dan kalender dipilih menurut tanggal sesi; sesi yang sudah dimulai mengambil snapshot versi kalender. Ini mendukung perubahan kalender yang berlaku untuk sesi mendatang tanpa mengubah jadwal mingguan satu per satu.
+Jadwal mingguan menyimpan rentang nomor periode, sedangkan kalender aktif dipilih ketika waktu sesi perlu diselesaikan. Sesi/draft yang sudah memiliki snapshot tetap menggunakan snapshot tersebut. Ini mendukung perubahan kalender untuk sesi mendatang tanpa mengubah jadwal mingguan satu per satu.
 
 ### `jurnal_mengajars`
 
@@ -225,16 +214,14 @@ Hal-hal berikut wajib diperiksa sebelum migration:
 6. **Konsistensi skema/status jurnal.** Verifikasi seluruh migration dan skema aktual terhadap model/controller. Jangan mengubah status jurnal atau enum sesi sebagai bagian dari fitur kalender tanpa kebutuhan terpisah.
 7. **Kalender awal dan pemetaan jadwal.** Admin harus memverifikasi jam tiap periode. Laporan dry-run harus menunjukkan jadwal cocok, tidak cocok, bentrok, atau perlu pemetaan manual.
 
-### Aturan operasional tanggal efektif
+### Aturan operasional aktivasi
 
-- Kalender versi baru memiliki `berlaku_mulai` eksplisit.
-- Saat aktivasi, versi sebelumnya ditutup pada tanggal sebelum tanggal mulai versi baru.
-- Kalender baru dipakai untuk sesi yang belum memiliki snapshot dan tanggal sesinya berada dalam rentang versi baru.
-- Draft yang sudah dibuat mempertahankan snapshot lama, meskipun tanggal efektif kalender baru tiba. Sesi yang belum memiliki draft memakai versi yang berlaku pada tanggal sesi.
+- Kalender baru dibuat dengan status `NONAKTIF` dan dapat dikonfigurasi.
+- Saat aktivasi, dalam satu transaksi kalender aktif sebelumnya diubah menjadi `NONAKTIF`, lalu kalender pilihan menjadi `AKTIF`.
+- Hanya kalender aktif yang digunakan untuk menyelesaikan waktu sesi yang belum memiliki snapshot.
+- Draft yang sudah memiliki snapshot mempertahankan waktu dan kalender snapshot lama meskipun kalender aktif diganti.
 - Sesi yang sudah dimulai tidak berubah waktu rencananya di tengah jalan karena snapshot sudah dibuat.
-- Untuk perubahan darurat pada hari yang sama, sesi/draft yang sudah memiliki snapshot tidak berubah; sesi yang belum memiliki draft dapat memakai kalender yang berlaku pada tanggal tersebut. UI harus memperingatkan dampak ini sebelum aktivasi.
-
-`berlaku_sampai` bersifat inklusif. Kalender tanpa tanggal akhir menggunakan `NULL`. Validasi overlap harus dilakukan dalam transaksi dan dilindungi dari aktivasi bersamaan; index tanggal membantu pencarian tetapi tidak dengan sendirinya mencegah overlap.
+- UI harus memberi peringatan bahwa pergantian kalender hanya memengaruhi sesi yang belum memiliki snapshot.
 
 ## 11. Status implementasi tahap database
 
