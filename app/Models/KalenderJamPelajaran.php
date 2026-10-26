@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class KalenderJamPelajaran extends Model
 {
+    protected $table = 'kalender_jam_pelajaran';
+
     public const STATUS_AKTIF = 'AKTIF';
     public const STATUS_NONAKTIF = 'NONAKTIF';
 
