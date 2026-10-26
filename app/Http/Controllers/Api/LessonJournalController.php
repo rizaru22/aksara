@@ -130,16 +130,29 @@ class LessonJournalController extends Controller
                 } catch (\RuntimeException $exception) {
                     throw new ConflictHttpException($exception->getMessage(), $exception);
                 }
-
-                if (AgendaSekolah::query()
-                    ->whereDate('tanggal', $now->toDateString())
-                    ->where('scope', 'SEKOLAH')
-                    ->where('override_kbm', true)
-                    ->where('jam_mulai', '<', $resolved['jam_selesai']->format('H:i:s'))
-                    ->where('jam_selesai', '>', $resolved['jam_mulai']->format('H:i:s'))
-                    ->exists()) {
-                    throw new ConflictHttpException('KBM pada waktu sesi ini ditangguhkan oleh agenda sekolah.');
+            } elseif ($journal->waktu_rencana_mulai && $journal->waktu_rencana_selesai) {
+                // Existing snapshots are authoritative even if the active calendar changed.
+                $resolved = [
+                    'jam_mulai' => Carbon::parse($journal->waktu_rencana_mulai, config('app.timezone')),
+                    'jam_selesai' => Carbon::parse($journal->waktu_rencana_selesai, config('app.timezone')),
+                ];
+            } else {
+                // Legacy drafts without snapshots remain compatible and are not backfilled here.
+                try {
+                    $resolved = $calendarResolver->resolve($lockedSchedule, $now);
+                } catch (\RuntimeException $exception) {
+                    throw new ConflictHttpException($exception->getMessage(), $exception);
                 }
+            }
+
+            if (AgendaSekolah::query()
+                ->whereDate('tanggal', $now->toDateString())
+                ->where('scope', 'SEKOLAH')
+                ->where('override_kbm', true)
+                ->where('jam_mulai', '<', $resolved['jam_selesai']->format('H:i:s'))
+                ->where('jam_selesai', '>', $resolved['jam_mulai']->format('H:i:s'))
+                ->exists()) {
+                throw new ConflictHttpException('KBM pada waktu sesi ini ditangguhkan oleh agenda sekolah.');
             }
 
             $journal ??= new JurnalMengajar;
