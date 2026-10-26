@@ -128,7 +128,7 @@ class TeacherScheduleController extends Controller
             $hasJournal = $journalStatus !== null;
             $insideSession = $journalStartsAt && $scheduleEndsAt && ! $now->lt($journalStartsAt) && ! $now->gt($scheduleEndsAt);
             $insideFinalizationWindow = $finalizationStartsAt && $scheduleEndsAt && ! $now->lt($finalizationStartsAt) && ! $now->gt($scheduleEndsAt);
-            $canFillJournal = $hasOpenDraft || (! $hasJournal && $insideSession && ! $timeResolutionError);
+            $canFillJournal = ! $timeResolutionError && ($hasOpenDraft || (! $hasJournal && $insideSession));
             $availabilityMessage = $timeResolutionError
                 ? 'Waktu jadwal belum dapat ditentukan: '.$timeResolutionError
                 : ($hasOpenDraft
@@ -143,7 +143,7 @@ class TeacherScheduleController extends Controller
                     : ($now->lt($journalStartsAt)
                         ? 'Draf jurnal dapat diisi mulai pukul '.$journalStartsAt->format('H:i').'.'
                         : ($now->gt($scheduleEndsAt) ? 'Waktu pengisian draf berakhir pukul '.$scheduleEndsAt->format('H:i').'.' : null))));
-            $canFinalizeJournal = $hasOpenDraft || (! $hasJournal && $insideFinalizationWindow && ! $timeResolutionError);
+            $canFinalizeJournal = ! $timeResolutionError && ($hasOpenDraft || (! $hasJournal && $insideFinalizationWindow));
             if ($timeResolutionError) {
                 $finalizationMessage = 'Finalisasi tidak tersedia karena waktu jadwal belum dapat ditentukan.';
             } elseif ($hasOpenDraft) {
