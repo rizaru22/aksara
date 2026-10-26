@@ -29,7 +29,7 @@ class AdminReportController extends Controller
      * Menyediakan laporan admin untuk periode harian, mingguan, atau bulanan berdasarkan filter yang dipilih.
      * Kontrol ini memanggil helper yang sesuai lalu mereturn payload yang siap ditampilkan di UI rekap admin.
      */
-    public function index(Request $request, CycleScheduleService $cycles)
+    public function index(Request $request, CycleScheduleService $cycles, KalenderJamPelajaranResolver $calendarResolver)
     {
         abort_unless($request->user()->hasRole('admin') || $request->user()->can('view-dashboard-kurikulum'), 403);
 
@@ -41,8 +41,8 @@ class AdminReportController extends Controller
         ]);
 
         $response = match ($filters['period']) {
-            'daily' => $this->daily($filters['date'], $cycles, $filters['class_id'] ?? null),
-            'weekly' => $this->weekly($filters['date'], $cycles, $filters['class_id'] ?? null),
+            'daily' => $this->daily($filters['date'], $cycles, $calendarResolver, $filters['class_id'] ?? null),
+            'weekly' => $this->weekly($filters['date'], $cycles, $calendarResolver, $filters['class_id'] ?? null),
             'monthly' => $this->monthly($filters['month']),
         };
 
@@ -89,7 +89,7 @@ class AdminReportController extends Controller
     /**
      * Menyusun data laporan harian untuk semua guru, termasuk status kehadiran, cuti, libur, dan sesi kelas yang berjalan.
      */
-    private function daily(string $date, CycleScheduleService $cycles, ?int $classId = null): array
+    private function daily(string $date, CycleScheduleService $cycles, KalenderJamPelajaranResolver $calendarResolver, ?int $classId = null): array
     {
         $day = Carbon::parse($date, config('app.timezone'))->startOfDay();
         $teachers = $this->userRoster();
@@ -122,7 +122,7 @@ class AdminReportController extends Controller
     /**
      * Menghitung ringkasan satu pekan kerja, termasuk durasi hadir, daftar guru yang belum mengisi jurnal, dan status kelas.
      */
-    private function weekly(string $date, CycleScheduleService $cycles, ?int $classId = null): array
+    private function weekly(string $date, CycleScheduleService $cycles, KalenderJamPelajaranResolver $calendarResolver, ?int $classId = null): array
     {
         $start = Carbon::parse($date, config('app.timezone'))->startOfWeek(Carbon::MONDAY)->startOfDay();
         $end = $start->copy()->addDays(6)->endOfDay();
