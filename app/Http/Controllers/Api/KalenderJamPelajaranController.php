@@ -81,7 +81,7 @@ class KalenderJamPelajaranController extends Controller
 
     public function periodsTemplate(SimpleXlsx $xlsx)
     {
-        if (! class_exists(\\ZipArchive::class)) {
+        if (! class_exists(\ZipArchive::class)) {
             return response()->json(['message' => 'Aktifkan ekstensi PHP zip untuk membuat template Excel.'], 503);
         }
 
@@ -102,7 +102,7 @@ class KalenderJamPelajaranController extends Controller
         }
 
         $request->validate(['file' => 'required|file|mimes:xlsx|max:10240']);
-        if (! class_exists(\\ZipArchive::class)) {
+        if (! class_exists(ZipArchive::class)) {
             return response()->json(['message' => 'Aktifkan ekstensi PHP zip untuk mengimpor file Excel.'], 503);
         }
 
