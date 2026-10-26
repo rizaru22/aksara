@@ -11,14 +11,11 @@ return new class extends Migration
         Schema::create('kalender_jam_pelajaran', function (Blueprint $table): void {
             $table->id();
             $table->string('nama', 100);
-            $table->date('berlaku_mulai');
-            $table->date('berlaku_sampai')->nullable();
-            $table->string('status', 16)->default('DRAFT');
+            $table->string('status', 16)->default('NONAKTIF');
             $table->text('catatan')->nullable();
             $table->foreignId('dibuat_oleh')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 
-            $table->index(['berlaku_mulai', 'berlaku_sampai'], 'kalender_jam_pelajaran_validity_idx');
             $table->index('status', 'kalender_jam_pelajaran_status_idx');
         });
 
