@@ -141,5 +141,7 @@ Layanan `App\\Services\\KalenderJamPelajaranService` juga telah ditambahkan untu
 | AT-10 | Kegagalan provider setelah kunci didaftarkan | Tidak ada retry otomatis; kegagalan dicatat, tanpa risiko duplikasi otomatis | Belum diuji |
 | AT-11 | Jadwal baru berbasis periode bentrok dengan jadwal periode lain untuk guru/kelas sama | Konflik rentang nomor periode ditolak | Implementasi tersedia; belum diuji |
 | AT-12 | Jadwal campuran periode dan legacy | Konflik dibandingkan dengan waktu hasil resolver pada hari sekolah yang sama | Implementasi tersedia; belum diuji |
+| AT-13 | Daftar/detail jadwal master diminta dengan tanggal tertentu | API menyertakan waktu hasil resolusi tanpa mengubah kolom jam legacy dan menolak tanggal yang tidak sesuai hari jadwal melalui indikator kesalahan | Implementasi tersedia; belum diuji |
+| AT-14 | Impor jadwal legacy berkonflik dengan jadwal berbasis periode yang sudah ada | Konflik dihitung menggunakan waktu hasil resolver, bukan nilai jam placeholder | Implementasi tersedia; belum diuji |
 
 Catatan: pemeriksaan dashboard dan laporan di atas adalah integrasi kode. Status “belum diuji” harus tetap dipertahankan sampai tes dijalankan di environment proyek; jangan menyimpulkan kelulusan dari inspeksi kode saja.
