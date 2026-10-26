@@ -235,9 +235,11 @@ class AcademicImportController extends Controller
             ->where('tahun_ajaran_id', $record['tahun_ajaran_id'])
             ->where('semester', $record['semester'])
             ->where('hari', $record['hari'])
-            ->where(fn ($query) => $query->whereNull('siklus_minggu')
-                ->orWhereNull('siklus_minggu')
-                ->orWhere('siklus_minggu', $record['siklus_minggu']))
+            ->where(function ($query) use ($record): void {
+                if ($record['siklus_minggu'] !== null) {
+                    $query->whereNull('siklus_minggu')->orWhere('siklus_minggu', $record['siklus_minggu']);
+                }
+            })
             ->where(fn ($query) => $query->where('user_id', $record['user_id'])->orWhere('kelas_id', $record['kelas_id']))
             ->get();
 
