@@ -1,10 +1,10 @@
 <?php
 
-namespace Tests\\Unit;
+namespace Tests\Unit;
 
-use App\\Models\\JadwalPelajaran;
-use App\\Services\\KalenderJamPelajaranResolver;
-use PHPUnit\\Framework\\TestCase;
+use App\Models\JadwalPelajaran;
+use App\Services\KalenderJamPelajaranResolver;
+use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 class KalenderJamPelajaranResolverTest extends TestCase
