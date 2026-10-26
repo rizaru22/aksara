@@ -1335,7 +1335,7 @@ renderStudentPage();
             ? `${htmlSafe(journal.jam_mulai)}–${htmlSafe(journal.jam_selesai)}`
             : '—';
 
-        const presensiRows = (journal.presensi_siswas || []).map((p) => {
+        const presensiRows = (journal.presensi_siswas || []).map((p,index) => {
             const statusColors = { HADIR: 'success', SAKIT: 'info', IZIN: 'warning', ALPHA: 'danger', CABUT: 'secondary' };
             const color = statusColors[p.status] || 'secondary';
             return `<tr>
