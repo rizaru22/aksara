@@ -232,31 +232,58 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
         }));
     }
     async function openCalendars(calendarId = null) {
-        let response;
+        let calendarsResponse;
+        let detailResponse = null;
         try {
-            response = await api(calendarId ? `/api/v1/academic/calendars/${calendarId}` : '/api/v1/academic/calendars');
+            calendarsResponse = await api('/api/v1/academic/calendars');
+            if (calendarId) detailResponse = await api(`/api/v1/academic/calendars/${calendarId}`);
         } catch (error) {
             setFeature('Kalender Jam Pelajaran', `<div class="alert alert-danger"><h2 class="h6">Kalender gagal dimuat</h2><p class="mb-2">${htmlSafe(error.message || 'Terjadi kesalahan saat memuat kalender.')}</p><button type="button" class="btn btn-outline-primary btn-sm" id="calendarRetry">Coba lagi</button></div>`);
             $('calendarRetry')?.addEventListener('click', () => openCalendars(calendarId));
             return;
         }
-        const selected = calendarId ? response.data : null;
-        if (calendarId && !selected) throw new Error('Kalender tidak ditemukan.');
-        const calendars = calendarId ? [selected] : (response.data || []);
-        const active = calendars.find((calendar) => calendar.status === 'AKTIF');
-        const list = calendars.map((calendar) => `<tr><td>${htmlSafe(calendar.nama)}</td><td><span class="badge ${calendar.status === 'AKTIF' ? 'text-bg-success' : 'text-bg-secondary'}">${htmlSafe(calendar.status)}</span></td><td>${(calendar.detail_periode || []).length}</td><td class="text-nowrap"><button class="btn btn-sm btn-outline-primary" data-calendar-edit="${calendar.id}">Atur periode</button>${calendar.status === 'AKTIF' ? ` <button class="btn btn-sm btn-outline-warning" data-calendar-deactivate="${calendar.id}">Nonaktifkan</button>` : ` <button class="btn btn-sm btn-success" data-calendar-activate="${calendar.id}">Aktifkan</button>`}</td></tr>`).join('');
+
+        const calendars = calendarsResponse.data || [];
+        const selected = calendarId ? detailResponse?.data : null;
+        if (calendarId && !selected) {
+            setFeature('Kalender Jam Pelajaran', '<div class="alert alert-danger">Kalender tidak ditemukan.</div>');
+            return;
+        }
+        const list = calendars.map((calendar) => {
+            const isSelected = String(calendar.id) === String(calendarId);
+            return `<tr class="${isSelected ? 'table-active' : ''}">
+                <td><strong>${htmlSafe(calendar.nama)}</strong>${isSelected ? ' <span class="badge text-bg-primary">Dipilih</span>' : ''}</td>
+                <td><span class="badge ${calendar.status === 'AKTIF' ? 'text-bg-success' : 'text-bg-secondary'}">${htmlSafe(calendar.status)}</span></td>
+                <td>${(calendar.detail_periode || []).length}</td>
+                <td class="text-nowrap"><button class="btn btn-sm ${isSelected ? 'btn-secondary' : 'btn-outline-primary'}" data-calendar-edit="${calendar.id}">${isSelected ? 'Terpilih' : 'Kelola detail'}</button>${calendar.status === 'AKTIF' ? ` <button class="btn btn-sm btn-outline-warning" data-calendar-deactivate="${calendar.id}">Nonaktifkan</button>` : ` <button class="btn btn-sm btn-success" data-calendar-activate="${calendar.id}">Aktifkan</button>`}</td>
+            </tr>`;
+        }).join('');
         const periods = (selected?.detail_periode || []).map((period) => ({...period, jam_mulai: String(period.jam_mulai).slice(0,5), jam_selesai: String(period.jam_selesai).slice(0,5)}));
         const periodRows = periods.map((period, index) => calendarPeriodRow(period, index)).join('');
+
         setFeature('Kalender Jam Pelajaran', `
-            ${selected ? '<button class="btn btn-outline-secondary btn-sm mb-3" type="button" id="calendarBackToList"><i class="bi bi-arrow-left"></i> Kembali ke daftar kalender</button>' : ''}
-            <div class="alert alert-info small">Atur jam tiap periode per hari. Jeda istirahat cukup dibuat sebagai selisih waktu antarkolom periode; tidak perlu dibuat sebagai periode tersendiri. Jadwal periode 1–3 otomatis menggunakan jam mulai periode 1 dan jam selesai periode 3.</div>
-            <form id="calendarCreateForm" class="card mb-3"><div class="card-body"><h2 class="h6">Buat kalender</h2><div class="row g-2"><div class="col-md-4"><label class="form-label">Nama kalender</label><input class="form-control" name="nama" maxlength="100" required></div><div class="col-md-6"><label class="form-label">Catatan (opsional)</label><input class="form-control" name="catatan"></div><div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100">Buat</button></div></div></div></form>
+            <form id="calendarCreateForm" class="card mb-3"><div class="card-body"><h2 class="h6">Buat kalender</h2><div class="row g-2"><div class="col-md-4"><label class="form-label">Nama kalender</label><input class="form-control" name="nama" maxlength="100" required></div><div class="col-md-6"><label class="form-label">Catatan (opsional)</label><input class="form-control" name="catatan"></div><div class="col-md-2 d-flex align-items-end"><button class="btn btn-success w-100" type="submit"><i class="bi bi-plus-lg"></i> Tambah data</button></div></div></div></form>
+
+            <div class="card mb-3"><div class="card-header"><strong>Daftar Kalender</strong></div><div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th>Nama</th><th>Status</th><th>Jumlah detail periode</th><th>Aksi</th></tr></thead><tbody>${list || '<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada kalender. Buat kalender di atas.</td></tr>'}</tbody></table></div></div>
+
             ${selected ? `
-                <form id="calendarPeriodsForm" class="card mb-3"><div class="card-body"><div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><div><h2 class="h6 mb-1">Periode: ${htmlSafe(selected.nama)}</h2><div class="small text-secondary">Status: ${htmlSafe(selected.status)}. Kalender aktif harus dinonaktifkan sebelum periode diubah.</div></div><div class="d-flex flex-wrap gap-2"><button class="btn btn-outline-success btn-sm" type="button" id="calendarImportTemplate">Unduh template Excel</button><button class="btn btn-outline-success btn-sm" type="button" id="calendarImportExcel" ${selected.status === 'AKTIF' ? 'disabled' : ''}>Impor Excel</button><input class="d-none" type="file" id="calendarImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"><button class="btn btn-outline-secondary btn-sm" type="button" id="calendarAddPeriod" ${selected.status === 'AKTIF' ? 'disabled' : ''}>Tambah periode</button><button class="btn btn-primary btn-sm" type="submit" ${selected.status === 'AKTIF' ? 'disabled' : ''}>Simpan periode</button></div></div><div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Hari</th><th>Nomor periode</th><th>Jam mulai</th><th>Jam selesai</th><th>Label (opsional)</th><th></th></tr></thead><tbody id="calendarPeriodRows">${periodRows || calendarPeriodRow({hari:'Senin',nomor_periode:1,jam_mulai:'07:30',jam_selesai:'08:15',label:''},0)}</tbody></table></div></div></form>
-            ` : '' }
-            <div class="card"><div class="card-header"><strong>Daftar kalender</strong></div><div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th>Nama</th><th>Status</th><th>Jumlah detail periode</th><th>Aksi</th></tr></thead><tbody>${list || '<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada kalender. Buat kalender di atas.</td></tr>'}</tbody></table></div></div>
+                <div class="card mb-3"><div class="card-body">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                        <div><h2 class="h6 mb-1">Detail Kalender: ${htmlSafe(selected.nama)}</h2><div class="small text-secondary">Status: ${htmlSafe(selected.status)}. Kalender aktif harus dinonaktifkan sebelum periode diubah.</div></div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-outline-primary btn-sm" type="button" id="calendarImportTemplate"><i class="bi bi-download"></i> Template Excel</button>
+                            <button class="btn btn-outline-success btn-sm" type="button" id="calendarImportExcel" ${selected.status === 'AKTIF' ? 'disabled' : ''}><i class="bi bi-upload"></i> Import Excel</button>
+                            <input class="d-none" type="file" id="calendarImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+                            <button class="btn btn-success btn-sm" type="button" id="calendarAddPeriod" ${selected.status === 'AKTIF' ? 'disabled' : ''}><i class="bi bi-plus-lg"></i> Tambah data</button>
+                            <button class="btn btn-primary btn-sm" type="submit" form="calendarPeriodsForm" ${selected.status === 'AKTIF' ? 'disabled' : ''}><i class="bi bi-save"></i> Simpan periode</button>
+                        </div>
+                    </div>
+                    <div class="alert alert-info small mb-0">Atur jam tiap periode per hari. Jeda istirahat cukup dibuat sebagai selisih waktu antarkolom periode; tidak perlu dibuat sebagai periode tersendiri. Jadwal periode 1–3 otomatis menggunakan jam mulai periode 1 dan jam selesai periode 3.</div>
+                </div></div>
+                <form id="calendarPeriodsForm" class="card mb-3"><div class="card-body"><div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Hari</th><th>Nomor periode</th><th>Jam mulai</th><th>Jam selesai</th><th>Label (opsional)</th><th></th></tr></thead><tbody id="calendarPeriodRows">${periodRows || calendarPeriodRow({hari:'Senin',nomor_periode:1,jam_mulai:'07:30',jam_selesai:'08:15',label:''},0)}</tbody></table></div></div></form>
+            ` : '<div class="alert alert-info">Pilih <strong>Kelola detail</strong> pada daftar kalender untuk mengatur periode.</div>'}
         `);
-        $('calendarBackToList')?.addEventListener('click', () => openCalendars());
+
         $('calendarCreateForm')?.addEventListener('submit', async (event) => {
             event.preventDefault();
             const values = Object.fromEntries(new FormData(event.currentTarget).entries());
@@ -332,12 +359,12 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
         document.querySelectorAll('[data-calendar-edit]').forEach((button) => button.addEventListener('click', () => openCalendars(button.dataset.calendarEdit)));
         document.querySelectorAll('[data-calendar-activate]').forEach((button) => button.addEventListener('click', async () => {
             if (!confirm('Aktifkan kalender ini? Kalender aktif sebelumnya akan dinonaktifkan.')) return;
-            try { const result = await api(`/api/v1/academic/calendars/${button.dataset.calendarActivate}/activate`, {method:'POST', body:{}}); showToast(result.message); openCalendars(); }
+            try { const result = await api(`/api/v1/academic/calendars/${button.dataset.calendarActivate}/activate`, {method:'POST', body:{}}); showToast(result.message); openCalendars(calendarId); }
             catch (error) { setFeatureError(error); }
         }));
         document.querySelectorAll('[data-calendar-deactivate]').forEach((button) => button.addEventListener('click', async () => {
             if (!confirm('Nonaktifkan kalender ini? Jadwal berbasis periode tidak dapat di-resolve sampai kalender lain diaktifkan.')) return;
-            try { const result = await api(`/api/v1/academic/calendars/${button.dataset.calendarDeactivate}/deactivate`, {method:'POST', body:{}}); showToast(result.message); openCalendars(); }
+            try { const result = await api(`/api/v1/academic/calendars/${button.dataset.calendarDeactivate}/deactivate`, {method:'POST', body:{}}); showToast(result.message); openCalendars(calendarId); }
             catch (error) { setFeatureError(error); }
         }));
     }
