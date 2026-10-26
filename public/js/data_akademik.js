@@ -187,13 +187,8 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             for (const field of definition.fields) {
                 if (field.type === 'time' && values[field.name]) values[field.name] = values[field.name].slice(0, 5);
             }
-            if (values.mode_waktu === 'periode') {
-                values.jam_mulai = values.jam_mulai || '00:00';
-                values.jam_selesai = values.jam_selesai || '00:01';
-            } else {
-                values.periode_mulai = null;
-                values.periode_selesai = null;
-            }
+            delete values.jam_mulai;
+            delete values.jam_selesai;
             delete values.mode_waktu;
             if (values.siklus_minggu === '') values.siklus_minggu = null;
             if (values.wali_kelas_id === '') values.wali_kelas_id = null;
