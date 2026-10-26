@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AgendaSekolah;
 use App\Models\JadwalPelajaran;
 use App\Models\Kelas;
+use App\Models\KalenderJamPelajaran;
 use App\Models\MataPelajaran;
 use App\Models\MateriPelajaran;
 use App\Models\Siswa;
@@ -89,7 +90,8 @@ class MasterDataController extends Controller
     {
         $this->authorizeResource($request, $resource);
         $modelClass = self::MAP[$resource];
-        $data = Validator::make($request->all(), $this->rules($resource))->validate();
+        $input = $resource === 'schedules' ? $this->resolveScheduleInput($request->all()) : $request->all();
+        $data = Validator::make($input, $this->rules($resource))->validate();
         $this->validateScheduleConflict($resource, $data);
 
         /** @var Model $model */
@@ -106,7 +108,9 @@ class MasterDataController extends Controller
     {
         $this->authorizeResource($request, $resource);
         $model = $this->query($resource)->findOrFail($id);
-        $data = Validator::make($request->all(), $this->rules($resource, $id, true))->validate();
+        $input = array_merge($model->getAttributes(), $request->all());
+        if ($resource === 'schedules') $input = $this->resolveScheduleInput($input);
+        $data = Validator::make($input, $this->rules($resource, $id, true))->validate();
         $this->validateScheduleConflict($resource, array_merge($model->getAttributes(), $data), $model->id);
         $model->fill($data)->save();
 
@@ -139,6 +143,47 @@ class MasterDataController extends Controller
         $active = $service->activate($tahunAjaran->id);
 
         return response()->json(['message' => 'Tahun ajaran aktif berhasil disinkronkan.', 'data' => $active]);
+    }
+
+    /**
+     * Resolve submitted period ranges server-side so browser-provided clock values
+     * can never override the active calendar as the source of truth.
+     */
+    private function resolveScheduleInput(array $data): array
+    {
+        $start = $data['periode_mulai'] ?? null;
+        $end = $data['periode_selesai'] ?? null;
+
+        if ($start === null && $end === null) return $data;
+        if ($start === null || $end === null || (int) $start < 1 || (int) $end < (int) $start) {
+            throw ValidationException::withMessages(['periode_mulai' => 'Periode mulai dan selesai harus diisi dengan rentang yang valid.']);
+        }
+
+        $calendar = KalenderJamPelajaran::query()
+            ->where('status', KalenderJamPelajaran::STATUS_AKTIF)
+            ->with(['detailPeriode' => fn ($query) => $query->where('hari', $data['hari'] ?? '')->orderBy('nomor_periode')])
+            ->first();
+
+        if (! $calendar) {
+            throw ValidationException::withMessages(['periode_mulai' => 'Tidak ada kalender jam pelajaran aktif. Aktifkan kalender terlebih dahulu.']);
+        }
+
+        $periods = $calendar->detailPeriode->keyBy(fn ($period) => (int) $period->nomor_periode);
+        $first = $periods->get((int) $start);
+        $last = $periods->get((int) $end);
+        if (! $first || ! $last) {
+            throw ValidationException::withMessages(['periode_mulai' => 'Rentang periode tidak tersedia pada hari yang dipilih di kalender aktif.']);
+        }
+
+        for ($number = (int) $start; $number <= (int) $end; $number++) {
+            if (! $periods->has($number)) {
+                throw ValidationException::withMessages(['periode_selesai' => 'Rentang periode harus berurutan dan tidak boleh melewati periode yang tidak tersedia.']);
+            }
+        }
+
+        $data['jam_mulai'] = substr((string) $first->jam_mulai, 0, 5);
+        $data['jam_selesai'] = substr((string) $last->jam_selesai, 0, 5);
+        return $data;
     }
 
     /**
