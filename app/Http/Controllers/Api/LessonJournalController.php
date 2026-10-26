@@ -522,10 +522,17 @@ class LessonJournalController extends Controller
             return;
         }
 
-        $start = Carbon::parse($now->toDateString().' '.$schedule->jam_mulai, config('app.timezone'));
-        $end = Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
-        if ($now->lt($start) || $now->gt($end)) {
-            throw new ConflictHttpException('Draf jurnal hanya dapat diisi selama waktu pembelajaran.');
+        try {
+            $resolved = $calendarResolver->resolve($schedule, $now);
+        } catch (\RuntimeException $exception) {
+            throw new ConflictHttpException($exception->getMessage(), $exception);
+        }
+
+        if ($now->lt($resolved['jam_mulai']) || $now->gt($resolved['jam_selesai'])) {
+            throw new ConflictHttpException(
+                'Draf jurnal hanya dapat diisi selama waktu pembelajaran ('
+                .$resolved['jam_mulai']->format('H:i').'–'.$resolved['jam_selesai']->format('H:i').').'
+            );
         }
     }
 
