@@ -121,6 +121,7 @@ Layanan `App\\Services\\KalenderJamPelajaranService` juga telah ditambahkan untu
 - [x] Monitoring jurnal admin menampilkan waktu rencana dan rentang periode snapshot jika tersedia.
 - [x] Endpoint daftar/detail jadwal master menyertakan jam_mulai_resolved, jam_selesai_resolved, sumber_waktu_rencana, tanggal_resolusi, dan kesalahan resolusi tanpa menimpa kolom jam legacy; parameter tanggal opsional dapat menentukan tanggal resolusi.
 - [x] CRUD jadwal master menerima periode_mulai/periode_selesai opsional, memvalidasi pasangan rentang, membandingkan rentang periode jika kedua jadwal berbasis periode, dan menggunakan resolver untuk membandingkan jadwal campuran periode/legacy pada tanggal representatif hari yang sama.
+- [x] Impor jadwal membandingkan baris impor legacy dengan jadwal yang sudah tersimpan menggunakan resolver, sehingga jadwal berbasis periode tidak dinilai hanya berdasarkan nilai jam placeholder.
 - [ ] Uji regresi end-to-end pada environment Laravel/PHP 8.3 dan database uji. Belum ada tes yang dijalankan setelah perubahan controller di tahap ini; percobaan mengambil clone repo untuk menjalankan tes lokal gagal karena environment eksekusi tidak dapat menjangkau GitHub.
 - [ ] Uji skenario penerimaan di bawah ini; daftar ini adalah rencana uji, bukan klaim hasil tes.
 
