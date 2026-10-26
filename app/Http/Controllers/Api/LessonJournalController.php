@@ -12,6 +12,7 @@ use App\Models\Setting;
 use App\Models\TahunAjaran;
 use App\Services\CycleScheduleService;
 use App\Services\HaversineService;
+use App\Services\KalenderJamPelajaranResolver;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,11 +39,11 @@ class LessonJournalController extends Controller
      * Mengambil daftar siswa satu kelas untuk dimunculkan di modal jurnal.
      * Endpoint ini juga memastikan jadwal yang dibuka benar-benar milik guru saat ini dan aktif di siklus yang berlaku.
      */
-    public function students(Request $request, JadwalPelajaran $jadwalPelajaran, CycleScheduleService $cycles)
+    public function students(Request $request, JadwalPelajaran $jadwalPelajaran, CycleScheduleService $cycles, KalenderJamPelajaranResolver $calendarResolver)
     {
         abort_unless($request->user()->can('isi-ejurnal'), 403);
         $now = now(config('app.timezone'));
-        $this->authorizeSchedule($request, $jadwalPelajaran, $now, $cycles);
+        $this->authorizeSchedule($request, $jadwalPelajaran, $now, $cycles, $calendarResolver);
 
         $draft = JurnalMengajar::query()->with('presensiSiswas')
             ->where('jadwal_pelajaran_id', $jadwalPelajaran->id)
@@ -62,7 +63,7 @@ class LessonJournalController extends Controller
      * Menyimpan atau memperbarui draft jurnal yang masih berlangsung.
      * Flow ini memastikan seluruh siswa kelas masuk dalam presensi dan data tidak dibuat secara parsial.
      */
-    public function store(Request $request, CycleScheduleService $cycles)
+    public function store(Request $request, CycleScheduleService $cycles, KalenderJamPelajaranResolver $calendarResolver)
     {
         abort_unless($request->user()->can('isi-ejurnal'), 403);
         $data = $request->validate([
@@ -78,7 +79,7 @@ class LessonJournalController extends Controller
 
         $now = now(config('app.timezone'));
         $schedule = JadwalPelajaran::query()->with('kelas')->findOrFail($data['jadwal_pelajaran_id']);
-        $this->authorizeSchedule($request, $schedule, $now, $cycles);
+        $this->authorizeSchedule($request, $schedule, $now, $cycles, $calendarResolver);
         $activeSubstitute = $this->activeSubstituteForSchedule($schedule, $now);
         $existingDraft = JurnalMengajar::query()
             ->where('jadwal_pelajaran_id', $schedule->id)
@@ -108,18 +109,8 @@ class LessonJournalController extends Controller
             throw ValidationException::withMessages(['presensi' => 'Daftar presensi harus mencakup seluruh siswa kelas dan tidak boleh memuat siswa dari kelas lain.']);
         }
 
-        [$journal, $created] = DB::transaction(function () use ($request, $data, $schedule, $now, $activeSubstitute): array {
+        [$journal, $created] = DB::transaction(function () use ($request, $data, $schedule, $now, $activeSubstitute, $calendarResolver): array {
             $lockedSchedule = JadwalPelajaran::query()->lockForUpdate()->findOrFail($schedule->id);
-            if (AgendaSekolah::query()
-                ->whereDate('tanggal', $now->toDateString())
-                ->where('scope', 'SEKOLAH')
-                ->where('override_kbm', true)
-                ->where('jam_mulai', '<', $lockedSchedule->jam_selesai)
-                ->where('jam_selesai', '>', $lockedSchedule->jam_mulai)
-                ->exists()) {
-                throw new ConflictHttpException('KBM pada waktu sesi ini ditangguhkan oleh agenda sekolah.');
-            }
-
             $journal = JurnalMengajar::query()
                 ->where('jadwal_pelajaran_id', $lockedSchedule->id)
                 ->whereDate('tanggal', $now->toDateString())
@@ -129,6 +120,41 @@ class LessonJournalController extends Controller
                 throw new ConflictHttpException('Jurnal sesi ini sudah selesai dan tidak dapat diubah.');
             }
             $created = ! $journal;
+            $resolved = null;
+
+            if ($created) {
+                try {
+                    // Resolve inside the transaction so the snapshot matches the calendar
+                    // state observed when the new draft is committed.
+                    $resolved = $calendarResolver->resolve($lockedSchedule, $now);
+                } catch (\RuntimeException $exception) {
+                    throw new ConflictHttpException($exception->getMessage(), $exception);
+                }
+            } elseif ($journal->waktu_rencana_mulai && $journal->waktu_rencana_selesai) {
+                // Existing snapshots are authoritative even if the active calendar changed.
+                $resolved = [
+                    'jam_mulai' => Carbon::parse($journal->waktu_rencana_mulai, config('app.timezone')),
+                    'jam_selesai' => Carbon::parse($journal->waktu_rencana_selesai, config('app.timezone')),
+                ];
+            } else {
+                // Legacy drafts without snapshots remain compatible and are not backfilled here.
+                try {
+                    $resolved = $calendarResolver->resolve($lockedSchedule, $now);
+                } catch (\RuntimeException $exception) {
+                    throw new ConflictHttpException($exception->getMessage(), $exception);
+                }
+            }
+
+            if (AgendaSekolah::query()
+                ->whereDate('tanggal', $now->toDateString())
+                ->where('scope', 'SEKOLAH')
+                ->where('override_kbm', true)
+                ->where('jam_mulai', '<', $resolved['jam_selesai']->format('H:i:s'))
+                ->where('jam_selesai', '>', $resolved['jam_mulai']->format('H:i:s'))
+                ->exists()) {
+                throw new ConflictHttpException('KBM pada waktu sesi ini ditangguhkan oleh agenda sekolah.');
+            }
+
             $journal ??= new JurnalMengajar;
             $journal->fill([
                 'user_id' => $lockedSchedule->user_id,
@@ -141,7 +167,21 @@ class LessonJournalController extends Controller
                 'jam_mulai_realisasi' => $journal->jam_mulai_realisasi ?? $now,
                 'jam_selesai_realisasi' => null,
                 'status_sesi' => JurnalMengajar::STATUS_DRAFT,
-            ])->save();
+            ]);
+
+            // Snapshot is written only once, when the first draft is created.
+            // Updating an existing draft must never replace its original calendar context.
+            if ($created && $resolved !== null) {
+                $journal->fill([
+                    'kalender_id_snapshot' => $resolved['kalender_id'],
+                    'waktu_rencana_mulai' => $resolved['jam_mulai'],
+                    'waktu_rencana_selesai' => $resolved['jam_selesai'],
+                    'periode_mulai_snapshot' => $resolved['periode_mulai'],
+                    'periode_selesai_snapshot' => $resolved['periode_selesai'],
+                ]);
+            }
+
+            $journal->save();
 
             $studentIds = collect($data['presensi'])->pluck('siswa_id')->map(fn ($id) => (int) $id)->all();
             $journal->presensiSiswas()->whereNotIn('siswa_id', $studentIds)->delete();
@@ -300,7 +340,7 @@ class LessonJournalController extends Controller
      * Proses finalisasi bertahap: validasi foto + GPS + geofence + waktu + kelengkapan daftar presensi.
      * Jika kondisi darurat, sistem memperbolehkan finalisasi lewat mode emergency dengan catatan penutupan.
      */
-    public function finalize(Request $request, JurnalMengajar $jurnalMengajar, CycleScheduleService $cycles, HaversineService $distance)
+    public function finalize(Request $request, JurnalMengajar $jurnalMengajar, CycleScheduleService $cycles, HaversineService $distance, KalenderJamPelajaranResolver $calendarResolver)
     {
         abort_unless($request->user()->can('isi-ejurnal'), 403);
         abort_unless(
@@ -345,13 +385,15 @@ class LessonJournalController extends Controller
             $sessionDate = $jurnalMengajar->tanggal instanceof \Carbon\Carbon
                 ? $jurnalMengajar->tanggal->toDateString()
                 : (string) $jurnalMengajar->tanggal;
-            $sessionEnd = Carbon::parse($sessionDate.' '.$schedule->jam_selesai, config('app.timezone'));
+            $sessionEnd = $jurnalMengajar->waktu_rencana_selesai
+                ? Carbon::parse($jurnalMengajar->waktu_rencana_selesai, config('app.timezone'))
+                : Carbon::parse($sessionDate.' '.$schedule->jam_selesai, config('app.timezone'));
             if ($now->lessThanOrEqualTo($sessionEnd)) {
                 throw new ConflictHttpException('Finalisasi susulan hanya tersedia setelah waktu pembelajaran berakhir.');
             }
         }
         if (! $isLateFinalization) {
-            $this->authorizeSchedule($request, $schedule, $now, $cycles);
+            $this->authorizeSchedule($request, $schedule, $now, $cycles, $calendarResolver);
         }
 
         $expectedIds = DB::table('siswas')->where('kelas_id', $schedule->kelas_id)->pluck('id')->map(fn ($id) => (int) $id)->sort()->values();
@@ -365,7 +407,7 @@ class LessonJournalController extends Controller
         if (! $isLateFinalization) {
             $isEmergency = filter_var($data['darurat'] ?? false, FILTER_VALIDATE_BOOLEAN);
             $distanceMeters = $this->verifyFinalizationLocation($data, $distance);
-            $this->authorizeFinalizationWindow($schedule, $now, $isEmergency);
+            $this->authorizeFinalizationWindow($schedule, $now, $isEmergency, $jurnalMengajar);
             $photoPath = $data['foto_kegiatan']->store('lesson-journals', 'local');
         }
 
@@ -488,7 +530,7 @@ class LessonJournalController extends Controller
      * aktif pada hari/siklus/semester yang berlaku, dan masih dalam jendela pengisian jurnal.
      * Jika draf sudah dibuka, akses lanjutan tetap diperbolehkan.
      */
-    private function authorizeSchedule(Request $request, JadwalPelajaran $schedule, Carbon $now, CycleScheduleService $cycles): void
+    private function authorizeSchedule(Request $request, JadwalPelajaran $schedule, Carbon $now, CycleScheduleService $cycles, KalenderJamPelajaranResolver $calendarResolver): void
     {
         $activeSubstitute = $this->activeSubstituteForSchedule($schedule, $now);
         $allowedUserIds = [$schedule->user_id];
@@ -521,10 +563,17 @@ class LessonJournalController extends Controller
             return;
         }
 
-        $start = Carbon::parse($now->toDateString().' '.$schedule->jam_mulai, config('app.timezone'));
-        $end = Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
-        if ($now->lt($start) || $now->gt($end)) {
-            throw new ConflictHttpException('Draf jurnal hanya dapat diisi selama waktu pembelajaran.');
+        try {
+            $resolved = $calendarResolver->resolve($schedule, $now);
+        } catch (\RuntimeException $exception) {
+            throw new ConflictHttpException($exception->getMessage(), $exception);
+        }
+
+        if ($now->lt($resolved['jam_mulai']) || $now->gt($resolved['jam_selesai'])) {
+            throw new ConflictHttpException(
+                'Draf jurnal hanya dapat diisi selama waktu pembelajaran ('
+                .$resolved['jam_mulai']->format('H:i').'–'.$resolved['jam_selesai']->format('H:i').').'
+            );
         }
     }
 
@@ -533,10 +582,14 @@ class LessonJournalController extends Controller
      * Jika bukan darurat, sistem hanya menerima pada 30 menit terakhir sesi.
      * Jika darurat, sistem tetap mengizinkan finalisasi selama masih masuk per jangkauan sesi yang valid.
      */
-    private function authorizeFinalizationWindow(JadwalPelajaran $schedule, Carbon $now, bool $isEmergency = false): void
+    private function authorizeFinalizationWindow(JadwalPelajaran $schedule, Carbon $now, bool $isEmergency = false, ?JurnalMengajar $journal = null): void
     {
-        $sessionStart = Carbon::parse($now->toDateString().' '.$schedule->jam_mulai, config('app.timezone'));
-        $sessionEnd = Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
+        $sessionStart = $journal?->waktu_rencana_mulai
+            ? Carbon::parse($journal->waktu_rencana_mulai, config('app.timezone'))
+            : Carbon::parse($now->toDateString().' '.$schedule->jam_mulai, config('app.timezone'));
+        $sessionEnd = $journal?->waktu_rencana_selesai
+            ? Carbon::parse($journal->waktu_rencana_selesai, config('app.timezone'))
+            : Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
         $windowStart = $sessionEnd->copy()->subMinutes(30);
         if ($windowStart->lt($sessionStart)) $windowStart = $sessionStart;
 

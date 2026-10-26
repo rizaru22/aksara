@@ -99,6 +99,8 @@ return new class extends Migration
             $table->enum('hari', ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']);
             $table->time('jam_mulai');
             $table->time('jam_selesai');
+            $table->unsignedSmallInteger('periode_mulai')->nullable();
+            $table->unsignedSmallInteger('periode_selesai')->nullable();
             $table->timestamps();
             $table->index(['tahun_ajaran_id', 'semester', 'hari']);
             $table->index(['user_id', 'tahun_ajaran_id', 'semester', 'hari']);
@@ -119,9 +121,14 @@ return new class extends Migration
             $table->decimal('long_finalisasi', 11, 8)->nullable();
             $table->double('gps_accuracy_finalisasi')->nullable();
             $table->double('jarak_geofence_finalisasi')->nullable();
+            $table->foreignId('kalender_id_snapshot')->nullable()->constrained('kalender_jam_pelajaran')->restrictOnDelete();
+            $table->dateTime('waktu_rencana_mulai')->nullable();
+            $table->dateTime('waktu_rencana_selesai')->nullable();
+            $table->unsignedSmallInteger('periode_mulai_snapshot')->nullable();
+            $table->unsignedSmallInteger('periode_selesai_snapshot')->nullable();
             $table->timestamp('jam_mulai_realisasi')->nullable();
             $table->timestamp('jam_selesai_realisasi')->nullable();
-            $table->enum('status_sesi', ['berlangsung', 'selesai', 'flagged'])->default('berlangsung');
+            $table->string('status_sesi', 32)->default('draft');
             $table->text('catatan_penutupan')->nullable();
             $table->timestamps();
         });

@@ -15,6 +15,7 @@ use App\Models\TahunAjaran;
 use App\Models\User;
 use App\Services\ActiveAcademicYearService;
 use App\Services\CycleScheduleService;
+use App\Services\KalenderJamPelajaranResolver;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -25,7 +26,7 @@ class DashboardController extends Controller
      * Endpoint GET /api/v1/dashboard/admin/live.
      * Mengambil status real-time admin tentang kehadiran guru, cuti, sakit, review presensi, dan sesi pembelajaran yang sedang berjalan.
      */
-    public function adminLive(Request $request, CycleScheduleService $cycles, ActiveAcademicYearService $academicYears)
+    public function adminLive(Request $request, CycleScheduleService $cycles, ActiveAcademicYearService $academicYears, KalenderJamPelajaranResolver $calendarResolver)
     {
         abort_unless($request->user()->hasRole('admin') || $request->user()->can('view-dashboard-kurikulum'), 403);
 
@@ -107,14 +108,33 @@ class DashboardController extends Controller
                 ->where('semester', $semester)
                 ->where('hari', $meta['hari'])
                 ->where(fn ($query) => $query->whereNull('siklus_minggu')->orWhere('siklus_minggu', $cycle))
-                ->whereTime('jam_mulai', '<=', $now->format('H:i:s'))
-                ->whereTime('jam_selesai', '>', $now->format('H:i:s'))
-                ->orderBy('jam_mulai')
-                ->get()
-                ->reject(fn (JadwalPelajaran $schedule) => $overrides->contains(fn (AgendaSekolah $agenda) => $agenda->jam_mulai < $schedule->jam_selesai && $agenda->jam_selesai > $schedule->jam_mulai))
-                ->values();
+                ->get();
 
-            $currentSessions = $schedules->map(function (JadwalPelajaran $schedule): array {
+            $resolvedSchedules = $schedules->map(function (JadwalPelajaran $schedule) use ($calendarResolver, $now, $overrides): ?array {
+                $journal = $schedule->jurnalMengajars->first();
+                try {
+                    if ($journal?->waktu_rencana_mulai && $journal?->waktu_rencana_selesai) {
+                        $start = Carbon::parse($journal->waktu_rencana_mulai, config('app.timezone'));
+                        $end = Carbon::parse($journal->waktu_rencana_selesai, config('app.timezone'));
+                    } else {
+                        $resolved = $calendarResolver->resolve($schedule, $now);
+                        $start = Carbon::parse($resolved['jam_mulai'], config('app.timezone'));
+                        $end = Carbon::parse($resolved['jam_selesai'], config('app.timezone'));
+                    }
+                } catch (\RuntimeException $exception) {
+                    report($exception);
+                    return null;
+                }
+
+                if ($now->lt($start) || $now->gte($end)) return null;
+                if ($overrides->contains(fn (AgendaSekolah $agenda) => $agenda->jam_mulai < $end->format('H:i:s') && $agenda->jam_selesai > $start->format('H:i:s'))) return null;
+
+                return ['schedule' => $schedule, 'start' => $start, 'end' => $end];
+            })->filter()->sortBy(fn (array $item) => $item['start']->timestamp)->values();
+
+            $currentSessions = $resolvedSchedules->map(function (array $item): array {
+                /** @var JadwalPelajaran $schedule */
+                $schedule = $item['schedule'];
                 $journal = $schedule->jurnalMengajars->first();
                 $expectedStudents = $schedule->kelas?->siswas->count() ?? 0;
                 $markedStudents = (int) ($journal?->presensi_siswas_count ?? 0);
@@ -125,8 +145,8 @@ class DashboardController extends Controller
                     'teacher_nip' => $schedule->guru?->nip,
                     'class_name' => $schedule->kelas?->nama_kelas ?? 'Kelas tidak ditemukan',
                     'subject_name' => $schedule->mataPelajaran?->nama_mapel ?? 'Mata pelajaran',
-                    'start' => substr((string) $schedule->jam_mulai, 0, 5),
-                    'end' => substr((string) $schedule->jam_selesai, 0, 5),
+                    'start' => $item['start']->format('H:i'),
+                    'end' => $item['end']->format('H:i'),
                     'journal_filled' => in_array($journal?->status_sesi, ['final', 'finalisasi_susulan'], true),
                     'journal_status' => $journal?->status_sesi ?? 'Belum diisi',
                     'expected_students' => $expectedStudents,

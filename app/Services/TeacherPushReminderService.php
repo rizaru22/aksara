@@ -9,9 +9,11 @@ use App\Models\JadwalPelajaran;
 use App\Models\JadwalPresensiHarian;
 use App\Models\JurnalMengajar;
 use App\Models\PengajuanIzin;
+use App\Models\PengajuanGuruPengganti;
 use App\Models\Setting;
 use App\Models\TahunAjaran;
 use App\Models\User;
+use App\Services\KalenderJamPelajaranResolver;
 use App\Notifications\TeacherReminderNotification;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -120,11 +122,23 @@ class TeacherPushReminderService
             Setting::value('semester_start_date', config('aksara.academic.semester_start_date')),
         );
 
+        $approvedSubstitutions = PengajuanGuruPengganti::query()
+            ->where('status_approval', 'APPROVED')
+            ->whereDate('tanggal', $now->toDateString())
+            ->whereIn('guru_pengganti_id', $teachers->modelKeys())
+            ->get()
+            ->keyBy('jadwal_pelajaran_id');
+
         $schedules = JadwalPelajaran::query()
             ->with(['jurnalMengajars' => fn ($query) => $query
                 ->with('presensiSiswas')
                 ->whereDate('tanggal', $now->toDateString())])
-            ->whereIn('user_id', $teachers->modelKeys())
+            ->where(function ($query) use ($teachers, $approvedSubstitutions) {
+                $query->whereIn('user_id', $teachers->modelKeys());
+                if ($approvedSubstitutions->isNotEmpty()) {
+                    $query->orWhereIn('id', $approvedSubstitutions->keys());
+                }
+            })
             ->where('tahun_ajaran_id', $year->id)
             ->where('semester', $semester)
             ->where('hari', $weekday)
@@ -139,29 +153,50 @@ class TeacherPushReminderService
 
         $teachersById = $teachers->keyBy('id');
         foreach ($schedules as $schedule) {
-            $teacher = $teachersById->get($schedule->user_id);
+            $substitution = $approvedSubstitutions->get($schedule->id);
+            $teacher = $substitution
+                ? $teachersById->get($substitution->guru_pengganti_id)
+                : $teachersById->get($schedule->user_id);
             if (! $teacher || in_array((int) $teacher->id, $onLeave, true)) {
                 continue;
             }
 
+            $journal = $schedule->jurnalMengajars->first();
+
+            // Existing journal snapshots must survive calendar activation changes.
+            // Future sessions without snapshots resolve against the currently active calendar.
+            try {
+                if ($journal?->waktu_rencana_mulai && $journal?->waktu_rencana_selesai) {
+                    $start = CarbonImmutable::parse($journal->waktu_rencana_mulai, config('app.timezone'));
+                    $end = CarbonImmutable::parse($journal->waktu_rencana_selesai, config('app.timezone'));
+                } else {
+                    $resolved = app(KalenderJamPelajaranResolver::class)->resolve($schedule, $now);
+                    $start = CarbonImmutable::parse($resolved['jam_mulai'], config('app.timezone'));
+                    $end = CarbonImmutable::parse($resolved['jam_selesai'], config('app.timezone'));
+                }
+            } catch (\RuntimeException $exception) {
+                Log::warning('Lesson reminder skipped because schedule time could not be resolved.', [
+                    'schedule_id' => $schedule->id,
+                    'date' => $now->toDateString(),
+                    'exception' => $exception->getMessage(),
+                ]);
+                continue;
+            }
+
             $cancelledSession = $cancelled->contains(fn (AgendaSekolah $agenda) =>
-                $agenda->jam_mulai < $schedule->jam_selesai && $agenda->jam_selesai > $schedule->jam_mulai
+                $agenda->jam_mulai < $end->format('H:i:s') && $agenda->jam_selesai > $start->format('H:i:s')
             );
             if ($cancelledSession) {
                 continue;
             }
 
-            $start = $this->atTime($now, $schedule->jam_mulai);
-            $end = $this->atTime($now, $schedule->jam_selesai);
-            $journal = $schedule->jurnalMengajars->first();
-
             if (! $journal && $this->within($now, $start->addMinutes(15), $end)) {
                 $sent += $this->sendOnce(
                     $teacher,
-                    "journal:{$now->toDateString()}:{$schedule->id}",
+                    "journal:{$now->toDateString()}:{$schedule->id}:{$teacher->id}",
                     'Pengingat jurnal dan presensi siswa',
                     'Pelajaran sudah berjalan 15 menit. Silakan isi jurnal mengajar dan presensi siswa.',
-                    "journal-{$now->toDateString()}-{$schedule->id}",
+                    "journal-{$now->toDateString()}-{$schedule->id}-{$teacher->id}",
                     $now,
                 );
             }
@@ -170,10 +205,10 @@ class TeacherPushReminderService
                 && $this->within($now, $start->addMinutes(15), $end)) {
                 $sent += $this->sendOnce(
                     $teacher,
-                    "student-attendance:{$now->toDateString()}:{$schedule->id}",
+                    "student-attendance:{$now->toDateString()}:{$schedule->id}:{$teacher->id}",
                     'Pengingat presensi siswa',
                     'Pelajaran sudah berjalan 15 menit. Presensi siswa pada sesi ini belum diisi.',
-                    "student-attendance-{$now->toDateString()}-{$schedule->id}",
+                    "student-attendance-{$now->toDateString()}-{$schedule->id}-{$teacher->id}",
                     $now,
                 );
             }
@@ -186,10 +221,10 @@ class TeacherPushReminderService
                 if ($this->within($now, $end->subMinutes(5), $end->addMinutes(5))) {
                     $sent += $this->sendOnce(
                         $teacher,
-                        "lesson-photo:{$now->toDateString()}:{$schedule->id}",
+                        "lesson-photo:{$now->toDateString()}:{$schedule->id}:{$teacher->id}",
                         'Pengingat foto kegiatan',
                         $body,
-                        "lesson-photo-{$now->toDateString()}-{$schedule->id}",
+                        "lesson-photo-{$now->toDateString()}-{$schedule->id}-{$teacher->id}",
                         $now,
                     );
                 }
@@ -199,22 +234,28 @@ class TeacherPushReminderService
 
     private function sendOnce(User $teacher, string $key, string $title, string $body, string $tag, CarbonImmutable $now): int
     {
-        if (DB::table('push_reminder_dispatches')->where('reminder_key', $key)->exists()) {
+        // Reserve the unique reminder key before sending so overlapping scheduler
+        // runs cannot both pass an exists() check and dispatch the same reminder.
+        $reserved = DB::table('push_reminder_dispatches')->insertOrIgnore([
+            'reminder_key' => $key,
+            'sent_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        if ($reserved !== 1) {
             return 0;
         }
 
         try {
             $teacher->notify(new TeacherReminderNotification($title, $body, $tag));
-            DB::table('push_reminder_dispatches')->insertOrIgnore([
-                'reminder_key' => $key,
-                'sent_at' => $now,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
 
             return 1;
         } catch (Throwable $exception) {
-            Log::warning('Web push reminder failed.', [
+            // Keep the reservation (at-most-once delivery) because the provider may
+            // have accepted a push before an exception occurred; deleting it could
+            // cause a duplicate on the next scheduler tick.
+            Log::warning('Web push reminder dispatch failed after reservation.', [
                 'reminder_key' => $key,
                 'user_id' => $teacher->id,
                 'exception' => $exception->getMessage(),

@@ -6,12 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Models\AgendaSekolah;
 use App\Models\JadwalPelajaran;
 use App\Models\Kelas;
+use App\Models\KalenderJamPelajaran;
 use App\Models\MataPelajaran;
 use App\Models\MateriPelajaran;
 use App\Models\Siswa;
 use App\Models\TahunAjaran;
 use App\Models\User;
 use App\Services\ActiveAcademicYearService;
+use App\Services\CycleScheduleService;
+use App\Services\KalenderJamPelajaranResolver;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -44,26 +48,38 @@ class MasterDataController extends Controller
      * Endpoint GET /api/v1/master-data/{resource}.
      * Mengambil daftar record untuk satu resource master, seperti kelas, siswa, mapel, jadwal, atau agenda sekolah.
      */
-    public function index(Request $request, string $resource)
+    public function index(Request $request, string $resource, KalenderJamPelajaranResolver $calendarResolver, CycleScheduleService $cycles)
     {
         $this->authorizeResource($request, $resource);
         $query = $this->query($resource);
         $this->withRelations($resource, $query);
+        $page = $query->latest()->paginate(30);
 
-        return response()->json($query->latest()->paginate(30));
+        if ($resource === 'schedules') {
+            $requestedDate = $request->validate(['tanggal' => ['nullable', 'date']])['tanggal'] ?? null;
+            $page->getCollection()->transform(fn (JadwalPelajaran $schedule) => $this->appendResolvedScheduleTimes($schedule, $requestedDate, $calendarResolver, $cycles));
+        }
+
+        return response()->json($page);
     }
 
     /**
      * Endpoint GET /api/v1/master-data/{resource}/{id}.
      * Menampilkan satu record master beserta relasi yang dibutuhkan untuk edit atau detail view.
      */
-    public function show(Request $request, string $resource, int $id)
+    public function show(Request $request, string $resource, int $id, KalenderJamPelajaranResolver $calendarResolver, CycleScheduleService $cycles)
     {
         $this->authorizeResource($request, $resource);
         $query = $this->query($resource);
         $this->withRelations($resource, $query);
+        $model = $query->findOrFail($id);
 
-        return response()->json(['data' => $query->findOrFail($id)]);
+        if ($resource === 'schedules') {
+            $requestedDate = $request->validate(['tanggal' => ['nullable', 'date']])['tanggal'] ?? null;
+            $model = $this->appendResolvedScheduleTimes($model, $requestedDate, $calendarResolver, $cycles);
+        }
+
+        return response()->json(['data' => $model]);
     }
 
     /**
@@ -74,7 +90,8 @@ class MasterDataController extends Controller
     {
         $this->authorizeResource($request, $resource);
         $modelClass = self::MAP[$resource];
-        $data = Validator::make($request->all(), $this->rules($resource))->validate();
+        $input = $resource === 'schedules' ? $this->resolveScheduleInput($request->all()) : $request->all();
+        $data = Validator::make($input, $this->rules($resource))->validate();
         $this->validateScheduleConflict($resource, $data);
 
         /** @var Model $model */
@@ -91,7 +108,9 @@ class MasterDataController extends Controller
     {
         $this->authorizeResource($request, $resource);
         $model = $this->query($resource)->findOrFail($id);
-        $data = Validator::make($request->all(), $this->rules($resource, $id, true))->validate();
+        $input = array_merge($model->getAttributes(), $request->all());
+        if ($resource === 'schedules') $input = $this->resolveScheduleInput($input);
+        $data = Validator::make($input, $this->rules($resource, $id, true))->validate();
         $this->validateScheduleConflict($resource, array_merge($model->getAttributes(), $data), $model->id);
         $model->fill($data)->save();
 
@@ -124,6 +143,93 @@ class MasterDataController extends Controller
         $active = $service->activate($tahunAjaran->id);
 
         return response()->json(['message' => 'Tahun ajaran aktif berhasil disinkronkan.', 'data' => $active]);
+    }
+
+    /**
+     * Resolve submitted period ranges server-side so browser-provided clock values
+     * can never override the active calendar as the source of truth.
+     */
+    private function resolveScheduleInput(array $data): array
+    {
+        $start = $data['periode_mulai'] ?? null;
+        $end = $data['periode_selesai'] ?? null;
+
+        if ($start === null && $end === null) return $data;
+        if ($start === null || $end === null || (int) $start < 1 || (int) $end < (int) $start) {
+            throw ValidationException::withMessages(['periode_mulai' => 'Periode mulai dan selesai harus diisi dengan rentang yang valid.']);
+        }
+
+        $calendar = KalenderJamPelajaran::query()
+            ->where('status', KalenderJamPelajaran::STATUS_AKTIF)
+            ->with(['detailPeriode' => fn ($query) => $query->where('hari', $data['hari'] ?? '')->orderBy('nomor_periode')])
+            ->first();
+
+        if (! $calendar) {
+            throw ValidationException::withMessages(['periode_mulai' => 'Tidak ada kalender jam pelajaran aktif. Aktifkan kalender terlebih dahulu.']);
+        }
+
+        $periods = $calendar->detailPeriode->keyBy(fn ($period) => (int) $period->nomor_periode);
+        $first = $periods->get((int) $start);
+        $last = $periods->get((int) $end);
+        if (! $first || ! $last) {
+            throw ValidationException::withMessages(['periode_mulai' => 'Rentang periode tidak tersedia pada hari yang dipilih di kalender aktif.']);
+        }
+
+        for ($number = (int) $start; $number <= (int) $end; $number++) {
+            if (! $periods->has($number)) {
+                throw ValidationException::withMessages(['periode_selesai' => 'Rentang periode harus berurutan dan tidak boleh melewati periode yang tidak tersedia.']);
+            }
+        }
+
+        $data['jam_mulai'] = substr((string) $first->jam_mulai, 0, 5);
+        $data['jam_selesai'] = substr((string) $last->jam_selesai, 0, 5);
+        return $data;
+    }
+
+    /**
+     * Append date-specific calendar times without overwriting legacy clock columns used by edit forms.
+     */
+    private function appendResolvedScheduleTimes(
+        JadwalPelajaran $schedule,
+        ?string $requestedDate,
+        KalenderJamPelajaranResolver $calendarResolver,
+        CycleScheduleService $cycles
+    ): JadwalPelajaran {
+        $date = $requestedDate
+            ? \Carbon\CarbonImmutable::parse($requestedDate, config('app.timezone'))->startOfDay()
+            : \Carbon\CarbonImmutable::today(config('app.timezone'));
+
+        if (! $requestedDate) {
+            for ($offset = 0; $offset < 7 && $cycles->getHariIndo($date) !== $schedule->hari; $offset++) {
+                $date = $date->addDay();
+            }
+        }
+
+        if ($cycles->getHariIndo($date) !== $schedule->hari) {
+            $schedule->setAttribute('jam_mulai_resolved', null);
+            $schedule->setAttribute('jam_selesai_resolved', null);
+            $schedule->setAttribute('sumber_waktu_rencana', null);
+            $schedule->setAttribute('tanggal_resolusi', $date->toDateString());
+            $schedule->setAttribute('kesalahan_resolusi_waktu', 'Tanggal tidak sesuai dengan hari jadwal.');
+            return $schedule;
+        }
+
+        try {
+            $resolved = $calendarResolver->resolve($schedule, $date);
+            $schedule->setAttribute('jam_mulai_resolved', $resolved['jam_mulai']->format('H:i:s'));
+            $schedule->setAttribute('jam_selesai_resolved', $resolved['jam_selesai']->format('H:i:s'));
+            $schedule->setAttribute('sumber_waktu_rencana', $resolved['sumber']);
+            $schedule->setAttribute('tanggal_resolusi', $resolved['tanggal']);
+            $schedule->setAttribute('kesalahan_resolusi_waktu', null);
+        } catch (\RuntimeException $exception) {
+            $schedule->setAttribute('jam_mulai_resolved', null);
+            $schedule->setAttribute('jam_selesai_resolved', null);
+            $schedule->setAttribute('sumber_waktu_rencana', null);
+            $schedule->setAttribute('tanggal_resolusi', $date->toDateString());
+            $schedule->setAttribute('kesalahan_resolusi_waktu', $exception->getMessage());
+        }
+
+        return $schedule;
     }
 
     /**
@@ -209,6 +315,8 @@ class MasterDataController extends Controller
                 'hari' => $prefix.'required|in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu',
                 'jam_mulai' => $prefix.'required|date_format:H:i',
                 'jam_selesai' => $prefix.'required|date_format:H:i|after:jam_mulai',
+                'periode_mulai' => $prefix.'nullable|integer|min:1',
+                'periode_selesai' => $prefix.'nullable|integer|min:1|gte:periode_mulai',
             ],
             'agendas' => [
                 'nama_agenda' => $prefix.'required|string|max:255',
@@ -231,16 +339,22 @@ class MasterDataController extends Controller
     private function validateScheduleConflict(string $resource, array $data, ?int $ignoreId = null): void
     {
         if ($resource !== 'schedules') return;
-        if ($data['jam_mulai'] >= $data['jam_selesai']) {
+        $periodStart = $data['periode_mulai'] ?? null;
+        $periodEnd = $data['periode_selesai'] ?? null;
+        if (($periodStart === null) !== ($periodEnd === null)) {
+            throw ValidationException::withMessages(['periode_mulai' => 'Periode mulai dan selesai harus diisi bersamaan.']);
+        }
+        if ($periodStart !== null && ((int) $periodStart < 1 || (int) $periodEnd < (int) $periodStart)) {
+            throw ValidationException::withMessages(['periode_mulai' => 'Rentang periode jadwal tidak valid.']);
+        }
+        if ($periodStart === null && $data['jam_mulai'] >= $data['jam_selesai']) {
             throw ValidationException::withMessages(['jam_mulai' => 'Jam mulai harus sebelum jam selesai.']);
         }
 
         $query = JadwalPelajaran::query()
             ->where('tahun_ajaran_id', $data['tahun_ajaran_id'])
             ->where('semester', $data['semester'])
-            ->where('hari', $data['hari'])
-            ->where('jam_mulai', '<', $data['jam_selesai'])
-            ->where('jam_selesai', '>', $data['jam_mulai']);
+            ->where('hari', $data['hari']);
         $cycle = $data['siklus_minggu'] ?? null;
         if ($cycle !== null) {
             $query->where(fn ($q) => $q->whereNull('siklus_minggu')->orWhere('siklus_minggu', $cycle));
@@ -248,7 +362,38 @@ class MasterDataController extends Controller
         if ($ignoreId) $query->where('id', '<>', $ignoreId);
         $query->where(fn ($q) => $q->where('user_id', $data['user_id'])->orWhere('kelas_id', $data['kelas_id']));
 
-        if ($query->exists()) {
+        $conflict = $query->get()->contains(function (JadwalPelajaran $existing) use ($data, $periodStart, $periodEnd): bool {
+            $existingPeriodStart = $existing->periode_mulai !== null ? (int) $existing->periode_mulai : null;
+            $existingPeriodEnd = $existing->periode_selesai !== null ? (int) $existing->periode_selesai : null;
+
+            if ($periodStart !== null && $periodEnd !== null && $existingPeriodStart !== null && $existingPeriodEnd !== null) {
+                return (int) $periodStart <= $existingPeriodEnd && (int) $periodEnd >= $existingPeriodStart;
+            }
+
+            // Resolve mixed legacy/period schedules to the same school day so a
+            // stale clock value cannot hide or invent a conflict.
+            $date = CarbonImmutable::today(config('app.timezone'));
+            $cycleSchedules = app(CycleScheduleService::class);
+            for ($offset = 0; $offset < 7 && $cycleSchedules->getHariIndo($date) !== $data['hari']; $offset++) {
+                $date = $date->addDay();
+            }
+
+            try {
+                $candidate = new JadwalPelajaran($data);
+                $resolver = app(KalenderJamPelajaranResolver::class);
+                $candidateTime = $resolver->resolve($candidate, $date);
+                $existingTime = $resolver->resolve($existing, $date);
+            } catch (\RuntimeException $exception) {
+                throw ValidationException::withMessages([
+                    'schedule' => 'Konflik jadwal tidak dapat divalidasi: '.$exception->getMessage(),
+                ]);
+            }
+
+            return $candidateTime['jam_mulai'] < $existingTime['jam_selesai']
+                && $candidateTime['jam_selesai'] > $existingTime['jam_mulai'];
+        });
+
+        if ($conflict) {
             throw ValidationException::withMessages(['schedule' => 'Jadwal bertabrakan dengan jadwal guru atau kelas yang sudah ada.']);
         }
     }

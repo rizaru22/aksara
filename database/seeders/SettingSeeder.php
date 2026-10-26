@@ -91,7 +91,7 @@ class SettingSeeder extends Seeder
             ],
             [
                 'key'         => 'journal_gps_accuracy_meters',
-                'value'       => '40',
+                'value'       => (string) env('JOURNAL_GPS_ACCURACY_METERS', env('ATTENDANCE_GPS_ACCURACY_METERS', 40)),
                 'group'       => 'presensi',
                 'type'        => 'number',
                 'label'       => 'Batas Akurasi GPS Jurnal (Meter)',

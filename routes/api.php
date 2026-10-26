@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\DiscrepancyController;
 use App\Http\Controllers\Api\LeaveRequestController;
 use App\Http\Controllers\Api\HolidayCalendarController;
+use App\Http\Controllers\Api\KalenderJamPelajaranController;
 use App\Http\Controllers\Api\JournalMonitoringController;
 use App\Http\Controllers\Api\LessonJournalController;
 use App\Http\Controllers\Api\MasterDataController;
@@ -110,6 +111,19 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
         Route::post('/', [HolidayCalendarController::class, 'store']);
         Route::patch('/{hariLibur}', [HolidayCalendarController::class, 'update']);
         Route::delete('/{hariLibur}', [HolidayCalendarController::class, 'destroy']);
+    });
+
+    Route::prefix('academic/calendars')->middleware('permission:kelola-master-data')->group(function (): void {
+        Route::get('/active', [KalenderJamPelajaranController::class, 'active']);
+        Route::get('/', [KalenderJamPelajaranController::class, 'index']);
+        Route::post('/', [KalenderJamPelajaranController::class, 'store']);
+        Route::get('/{calendar}', [KalenderJamPelajaranController::class, 'show'])->whereNumber('calendar');
+        Route::patch('/{calendar}', [KalenderJamPelajaranController::class, 'update'])->whereNumber('calendar');
+        Route::get('/periods/template', [KalenderJamPelajaranController::class, 'periodsTemplate']);
+        Route::post('/{calendar}/periods/import', [KalenderJamPelajaranController::class, 'importPeriods'])->whereNumber('calendar');
+        Route::put('/{calendar}/periods', [KalenderJamPelajaranController::class, 'savePeriods'])->whereNumber('calendar');
+        Route::post('/{calendar}/activate', [KalenderJamPelajaranController::class, 'activate'])->whereNumber('calendar');
+        Route::post('/{calendar}/deactivate', [KalenderJamPelajaranController::class, 'deactivate'])->whereNumber('calendar');
     });
 
     Route::prefix('academic')->group(function (): void {

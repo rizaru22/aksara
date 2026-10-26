@@ -10,7 +10,7 @@ class JadwalPelajaran extends Model
 {
     protected $fillable = [
         'tahun_ajaran_id', 'semester', 'user_id', 'kelas_id', 'mata_pelajaran_id',
-        'siklus_minggu', 'hari', 'jam_mulai', 'jam_selesai'
+        'siklus_minggu', 'hari', 'jam_mulai', 'jam_selesai', 'periode_mulai', 'periode_selesai'
     ];
 
     public function guru(): BelongsTo

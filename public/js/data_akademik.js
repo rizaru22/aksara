@@ -23,7 +23,8 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             { name: 'mata_pelajaran_id', label: 'Mata pelajaran', type: 'select', options: 'subjects', required: true, value: 'nama_mapel' },
             { name: 'siklus_minggu', label: 'Siklus (kosong = mingguan)', type: 'select', optional: true, options: [['', 'Mingguan'], ['1', 'Siklus 1'], ['2', 'Siklus 2'], ['3', 'Siklus 3']] },
             { name: 'hari', label: 'Hari', type: 'select', required: true, options: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'].map((x) => [x, x]) },
-            { name: 'jam_mulai', label: 'Jam mulai', type: 'time', required: true }, { name: 'jam_selesai', label: 'Jam selesai', type: 'time', required: true },
+            { name: 'periode_mulai', label: 'Periode mulai', type: 'period', optional: true },
+            { name: 'periode_selesai', label: 'Periode selesai', type: 'period', optional: true },
         ] },
         agendas: { title: 'Agenda Sekolah', columns: ['nama_agenda', 'tanggal', 'jam_mulai', 'jam_selesai', 'override_kbm'], columnLabels: { nama_agenda: 'Nama Agenda', tanggal: 'Tanggal', jam_mulai: 'Jam Mulai', jam_selesai: 'Jam Selesai', override_kbm: 'Override KBM' }, fields: [
             { name: 'nama_agenda', label: 'Nama agenda', required: true }, { name: 'tanggal', label: 'Tanggal', type: 'date', required: true },
@@ -65,6 +66,12 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
         const definition = masterDefinitions[resource];
         const items = await window.aksaraFetchAllPages(api, `/api/v1/academic/${resource}`);
         const references = {};
+        let activeCalendar = null;
+        if (resource === 'schedules') {
+            try { activeCalendar = (await api('/api/v1/academic/calendars/active')).data || null; }
+            catch (error) { activeCalendar = null; }
+            references.periods = activeCalendar?.detail_periode || [];
+        }
         for (const field of definition.fields) if (field.options && typeof field.options === 'string') references[field.options] = await loadOptions(field.options);
         const fieldMarkup = definition.fields.map((field) => {
             let oldValue = current ? nestedValue(current, field.name) ?? current[field.name] ?? '' : '';
@@ -72,8 +79,10 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             if (field.name === 'override_kbm') oldValue = oldValue ? '1' : '0';
             const required = field.required ? 'required' : '';
             let control;
-            if (field.type === 'select') {
-                const options = typeof field.options === 'string'
+            if (field.type === 'select' || field.type === 'period') {
+                const options = field.type === 'period'
+                    ? []
+                    : typeof field.options === 'string'
                     ? (references[field.options] || []).map((item) => [item.id, item[field.value || 'nama']])
                     : field.options;
                 control = `<select class="form-select" name="${field.name}" ${required}><option value="">Pilih…</option>${options.map(([value, label]) => `<option value="${htmlSafe(value)}" ${String(oldValue) === String(value) ? 'selected' : ''}>${htmlSafe(label)}</option>`).join('')}</select>`;
@@ -88,7 +97,8 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
                         : '';
                 control = `<input class="form-control" name="${field.name}" type="${field.type || 'text'}" value="${htmlSafe(oldValue)}" ${required} ${coordinateAttrs}>`;
             }
-            return `<div class="col-sm-12"><label class="form-label">${htmlSafe(field.label)}</label>${control}</div>`;
+            const wrapperId = resource === 'schedules' && ['periode_mulai', 'periode_selesai'].includes(field.name) ? ` data-schedule-field="${field.name}"` : '';
+            return `<div class="col-sm-12"${wrapperId}><label class="form-label">${htmlSafe(field.label)}</label>${control}</div>`;
         }).join('');
         const heading = current ? `Ubah ${definition.title}` : `Tambah ${definition.title}`;
         const importable = ['classes', 'students', 'subjects', 'materials', 'schedules'].includes(resource);
@@ -97,7 +107,8 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             ? `<div><label class="form-label small mb-1" for="studentImportClass">Kelas tujuan impor</label><select class="form-select" id="studentImportClass" ${studentClasses.length ? '' : 'disabled'}><option value="">${studentClasses.length ? 'Pilih kelas' : 'Belum ada kelas tersedia'}</option>${studentClasses.map((item) => `<option value="${htmlSafe(item.id)}">${htmlSafe(item.nama_kelas)}</option>`).join('')}</select></div>`
             : '';
         const importActions = importable ? `${studentImportClassSelect}<button class="btn btn-outline-success align-self-end" type="button" id="masterImportButton"><i class="bi bi-upload"></i> Import Excel</button><button class="btn btn-outline-primary align-self-end" type="button" id="masterTemplateButton"><i class="bi bi-download"></i> Template Excel</button><input class="d-none" type="file" id="masterImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">` : '';
-        setFeature(definition.title, `<div class="d-flex flex-wrap align-items-end gap-2 mb-3"><button class="btn btn-success align-self-end" id="showMasterForm" ${current ? 'hidden' : ''}><i class="bi bi-plus-lg"></i> Tambah data</button>${importActions}</div>${resource === 'students' ? '<div class="form-text mb-3">Semua siswa dalam file akan dimasukkan ke kelas yang dipilih.</div>' : ''}<div id="masterImportResult" class="mb-3"></div><form class="card mb-4 admin-form-card" id="masterForm" ${current ? `data-id="${current.id}"` : ''} ${current ? '' : 'hidden'}><div class="card-body"><h3 class="h6 mb-3">${heading}</h3><div class="row g-3 admin-form-grid">${fieldMarkup}<div class="col-sm-12 d-flex gap-2 form-actions"><button class="btn btn-primary" type="submit">Simpan</button><button class="btn btn-outline-secondary" type="button" id="cancelMasterForm">Batal</button></div></div></div></form><div class="table-responsive"><table class="table table-sm align-middle mobile-table"><thead><tr><th>No.</th>${definition.columns.map((column) => `<th>${htmlSafe(definition.columnLabels?.[column] || column.split('.').pop().replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase()))}</th>`).join('')}<th>Aksi</th></tr></thead><tbody>${items.map((item, index) => `<tr><td>${index + 1}</td>${definition.columns.map((column) => `<td>${htmlSafe(nestedValue(item, column) ?? item[column] ?? '—')}</td>`).join('')}<td class="d-flex gap-1">${resource === 'academic-years' ? `<button class="btn btn-sm btn-outline-success" data-activate="${item.id}" ${item.is_active ? 'disabled' : ''}>${item.is_active ? 'Aktif' : 'Aktifkan'}</button>` : ''}<button class="btn btn-sm btn-outline-primary" data-edit="${item.id}">Ubah</button><button class="btn btn-sm btn-outline-danger" data-delete="${item.id}">Hapus</button></td></tr>`).join('') || `<tr><td colspan="${definition.columns.length + 2}" class="text-center text-secondary py-4">Belum ada data.</td></tr>`}</tbody></table></div>${resource === 'agendas' ? '<div class="alert alert-warning small">Scope tingkat/kelas belum tersedia karena skema tidak memiliki target kelas/tingkat.</div>' : ''}`);
+        const calendarNotice = resource === 'schedules' ? (activeCalendar ? `<div class="alert alert-info small">Kalender aktif: <strong>${htmlSafe(activeCalendar.nama)}</strong>. Pilih hari, lalu tentukan periode mulai dan selesai. Jam jadwal dihitung otomatis dari detail kalender.</div>` : '<div class="alert alert-warning small">Belum ada kalender jam pelajaran aktif. Aktifkan kalender terlebih dahulu sebelum menambahkan jadwal.</div>') : '';
+        setFeature(definition.title, `${calendarNotice}<div class="d-flex flex-wrap align-items-end gap-2 mb-3"><button class="btn btn-success align-self-end" id="showMasterForm" ${current ? 'hidden' : ''}><i class="bi bi-plus-lg"></i> Tambah data</button>${importActions}</div>${resource === 'students' ? '<div class="form-text mb-3">Semua siswa dalam file akan dimasukkan ke kelas yang dipilih.</div>' : ''}<div id="masterImportResult" class="mb-3"></div><form class="card mb-4 admin-form-card" id="masterForm" ${current ? `data-id="${current.id}"` : ''} ${current ? '' : 'hidden'}><div class="card-body"><h3 class="h6 mb-3">${heading}</h3><div class="row g-3 admin-form-grid">${fieldMarkup}<div class="col-sm-12 d-flex gap-2 form-actions"><button class="btn btn-primary" type="submit">Simpan</button><button class="btn btn-outline-secondary" type="button" id="cancelMasterForm">Batal</button></div></div></div></form><div class="table-responsive"><table class="table table-sm align-middle mobile-table"><thead><tr><th>No.</th>${definition.columns.map((column) => `<th>${htmlSafe(definition.columnLabels?.[column] || column.split('.').pop().replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase()))}</th>`).join('')}<th>Aksi</th></tr></thead><tbody>${items.map((item, index) => `<tr><td>${index + 1}</td>${definition.columns.map((column) => `<td>${htmlSafe((resource === 'schedules' && column === 'jam_mulai' ? (item.jam_mulai_resolved ?? 'Tidak tersedia') : resource === 'schedules' && column === 'jam_selesai' ? (item.jam_selesai_resolved ?? 'Tidak tersedia') : nestedValue(item, column) ?? item[column] ?? '—'))}</td>`).join('')}<td class="d-flex gap-1">${resource === 'academic-years' ? `<button class="btn btn-sm btn-outline-success" data-activate="${item.id}" ${item.is_active ? 'disabled' : ''}>${item.is_active ? 'Aktif' : 'Aktifkan'}</button>` : ''}<button class="btn btn-sm btn-outline-primary" data-edit="${item.id}">Ubah</button><button class="btn btn-sm btn-outline-danger" data-delete="${item.id}">Hapus</button></td></tr>`).join('') || `<tr><td colspan="${definition.columns.length + 2}" class="text-center text-secondary py-4">Belum ada data.</td></tr>`}</tbody></table></div>${resource === 'agendas' ? '<div class="alert alert-warning small">Scope tingkat/kelas belum tersedia karena skema tidak memiliki target kelas/tingkat.</div>' : ''}`);
         $('masterImportButton')?.addEventListener('click', () => {
             if (resource === 'students' && !$('studentImportClass')?.value) {
                 $('masterImportResult').innerHTML = '<div class="alert alert-warning mb-0">Pilih kelas tujuan terlebih dahulu.</div>';
@@ -130,6 +141,41 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
                 event.currentTarget.value = '';
             }
         });
+        if (resource === 'schedules') {
+            const startPeriod = $('masterForm').querySelector('[name="periode_mulai"]');
+            const endPeriod = $('masterForm').querySelector('[name="periode_selesai"]');
+            const day = $('masterForm').querySelector('[name="hari"]');
+            const renderPeriodOptions = () => {
+                const selectedStart = startPeriod?.value || '';
+                const selectedEnd = endPeriod?.value || '';
+                const periods = (activeCalendar?.detail_periode || [])
+                    .filter((period) => period.hari === day?.value)
+                    .sort((a, b) => Number(a.nomor_periode) - Number(b.nomor_periode));
+                const options = periods.map((period) => {
+                    const start = String(period.jam_mulai || '').slice(0, 5);
+                    const end = String(period.jam_selesai || '').slice(0, 5);
+                    const label = `Periode ${period.nomor_periode} (${start}–${end})`;
+                    return `<option value="${htmlSafe(period.nomor_periode)}">${htmlSafe(label)}</option>`;
+                }).join('');
+                for (const [select, value] of [[startPeriod, selectedStart], [endPeriod, selectedEnd]]) {
+                    if (!select) continue;
+                    select.innerHTML = `<option value="">Pilih periode…</option>${options}`;
+                    if (periods.some((period) => String(period.nomor_periode) === String(value))) select.value = value;
+                    select.disabled = !activeCalendar || !day?.value || periods.length === 0;
+                    select.required = Boolean(activeCalendar);
+                }
+                if (startPeriod && endPeriod && startPeriod.value && endPeriod.value && Number(endPeriod.value) < Number(startPeriod.value)) {
+                    endPeriod.setCustomValidity('Periode selesai harus sama dengan atau setelah periode mulai.');
+                } else {
+                    endPeriod?.setCustomValidity('');
+                }
+            };
+            if (day && current?.hari) day.value = current.hari;
+            day?.addEventListener('change', renderPeriodOptions);
+            startPeriod?.addEventListener('change', renderPeriodOptions);
+            endPeriod?.addEventListener('change', renderPeriodOptions);
+            renderPeriodOptions();
+        }
         $('showMasterForm').addEventListener('click', () => { $('masterForm').hidden = false; });
         $('cancelMasterForm').addEventListener('click', () => {
             if (current) openMaster(resource);
@@ -141,6 +187,9 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             for (const field of definition.fields) {
                 if (field.type === 'time' && values[field.name]) values[field.name] = values[field.name].slice(0, 5);
             }
+            delete values.jam_mulai;
+            delete values.jam_selesai;
+            delete values.mode_waktu;
             if (values.siklus_minggu === '') values.siklus_minggu = null;
             if (values.wali_kelas_id === '') values.wali_kelas_id = null;
             if (values.lat_temporary === '') values.lat_temporary = null;
@@ -165,5 +214,148 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             catch (error) { showToast(error.message); }
         }));
     }
-    return { loadOptions, openMaster };
+    async function openCalendars(calendarId = null) {
+        let calendarsResponse;
+        let detailResponse = null;
+        try {
+            calendarsResponse = await api('/api/v1/academic/calendars');
+            if (calendarId) detailResponse = await api(`/api/v1/academic/calendars/${calendarId}`);
+        } catch (error) {
+            setFeature('Kalender Jam Pelajaran', `<div class="alert alert-danger"><h2 class="h6">Kalender gagal dimuat</h2><p class="mb-2">${htmlSafe(error.message || 'Terjadi kesalahan saat memuat kalender.')}</p><button type="button" class="btn btn-outline-primary btn-sm" id="calendarRetry">Coba lagi</button></div>`);
+            $('calendarRetry')?.addEventListener('click', () => openCalendars(calendarId));
+            return;
+        }
+
+        const calendars = calendarsResponse.data || [];
+        const selected = calendarId ? detailResponse?.data : null;
+        if (calendarId && !selected) {
+            setFeature('Kalender Jam Pelajaran', '<div class="alert alert-danger">Kalender tidak ditemukan.</div>');
+            return;
+        }
+        const list = calendars.map((calendar) => {
+            const isSelected = String(calendar.id) === String(calendarId);
+            return `<tr class="${isSelected ? 'table-active' : ''}">
+                <td><strong>${htmlSafe(calendar.nama)}</strong>${isSelected ? ' <span class="badge text-bg-primary">Dipilih</span>' : ''}</td>
+                <td><span class="badge ${calendar.status === 'AKTIF' ? 'text-bg-success' : 'text-bg-secondary'}">${htmlSafe(calendar.status)}</span></td>
+                <td>${(calendar.detail_periode || []).length}</td>
+                <td class="text-nowrap"><button class="btn btn-sm ${isSelected ? 'btn-secondary' : 'btn-outline-primary'}" data-calendar-edit="${calendar.id}">${isSelected ? 'Terpilih' : 'Kelola detail'}</button>${calendar.status === 'AKTIF' ? ` <button class="btn btn-sm btn-outline-warning" data-calendar-deactivate="${calendar.id}">Nonaktifkan</button>` : ` <button class="btn btn-sm btn-success" data-calendar-activate="${calendar.id}">Aktifkan</button>`}</td>
+            </tr>`;
+        }).join('');
+        const periods = (selected?.detail_periode || []).map((period) => ({...period, jam_mulai: String(period.jam_mulai).slice(0,5), jam_selesai: String(period.jam_selesai).slice(0,5)}));
+        const periodRows = periods.map((period, index) => calendarPeriodRow(period, index)).join('');
+
+        setFeature('Kalender Jam Pelajaran', `
+            <form id="calendarCreateForm" class="card mb-3"><div class="card-body"><h2 class="h6">Buat kalender</h2><div class="row g-2"><div class="col-md-4"><label class="form-label">Nama kalender</label><input class="form-control" name="nama" maxlength="100" required></div><div class="col-md-6"><label class="form-label">Catatan (opsional)</label><input class="form-control" name="catatan"></div><div class="col-md-2 d-flex align-items-end"><button class="btn btn-success w-100" type="submit"><i class="bi bi-plus-lg"></i> Tambah data</button></div></div></div></form>
+
+            <div class="card mb-3"><div class="card-header"><strong>Daftar Kalender</strong></div><div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th>Nama</th><th>Status</th><th>Jumlah detail periode</th><th>Aksi</th></tr></thead><tbody>${list || '<tr><td colspan="4" class="text-center text-secondary py-3">Belum ada kalender. Buat kalender di atas.</td></tr>'}</tbody></table></div></div>
+
+            ${selected ? `
+                <div class="card mb-3"><div class="card-body">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                        <div><h2 class="h6 mb-1">Detail Kalender: ${htmlSafe(selected.nama)}</h2><div class="small text-secondary">Status: ${htmlSafe(selected.status)}. Kalender aktif harus dinonaktifkan sebelum periode diubah.</div></div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-outline-primary btn-sm" type="button" id="calendarImportTemplate"><i class="bi bi-download"></i> Template Excel</button>
+                            <button class="btn btn-outline-success btn-sm" type="button" id="calendarImportExcel" ${selected.status === 'AKTIF' ? 'disabled' : ''}><i class="bi bi-upload"></i> Import Excel</button>
+                            <input class="d-none" type="file" id="calendarImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+                            <button class="btn btn-success btn-sm" type="button" id="calendarAddPeriod" ${selected.status === 'AKTIF' ? 'disabled' : ''}><i class="bi bi-plus-lg"></i> Tambah data</button>
+                            <button class="btn btn-primary btn-sm" type="submit" form="calendarPeriodsForm" ${selected.status === 'AKTIF' ? 'disabled' : ''}><i class="bi bi-save"></i> Simpan periode</button>
+                        </div>
+                    </div>
+                    <div class="alert alert-info small mb-0">Atur jam tiap periode per hari. Jeda istirahat cukup dibuat sebagai selisih waktu antarkolom periode; tidak perlu dibuat sebagai periode tersendiri. Jadwal periode 1–3 otomatis menggunakan jam mulai periode 1 dan jam selesai periode 3.</div>
+                </div></div>
+                <form id="calendarPeriodsForm" class="card mb-3"><div class="card-body"><div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Hari</th><th>Nomor periode</th><th>Jam mulai</th><th>Jam selesai</th><th>Label (opsional)</th><th></th></tr></thead><tbody id="calendarPeriodRows">${periodRows || calendarPeriodRow({hari:'Senin',nomor_periode:1,jam_mulai:'07:30',jam_selesai:'08:15',label:''},0)}</tbody></table></div></div></form>
+            ` : '<div class="alert alert-info">Pilih <strong>Kelola detail</strong> pada daftar kalender untuk mengatur periode.</div>'}
+        `);
+
+        $('calendarCreateForm')?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const values = Object.fromEntries(new FormData(event.currentTarget).entries());
+            try { const created = await api('/api/v1/academic/calendars', {method:'POST', body:values}); showToast(created.message); openCalendars(created.data.id); }
+            catch (error) { setFeatureError(error); }
+        });
+        $('calendarImportTemplate')?.addEventListener('click', async () => {
+            try {
+                const response = await fetch(window.aksaraApiUrl('/api/v1/academic/calendars/periods/template'), {
+                    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+                });
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({}));
+                    throw new Error(error.message || `Template gagal diunduh (${response.status}).`);
+                }
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'template_detail_kalender.xlsx';
+                link.click();
+                URL.revokeObjectURL(url);
+            } catch (error) { setFeatureError(error); }
+        });
+        $('calendarImportExcel')?.addEventListener('click', () => $('calendarImportFile')?.click());
+        $('calendarImportFile')?.addEventListener('change', async (event) => {
+            const input = event.currentTarget;
+            const file = input.files?.[0];
+            if (!file) return;
+            if (!confirm('Impor Excel akan mengganti seluruh detail periode pada kalender ini. Lanjutkan?')) {
+                input.value = '';
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const response = await fetch(window.aksaraApiUrl(`/api/v1/academic/calendars/${selected.id}/periods/import`), {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+                    body: formData,
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    const details = result.errors ? Object.values(result.errors).flat().join(' ') : '';
+                    throw new Error(details || result.message || `Impor gagal (${response.status}).`);
+                }
+                showToast(result.message || 'Detail kalender berhasil diimpor.');
+                openCalendars(selected.id);
+            } catch (error) { setFeatureError(error); }
+            finally { input.value = ''; }
+        });
+        $('calendarAddPeriod')?.addEventListener('click', () => {
+            const rows = $('calendarPeriodRows');
+            const next = rows.querySelectorAll('tr').length + 1;
+            rows.insertAdjacentHTML('beforeend', calendarPeriodRow({hari:'Senin',nomor_periode:next,jam_mulai:'',jam_selesai:'',label:''}, Date.now()));
+        });
+        $('calendarPeriodRows')?.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-period-remove]');
+            if (button) button.closest('tr')?.remove();
+        });
+        $('calendarPeriodsForm')?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const periods = Array.from(event.currentTarget.querySelectorAll('#calendarPeriodRows tr')).map((row) => ({
+                hari: row.querySelector('[name="hari"]').value,
+                nomor_periode: Number(row.querySelector('[name="nomor_periode"]').value),
+                jam_mulai: row.querySelector('[name="jam_mulai"]').value,
+                jam_selesai: row.querySelector('[name="jam_selesai"]').value,
+                label: row.querySelector('[name="label"]').value || null,
+            }));
+            try { const saved = await api(`/api/v1/academic/calendars/${selected.id}/periods`, {method:'PUT', body:{periods}}); showToast(saved.message); openCalendars(selected.id); }
+            catch (error) { setFeatureError(error); }
+        });
+        document.querySelectorAll('[data-calendar-edit]').forEach((button) => button.addEventListener('click', () => openCalendars(button.dataset.calendarEdit)));
+        document.querySelectorAll('[data-calendar-activate]').forEach((button) => button.addEventListener('click', async () => {
+            if (!confirm('Aktifkan kalender ini? Kalender aktif sebelumnya akan dinonaktifkan.')) return;
+            try { const result = await api(`/api/v1/academic/calendars/${button.dataset.calendarActivate}/activate`, {method:'POST', body:{}}); showToast(result.message); openCalendars(calendarId); }
+            catch (error) { setFeatureError(error); }
+        }));
+        document.querySelectorAll('[data-calendar-deactivate]').forEach((button) => button.addEventListener('click', async () => {
+            if (!confirm('Nonaktifkan kalender ini? Jadwal berbasis periode tidak dapat di-resolve sampai kalender lain diaktifkan.')) return;
+            try { const result = await api(`/api/v1/academic/calendars/${button.dataset.calendarDeactivate}/deactivate`, {method:'POST', body:{}}); showToast(result.message); openCalendars(calendarId); }
+            catch (error) { setFeatureError(error); }
+        }));
+    }
+
+    function calendarPeriodRow(period, key) {
+        const days = ['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+        return `<tr data-period-row="${htmlSafe(key)}"><td><select class="form-select form-select-sm" name="hari">${days.map((day) => `<option value="${day}" ${period.hari === day ? 'selected' : ''}>${day}</option>`).join('')}</select></td><td><input class="form-control form-control-sm" type="number" name="nomor_periode" min="1" max="30" value="${htmlSafe(period.nomor_periode || 1)}" required></td><td><input class="form-control form-control-sm" type="time" name="jam_mulai" value="${htmlSafe(period.jam_mulai || '')}" required></td><td><input class="form-control form-control-sm" type="time" name="jam_selesai" value="${htmlSafe(period.jam_selesai || '')}" required></td><td><input class="form-control form-control-sm" name="label" maxlength="50" value="${htmlSafe(period.label || '')}"></td><td><button class="btn btn-sm btn-outline-danger" type="button" data-period-remove aria-label="Hapus periode">Hapus</button></td></tr>`;
+    }
+
+    return { loadOptions, openMaster, openCalendars };
 };

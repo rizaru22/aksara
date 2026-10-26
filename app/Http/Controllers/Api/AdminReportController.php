@@ -8,6 +8,7 @@ use App\Models\AgendaSekolah;
 use App\Models\HariLibur;
 use App\Models\JadwalPelajaran;
 use App\Models\JurnalMengajar;
+use App\Services\KalenderJamPelajaranResolver;
 use App\Models\JadwalPresensiHarian;
 use App\Models\Kelas;
 use App\Models\PengajuanIzin;
@@ -28,7 +29,7 @@ class AdminReportController extends Controller
      * Menyediakan laporan admin untuk periode harian, mingguan, atau bulanan berdasarkan filter yang dipilih.
      * Kontrol ini memanggil helper yang sesuai lalu mereturn payload yang siap ditampilkan di UI rekap admin.
      */
-    public function index(Request $request, CycleScheduleService $cycles)
+    public function index(Request $request, CycleScheduleService $cycles, KalenderJamPelajaranResolver $calendarResolver)
     {
         abort_unless($request->user()->hasRole('admin') || $request->user()->can('view-dashboard-kurikulum'), 403);
 
@@ -40,8 +41,8 @@ class AdminReportController extends Controller
         ]);
 
         $response = match ($filters['period']) {
-            'daily' => $this->daily($filters['date'], $cycles, $filters['class_id'] ?? null),
-            'weekly' => $this->weekly($filters['date'], $cycles, $filters['class_id'] ?? null),
+            'daily' => $this->daily($filters['date'], $cycles, $calendarResolver, $filters['class_id'] ?? null),
+            'weekly' => $this->weekly($filters['date'], $cycles, $calendarResolver, $filters['class_id'] ?? null),
             'monthly' => $this->monthly($filters['month']),
         };
 
@@ -88,7 +89,7 @@ class AdminReportController extends Controller
     /**
      * Menyusun data laporan harian untuk semua guru, termasuk status kehadiran, cuti, libur, dan sesi kelas yang berjalan.
      */
-    private function daily(string $date, CycleScheduleService $cycles, ?int $classId = null): array
+    private function daily(string $date, CycleScheduleService $cycles, KalenderJamPelajaranResolver $calendarResolver, ?int $classId = null): array
     {
         $day = Carbon::parse($date, config('app.timezone'))->startOfDay();
         $teachers = $this->userRoster();
@@ -114,14 +115,14 @@ class AdminReportController extends Controller
             'period' => ['from' => $date, 'to' => $date, 'label' => $day->translatedFormat('l, d F Y')],
             'holiday' => $holiday ? ['nama' => $holiday->nama, 'jenis' => $holiday->jenis] : ($day->isSunday() ? ['nama' => 'Hari Minggu', 'jenis' => 'MINGGU'] : null),
             'attendance' => $teacherRows,
-            'classes' => $this->classSessions(collect([$day]), $cycles, $classId),
+            'classes' => $this->classSessions(collect([$day]), $cycles, $calendarResolver, $classId),
         ];
     }
 
     /**
      * Menghitung ringkasan satu pekan kerja, termasuk durasi hadir, daftar guru yang belum mengisi jurnal, dan status kelas.
      */
-    private function weekly(string $date, CycleScheduleService $cycles, ?int $classId = null): array
+    private function weekly(string $date, CycleScheduleService $cycles, KalenderJamPelajaranResolver $calendarResolver, ?int $classId = null): array
     {
         $start = Carbon::parse($date, config('app.timezone'))->startOfWeek(Carbon::MONDAY)->startOfDay();
         $end = $start->copy()->addDays(6)->endOfDay();
@@ -164,7 +165,7 @@ class AdminReportController extends Controller
             ];
         });
 
-        $classRows = $this->classSessions(collect(CarbonPeriod::create($start->toDateString(), $start->copy()->addDays(6)->toDateString())), $cycles, $classId);
+        $classRows = $this->classSessions(collect(CarbonPeriod::create($start->toDateString(), $start->copy()->addDays(6)->toDateString())), $cycles, $calendarResolver, $classId);
         $missingByTeacher = $classRows->where('journal_filled', false)->groupBy('teacher_name')->map(fn ($rows, $name) => [
             'teacher_name' => $name,
             'missing_sessions' => $rows->count(),
@@ -336,7 +337,7 @@ class AdminReportController extends Controller
     /**
      * Mengambil seluruh sesi kelas untuk rentang tanggal tertentu dan menandai apakah jurnal sudah diisi atau belum.
      */
-    private function classSessions($dates, CycleScheduleService $cycles, ?int $classId = null)
+    private function classSessions($dates, CycleScheduleService $cycles, KalenderJamPelajaranResolver $calendarResolver, ?int $classId = null)
     {
         $year = TahunAjaran::query()->where('is_active', true)->first();
         if (! $year) return collect();
@@ -353,15 +354,34 @@ class AdminReportController extends Controller
             $schedules = $allSchedules->get($weekday, collect())->filter(fn (JadwalPelajaran $item) => $item->siklus_minggu === null || (int) $item->siklus_minggu === (int) $cycle)->values();
             if ($schedules->isEmpty()) continue;
             $overrides = AgendaSekolah::query()->whereDate('tanggal', $day->toDateString())->where('scope', 'SEKOLAH')->where('override_kbm', true)->get();
-            $schedules = $schedules->reject(fn (JadwalPelajaran $schedule) => $overrides->contains(fn (AgendaSekolah $agenda) => $agenda->jam_mulai < $schedule->jam_selesai && $agenda->jam_selesai > $schedule->jam_mulai))->values();
             $journals = JurnalMengajar::query()->whereDate('tanggal', $day->toDateString())->whereIn('jadwal_pelajaran_id', $schedules->pluck('id'))->get()->keyBy('jadwal_pelajaran_id');
             foreach ($schedules as $schedule) {
                 $journal = $journals->get($schedule->id);
+                $resolutionError = null;
+                try {
+                    if ($journal?->waktu_rencana_mulai && $journal?->waktu_rencana_selesai) {
+                        $startAt = \Carbon\Carbon::parse($journal->waktu_rencana_mulai, config('app.timezone'));
+                        $endAt = \Carbon\Carbon::parse($journal->waktu_rencana_selesai, config('app.timezone'));
+                    } else {
+                        $resolved = $calendarResolver->resolve($schedule, $day);
+                        $startAt = \Carbon\Carbon::parse($resolved['jam_mulai'], config('app.timezone'));
+                        $endAt = \Carbon\Carbon::parse($resolved['jam_selesai'], config('app.timezone'));
+                    }
+                } catch (\RuntimeException $exception) {
+                    $startAt = $endAt = null;
+                    $resolutionError = $exception->getMessage();
+                }
+
+                if ($startAt && $endAt && $overrides->contains(fn (AgendaSekolah $agenda) => $agenda->jam_mulai < $endAt->format('H:i:s') && $agenda->jam_selesai > $startAt->format('H:i:s'))) {
+                    continue;
+                }
+
                 $rows->push([
                     'date' => $day->toDateString(), 'teacher_name' => $schedule->guru?->nama ?? 'Guru tidak ditemukan',
                     'nip' => $schedule->guru?->nip, 'class_name' => $schedule->kelas?->nama_kelas ?? 'Kelas tidak ditemukan',
                     'subject_name' => $schedule->mataPelajaran?->nama_mapel ?? 'Mata pelajaran',
-                    'start' => substr((string) $schedule->jam_mulai, 0, 5), 'end' => substr((string) $schedule->jam_selesai, 0, 5),
+                    'start' => $startAt?->format('H:i'), 'end' => $endAt?->format('H:i'),
+                    'time_resolution_error' => $resolutionError,
                     'journal_filled' => (bool) $journal,
                     'journal_status' => $journal?->status_sesi ?? 'Belum diisi',
                     'materi' => $journal?->materi_pembahasan, 'catatan' => $journal?->catatan_kejadian_kelas,
