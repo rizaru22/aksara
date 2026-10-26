@@ -20,6 +20,14 @@ class JurnalMengajar extends Model
         self::STATUS_KEDALUWARSA,
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'waktu_rencana_mulai' => 'datetime',
+            'waktu_rencana_selesai' => 'datetime',
+        ];
+    }
+
     protected $fillable = [
         'user_id', 'guru_pengganti_id', 'jadwal_pelajaran_id', 'materi_pelajaran_id',
         'tanggal', 'materi_pembahasan', 'catatan_kejadian_kelas', 'foto_kegiatan',
@@ -28,6 +36,11 @@ class JurnalMengajar extends Model
         'kalender_id_snapshot', 'waktu_rencana_mulai', 'waktu_rencana_selesai',
         'periode_mulai_snapshot', 'periode_selesai_snapshot',
     ];
+
+    public function kalenderSnapshot(): BelongsTo
+    {
+        return $this->belongsTo(KalenderJamPelajaran::class, 'kalender_id_snapshot');
+    }
 
     /**
      * Relasi ke guru yang membuat jurnal; digunakan saat menampilkan riwayat, validasi kepemilikan,
