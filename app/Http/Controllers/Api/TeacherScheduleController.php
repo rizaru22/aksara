@@ -162,7 +162,7 @@ class TeacherScheduleController extends Controller
             unset($schedule->jurnalMengajars);
 
             return $schedule;
-        });
+        })->sortBy(fn (JadwalPelajaran $schedule) => $schedule->getAttribute('waktu_rencana_mulai_resolved') ?? '9999-12-31 23:59:59')->values();
 
         return response()->json([
             'data' => $data,
