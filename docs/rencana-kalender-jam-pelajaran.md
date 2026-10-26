@@ -145,3 +145,19 @@ Layanan `App\\Services\\KalenderJamPelajaranService` juga telah ditambahkan untu
 | AT-14 | Impor jadwal legacy berkonflik dengan jadwal berbasis periode yang sudah ada | Konflik dihitung menggunakan waktu hasil resolver, bukan nilai jam placeholder | Implementasi tersedia; belum diuji |
 
 Catatan: pemeriksaan dashboard dan laporan di atas adalah integrasi kode. Status “belum diuji” harus tetap dipertahankan sampai tes dijalankan di environment proyek; jangan menyimpulkan kelulusan dari inspeksi kode saja.
+
+
+## Implementasi UI dan API kalender — 2026-10-26
+
+Pada branch `feature/kalender-jam-pelajaran`, implementasi awal pengelolaan kalender kini mencakup:
+
+- API terautentikasi dengan permission `kelola-master-data` untuk daftar, pembuatan, detail, perubahan identitas kalender, penyimpanan detail periode, aktivasi, dan deaktivasi.
+- Menu `Kalender Jam Pelajaran` di grup `KALENDER AKADEMIK` untuk role admin/kurikulum yang memiliki permission master data.
+- Halaman untuk membuat kalender, menyunting detail periode ketika kalender nonaktif, mengaktifkan kalender, dan menonaktifkannya.
+- Form jadwal mendukung mode kalender aktif (pilih periode mulai/selesai dan lihat jam hasil resolusi) serta mode jam manual untuk kompatibilitas jadwal legacy.
+- Saat jadwal berbasis periode dikirim, backend menghitung ulang `jam_mulai` dari periode awal dan `jam_selesai` dari periode akhir pada kalender aktif; nilai jam yang dikirim browser tidak menjadi sumber kebenaran.
+- Daftar jadwal master menggunakan `jam_mulai_resolved` dan `jam_selesai_resolved`; jika resolusi gagal, UI menampilkan `Tidak tersedia` dan tidak diam-diam memakai nilai jam lama.
+
+Contoh: periode 1 07.30–08.15, periode 2 08.15–09.00, periode 3 09.00–09.45. Jadwal periode 1–3 menghasilkan 07.30–09.45 dan tetap dihitung sebagai satu jadwal/jurnal. Jeda di antara periode dapat berupa selisih waktu dan tidak perlu direpresentasikan sebagai periode tersendiri.
+
+**Status validasi:** kode telah ditulis ke branch, tetapi PHP lint, JavaScript syntax check, PHPUnit/feature tests, dan uji browser belum dijalankan. Implementasi ini belum boleh dianggap lulus penerimaan sebelum seluruh pemeriksaan tersebut berhasil.
