@@ -141,6 +141,18 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             document.querySelectorAll('tbody tr').forEach((row) => { /* keep table rows untouched */ });
         }
         if (resource === 'schedules') {
+            const yearField = $('masterForm')?.querySelector('[name="tahun_ajaran_id"]');
+            const classField = $('masterForm')?.querySelector('[name="kelas_id"]');
+            const refreshScheduleClasses = () => {
+                if (!classField) return;
+                const selected = classField.value;
+                const filtered = (references.classes || []).filter((item) => String(item.tahun_ajaran_id) === String(yearField?.value || ''));
+                classField.innerHTML = `<option value="">Pilih kelas…</option>${filtered.map((item) => `<option value="${htmlSafe(item.id)}">${htmlSafe(item.nama_kelas)}</option>`).join('')}`;
+                if (filtered.some((item) => String(item.id) === String(selected))) classField.value = selected;
+                classField.disabled = !yearField?.value || filtered.length === 0;
+            };
+            yearField?.addEventListener('change', refreshScheduleClasses);
+            refreshScheduleClasses();
             const filterClass = $('scheduleFilterClass');
             const filterTeacher = $('scheduleFilterTeacher');
             const filterDay = $('scheduleFilterDay');
