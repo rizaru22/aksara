@@ -311,6 +311,7 @@
         if (action === 'substitute-approvals') return openSubstituteApprovals();
         if (action === 'lesson-calendar') return academicData.openCalendars();
         if (['classes', 'students', 'subjects', 'materials', 'schedules'].includes(action)) return academicData.openMaster(action);
+        if (action === 'promote-students') return academicData.openPromotions();
         if (module) return openModule(module);
     }
 
