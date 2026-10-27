@@ -1,7 +1,8 @@
 window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setFeatureError, showToast, token }) {
     const masterDefinitions = {
         'academic-years': { title: 'Tahun Ajaran', columns: ['tahun_ajaran', 'is_active'], columnLabels: { tahun_ajaran: 'Tahun Ajaran', is_active: 'Status' }, fields: [{ name: 'tahun_ajaran', label: 'Tahun ajaran', required: true }] },
-        classes: { title: 'Kelas', columns: ['nama_kelas', 'tingkat', 'jurusan', 'wali_kelas.nama'], columnLabels: { nama_kelas: 'Nama Kelas', tingkat: 'Tingkat', jurusan: 'Jurusan', 'wali_kelas.nama': 'Nama Wali Kelas' }, fields: [
+        classes: { title: 'Kelas', columns: ['nama_kelas', 'tingkat', 'jurusan', 'tahun_ajaran.tahun_ajaran', 'wali_kelas.nama'], columnLabels: { nama_kelas: 'Nama Kelas', tingkat: 'Tingkat', jurusan: 'Jurusan', 'tahun_ajaran.tahun_ajaran': 'Tahun Ajaran', 'wali_kelas.nama': 'Nama Wali Kelas' }, fields: [
+            { name: 'tahun_ajaran_id', label: 'Tahun ajaran', type: 'select', options: 'academic-years', required: true, value: 'tahun_ajaran' },
             { name: 'nama_kelas', label: 'Nama kelas', required: true }, { name: 'tingkat', label: 'Tingkat', required: true }, { name: 'jurusan', label: 'Jurusan', required: true },
             { name: 'wali_kelas_id', label: 'Wali kelas', type: 'select', options: 'teachers', optional: true },
         ] },
