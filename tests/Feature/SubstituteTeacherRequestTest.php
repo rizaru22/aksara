@@ -96,7 +96,7 @@ class SubstituteTeacherRequestTest extends TestCase
         Setting::query()->create(['key' => 'active_tahun_ajaran', 'value' => $year->tahun_ajaran, 'group' => 'academic', 'type' => 'string', 'label' => 'Tahun aktif']);
         Setting::query()->create(['key' => 'semester_start_date', 'value' => '2026-07-13', 'group' => 'academic', 'type' => 'date', 'label' => 'Awal semester']);
 
-        $class = Kelas::query()->create(['nama_kelas' => 'XI RPL', 'tingkat' => 'XI', 'jurusan' => 'RPL']);
+        $class = Kelas::query()->create(['nama_kelas' => 'XI RPL', 'tingkat' => 'XI', 'jurusan' => 'RPL', 'tahun_ajaran_id' => $year->id]);
         $subject = MataPelajaran::query()->create(['kode_mapel' => 'WEB-TEST', 'nama_mapel' => 'Pemrograman Web']);
         $today = Carbon::now(config('app.timezone'));
         $semester = $today->month >= 7 ? 'Ganjil' : 'Genap';
@@ -113,9 +113,12 @@ class SubstituteTeacherRequestTest extends TestCase
         ]);
 
         $students = collect([
-            Siswa::query()->create(['nisn' => 'SUB000001', 'nama' => 'Siswa Pengganti 1', 'kelas_id' => $class->id, 'jenis_kelamin' => 'L']),
-            Siswa::query()->create(['nisn' => 'SUB000002', 'nama' => 'Siswa Pengganti 2', 'kelas_id' => $class->id, 'jenis_kelamin' => 'P']),
+            Siswa::query()->create(['nisn' => 'SUB000001', 'nama' => 'Siswa Pengganti 1', 'jenis_kelamin' => 'L']),
+            Siswa::query()->create(['nisn' => 'SUB000002', 'nama' => 'Siswa Pengganti 2', 'jenis_kelamin' => 'P']),
         ]);
+        $students->each(fn (Siswa $student) => \\App\\Models\\PenempatanSiswa::query()->create([
+            'siswa_id' => $student->id, 'kelas_id' => $class->id, 'tahun_ajaran_id' => $year->id,
+        ]));
 
         return [$primaryTeacher, $substituteTeacher, $schedule, $students];
     }
