@@ -87,4 +87,5 @@ class StudentPlacementService
             }
             return $created;
         });
-    }}
+    }
+}
