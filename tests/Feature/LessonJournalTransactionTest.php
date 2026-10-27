@@ -439,7 +439,7 @@ class LessonJournalTransactionTest extends TestCase
             Siswa::query()->create(['nisn' => 'TEST000001', 'nama' => 'Siswa Satu', 'jenis_kelamin' => 'L']),
             Siswa::query()->create(['nisn' => 'TEST000002', 'nama' => 'Siswa Dua', 'jenis_kelamin' => 'P']),
         ]);
-        $students->each(fn (Siswa $student) => \\App\\Models\\PenempatanSiswa::query()->create([
+        $students->each(fn (Siswa $student) => \App\Models\PenempatanSiswa::query()->create([
             'siswa_id' => $student->id, 'kelas_id' => $class->id, 'tahun_ajaran_id' => $year->id,
         ]));
 
