@@ -30,6 +30,8 @@ jobs:
           mkdir -p database
           touch database/database.sqlite
 
+      - name: Check academic admin JavaScript syntax
+        run: node --check public/js/data_akademik.js
       - name: Run test suite
         env:
           DB_CONNECTION: sqlite
