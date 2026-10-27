@@ -116,7 +116,7 @@ class SubstituteTeacherRequestTest extends TestCase
             Siswa::query()->create(['nisn' => 'SUB000001', 'nama' => 'Siswa Pengganti 1', 'jenis_kelamin' => 'L']),
             Siswa::query()->create(['nisn' => 'SUB000002', 'nama' => 'Siswa Pengganti 2', 'jenis_kelamin' => 'P']),
         ]);
-        $students->each(fn (Siswa $student) => \\App\\Models\\PenempatanSiswa::query()->create([
+        $students->each(fn (Siswa $student) => \App\Models\PenempatanSiswa::query()->create([
             'siswa_id' => $student->id, 'kelas_id' => $class->id, 'tahun_ajaran_id' => $year->id,
         ]));
 
