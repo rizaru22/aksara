@@ -18,6 +18,7 @@ use App\Services\CycleScheduleService;
 use App\Services\KalenderJamPelajaranResolver;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class DashboardController extends Controller
