@@ -77,8 +77,8 @@ class AdminReportController extends Controller
      */
     private function reportSignatories(): array
     {
-        $principal = User::role('kepsek')->first();
-        $curriculum = User::role('kurikulum')->first();
+        $principal = User::query()->whereHas('roles', fn ($query) => $query->where('name', 'kepsek'))->first();
+        $curriculum = User::query()->whereHas('roles', fn ($query) => $query->where('name', 'kurikulum'))->first();
 
         return [
             'principal' => ['name' => $principal?->nama ?? 'Nama Kepala Sekolah', 'nip' => $principal?->nip ?? ''],
