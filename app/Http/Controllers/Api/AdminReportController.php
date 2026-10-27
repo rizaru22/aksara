@@ -267,56 +267,45 @@ class AdminReportController extends Controller
     {
         [$year, $monthNumber] = array_map('intval', explode('-', $month));
         $start = Carbon::create($year, $monthNumber, 1, 0, 0, 0, config('app.timezone'));
+        $activeYear = TahunAjaran::query()->where('is_active', true)->first();
         $class = $classId ? Kelas::query()->find($classId) : null;
+
         $students = Siswa::query()
-            ->when($classId, fn ($query) => $query->where('kelas_id', $classId))
-            ->with('kelas:id,nama_kelas')
+            ->whereDoesntHave('arsip')
+            ->when($classId, fn ($query) => $query->whereHas('penempatans', fn ($placement) => $placement->where('kelas_id', $classId)->when($activeYear, fn ($q) => $q->where('tahun_ajaran_id', $activeYear->id))))
+            ->with(['penempatans' => fn ($query) => $query->with('kelas:id,nama_kelas')->when($activeYear, fn ($q) => $q->where('tahun_ajaran_id', $activeYear->id))])
             ->orderBy('nama')
-            ->get(['id', 'nama', 'nisn', 'kelas_id']);
+            ->get(['id', 'nama', 'nisn']);
 
         $attendance = PresensiSiswa::query()
             ->whereIn('siswa_id', $students->pluck('id'))
             ->whereHas('jurnalMengajar', fn ($query) => $query
                 ->whereYear('tanggal', $year)
-                ->whereMonth('tanggal', $monthNumber)
-                ->when($classId, fn ($scheduleQuery) => $scheduleQuery->whereHas('jadwalPelajaran', fn ($jadwalQuery) => $jadwalQuery->where('kelas_id', $classId))))
-            ->get(['id', 'siswa_id', 'status']);
+                ->whereMonth('tanggal', $monthNumber))
+            ->with('jurnalMengajar:id,tanggal,jadwal_pelajaran_id')
+            ->get(['id', 'siswa_id', 'jurnal_mengajar_id', 'status']);
 
         $byStudent = $attendance->groupBy('siswa_id');
         $statusTotals = ['HADIR' => 0, 'IZIN' => 0, 'SAKIT' => 0, 'ALPHA' => 0, 'CABUT' => 0];
-        $rows = $students->map(function (Siswa $student) use ($byStudent, &$statusTotals): array {
+        $rows = $students->map(function (Siswa $student) use ($byStudent, &$statusTotals, $activeYear): array {
             $records = $byStudent->get($student->id, collect());
             $counts = ['present' => 0, 'izin' => 0, 'sick' => 0, 'alpha' => 0, 'cabut' => 0];
             foreach ($records as $record) {
                 $status = strtoupper((string) $record->status);
                 $key = match ($status) {
-                    'HADIR' => 'present',
-                    'IZIN' => 'izin',
-                    'SAKIT' => 'sick',
-                    'ALPHA' => 'alpha',
-                    'CABUT' => 'cabut',
-                    default => 'alpha',
+                    'HADIR' => 'present', 'IZIN' => 'izin', 'SAKIT' => 'sick', 'ALPHA' => 'alpha', 'CABUT' => 'cabut', default => 'alpha',
                 };
                 $counts[$key]++;
-                if (isset($statusTotals[$status])) {
-                    $statusTotals[$status]++;
-                }
+                if (isset($statusTotals[$status])) $statusTotals[$status]++;
             }
-
+            $placement = $student->penempatans->first();
             $present = $counts['present'];
             $total = $records->count();
-
             return [
-                'id' => $student->id,
-                'nama' => $student->nama,
-                'nisn' => $student->nisn,
-                'kelas' => $student->kelas?->nama_kelas ?? '—',
-                'present_count' => $present,
-                'izin_count' => $counts['izin'],
-                'sick_count' => $counts['sick'],
-                'alpha_count' => $counts['alpha'],
-                'cabut_count' => $counts['cabut'],
-                'total_records' => $total,
+                'id' => $student->id, 'nama' => $student->nama, 'nisn' => $student->nisn,
+                'kelas' => $placement?->kelas?->nama_kelas ?? '—',
+                'present_count' => $present, 'izin_count' => $counts['izin'], 'sick_count' => $counts['sick'],
+                'alpha_count' => $counts['alpha'], 'cabut_count' => $counts['cabut'], 'total_records' => $total,
                 'attendance_percentage' => $total > 0 ? round(($present / $total) * 100, 2) : 0.0,
             ];
         })->values();
@@ -324,10 +313,8 @@ class AdminReportController extends Controller
         return [
             'period' => ['month' => $month, 'label' => $start->translatedFormat('F Y')],
             'summary' => [
-                'total_students' => $rows->count(),
-                'total_records' => $attendance->count(),
-                'total_present' => $rows->sum('present_count'),
-                'class_name' => $class?->nama_kelas ?? 'Semua Kelas',
+                'total_students' => $rows->count(), 'total_records' => $attendance->count(),
+                'total_present' => $rows->sum('present_count'), 'class_name' => $class?->nama_kelas ?? 'Semua Kelas',
                 'by_status' => $statusTotals,
             ],
             'students' => $rows,
