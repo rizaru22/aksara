@@ -135,7 +135,29 @@ class MasterDataController extends Controller
         if ($resource === 'schedules') $input = $this->resolveScheduleInput($input);
         $data = Validator::make($input, $this->rules($resource, $id, true))->validate();
         $this->validateScheduleConflict($resource, array_merge($model->getAttributes(), $data), $model->id);
-        $model->fill($data)->save();
+
+        $placement = null;
+        if ($resource === 'students' && ($request->exists('kelas_id') || $request->exists('tahun_ajaran_id'))) {
+            $placement = Validator::make($request->all(), [
+                'kelas_id' => ['required', 'integer', 'exists:kelas,id'],
+                'tahun_ajaran_id' => ['required', 'integer', 'exists:tahun_ajarans,id'],
+            ])->validate();
+            $class = Kelas::query()->findOrFail($placement['kelas_id']);
+            if ((int) $class->tahun_ajaran_id !== (int) $placement['tahun_ajaran_id']) {
+                throw ValidationException::withMessages(['kelas_id' => 'Kelas tidak termasuk tahun ajaran yang dipilih.']);
+            }
+            unset($data['kelas_id'], $data['tahun_ajaran_id']);
+        }
+
+        DB::transaction(function () use ($model, $data, $resource, $placement): void {
+            $model->fill($data)->save();
+            if ($resource === 'students' && $placement) {
+                PenempatanSiswa::query()->updateOrCreate(
+                    ['siswa_id' => $model->id, 'tahun_ajaran_id' => (int) $placement['tahun_ajaran_id']],
+                    ['kelas_id' => (int) $placement['kelas_id']]
+                );
+            }
+        });
 
         return response()->json(['message' => 'Data berhasil diperbarui.', 'data' => $model->refresh()], 200);
     }
