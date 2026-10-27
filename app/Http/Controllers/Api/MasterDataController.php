@@ -384,6 +384,10 @@ class MasterDataController extends Controller
     private function validateScheduleConflict(string $resource, array $data, ?int $ignoreId = null): void
     {
         if ($resource !== 'schedules') return;
+        $classMatchesYear = Kelas::query()->whereKey($data['kelas_id'] ?? 0)->where('tahun_ajaran_id', $data['tahun_ajaran_id'] ?? 0)->exists();
+        if (! $classMatchesYear) {
+            throw ValidationException::withMessages(['kelas_id' => 'Kelas harus berasal dari tahun ajaran yang sama dengan jadwal.']);
+        }
         $periodStart = $data['periode_mulai'] ?? null;
         $periodEnd = $data['periode_selesai'] ?? null;
         if (($periodStart === null) !== ($periodEnd === null)) {
