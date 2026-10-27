@@ -173,11 +173,11 @@ class AcademicImportController extends Controller
     {
         $year = TahunAjaran::query()->where('tahun_ajaran', trim($row['tahun_ajaran'] ?? ''))->first();
         $teacher = User::query()->where('nip', trim($row['nip_guru'] ?? ''))->role(['guru', 'admin', 'kurikulum', 'kepsek'])->first();
-        $class = Kelas::query()->where('nama_kelas', trim($row['nama_kelas'] ?? ''))->first();
+        $class = $year ? Kelas::query()->where('tahun_ajaran_id', $year->id)->where('nama_kelas', trim($row['nama_kelas'] ?? ''))->first() : null;
         $subject = MataPelajaran::query()->where('kode_mapel', trim($row['kode_mapel'] ?? ''))->first();
         if (! $year) throw new RuntimeException('Tahun ajaran tidak ditemukan; gunakan format yang sama seperti data master.');
         if (! $teacher) throw new RuntimeException('Guru dengan NIP tersebut tidak ditemukan.');
-        if (! $class) throw new RuntimeException('Kelas tidak ditemukan.');
+        if (! $class) throw new RuntimeException('Kelas tidak ditemukan pada tahun ajaran yang dipilih.');
         if (! $subject) throw new RuntimeException('Mata pelajaran tidak ditemukan.');
         $periodeMulai = filter_var($row['periode_mulai'] ?? null, FILTER_VALIDATE_INT);
         $periodeSelesai = filter_var($row['periode_selesai'] ?? null, FILTER_VALIDATE_INT);
