@@ -117,3 +117,80 @@ jobs:
           }
           echo "Legacy statuses normalized correctly\n";
           PHP
+
+  student-placement-migration:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MARIADB_ROOT_PASSWORD: aksara-test
+          MARIADB_DATABASE: aksara_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, dom, fileinfo, pdo_mysql, gd
+          coverage: none
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+      - name: Prepare minimal legacy academic schema
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: aksara_test
+          DB_USERNAME: root
+          DB_PASSWORD: aksara-test
+        run: |
+          php <<'PHP'
+          <?php
+          $pdo = new PDO('mysql:host=127.0.0.1;dbname=aksara_test', 'root', 'aksara-test', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+          $pdo->exec("CREATE TABLE tahun_ajarans (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, tahun_ajaran VARCHAR(9) NOT NULL, is_active TINYINT(1) NOT NULL DEFAULT 0, created_at TIMESTAMP NULL, updated_at TIMESTAMP NULL) ENGINE=InnoDB");
+          $pdo->exec("INSERT INTO tahun_ajarans (tahun_ajaran, is_active) VALUES ('2026/2027', 1)");
+          $pdo->exec("CREATE TABLE kelas (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, nama_kelas VARCHAR(255) NOT NULL, tingkat VARCHAR(50) NOT NULL, jurusan VARCHAR(100) NOT NULL, wali_kelas_id BIGINT UNSIGNED NULL, created_at TIMESTAMP NULL, updated_at TIMESTAMP NULL) ENGINE=InnoDB");
+          $pdo->exec("INSERT INTO kelas (nama_kelas, tingkat, jurusan) VALUES ('X RPL', 'X', 'RPL')");
+          $pdo->exec("CREATE TABLE siswas (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, nisn VARCHAR(255) NOT NULL UNIQUE, nama VARCHAR(255) NOT NULL, kelas_id BIGINT UNSIGNED NOT NULL, jenis_kelamin ENUM('L','P') NOT NULL, created_at TIMESTAMP NULL, updated_at TIMESTAMP NULL, CONSTRAINT siswas_kelas_id_foreign FOREIGN KEY (kelas_id) REFERENCES kelas(id) ON DELETE CASCADE) ENGINE=InnoDB");
+          PHP
+      - name: Run student placement migration on MariaDB 10.6
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: aksara_test
+          DB_USERNAME: root
+          DB_PASSWORD: aksara-test
+        run: php artisan migrate --path=database/migrations/2026_10_28_090000_add_academic_year_to_classes_and_create_student_placements.php --force
+      - name: Verify class backfill and new schema
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: aksara_test
+          DB_USERNAME: root
+          DB_PASSWORD: aksara-test
+        run: |
+          php <<'PHP'
+          <?php
+          $pdo = new PDO('mysql:host=127.0.0.1;dbname=aksara_test', 'root', 'aksara-test', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+          $year = $pdo->query("SELECT tahun_ajaran_id FROM kelas WHERE nama_kelas = 'X RPL'")->fetchColumn();
+          if ((int) $year !== 1) { fwrite(STDERR, "Existing class was not backfilled to active academic year\n"); exit(1); }
+          foreach (['penempatan_siswas', 'arsip_siswas'] as $table) {
+              if (!$pdo->query("SHOW TABLES LIKE ".$pdo->quote($table))->fetchColumn()) { fwrite(STDERR, "Missing table: ".$table."\n"); exit(1); }
+          }
+          $columns = $pdo->query("SHOW COLUMNS FROM siswas")->fetchAll(PDO::FETCH_COLUMN);
+          if (in_array('kelas_id', $columns, true)) { fwrite(STDERR, "Legacy siswas.kelas_id was not removed\n"); exit(1); }
+          echo "Student placement schema migrated and legacy class row backfilled\n";
+          PHP
