@@ -449,5 +449,100 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
         return `<tr data-period-row="${htmlSafe(key)}"><td><select class="form-select form-select-sm" name="hari">${days.map((day) => `<option value="${day}" ${period.hari === day ? 'selected' : ''}>${day}</option>`).join('')}</select></td><td><input class="form-control form-control-sm" type="number" name="nomor_periode" min="1" max="30" value="${htmlSafe(period.nomor_periode || 1)}" required></td><td><input class="form-control form-control-sm" type="time" name="jam_mulai" value="${htmlSafe(period.jam_mulai || '')}" required></td><td><input class="form-control form-control-sm" type="time" name="jam_selesai" value="${htmlSafe(period.jam_selesai || '')}" required></td><td><input class="form-control form-control-sm" name="label" maxlength="50" value="${htmlSafe(period.label || '')}"></td><td><button class="btn btn-sm btn-outline-danger" type="button" data-period-remove aria-label="Hapus periode">Hapus</button></td></tr>`;
     }
 
-    return { loadOptions, openMaster, openCalendars };
+
+    // Alur kenaikan kelas: siapkan pemetaan sebagai draf, periksa hasilnya, lalu konfirmasi sebelum menyimpan.
+    async function openPromotions() {
+        setFeature('Kenaikan Kelas', `
+            <div class="alert alert-info">Pilih tahun ajaran asal dan tujuan. Periksa setiap kelas tujuan terlebih dahulu; belum ada perubahan yang disimpan sampai Anda menekan Konfirmasi Kenaikan Kelas.</div>
+            <form id="promotionSetup" class="card admin-form-card mb-3"><div class="card-body"><div class="row g-3">
+                <div class="col-md-5"><label class="form-label" for="promotionSourceYear">Tahun ajaran asal</label><select class="form-select" id="promotionSourceYear" required><option value="">Memuat tahun ajaran…</option></select></div>
+                <div class="col-md-5"><label class="form-label" for="promotionTargetYear">Tahun ajaran tujuan</label><select class="form-select" id="promotionTargetYear" required><option value="">Pilih tahun ajaran tujuan</option></select></div>
+                <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-primary w-100" type="submit">Siapkan draf</button></div>
+            </div></div></form>
+            <div id="promotionDraft" aria-live="polite"><div class="text-secondary">Pilih tahun ajaran untuk menyiapkan daftar siswa.</div></div>`);
+        const sourceSelect = $('promotionSourceYear');
+        const targetSelect = $('promotionTargetYear');
+        const draft = $('promotionDraft');
+        try {
+            const yearResult = await api('/api/v1/academic/students/academic-years');
+            const years = yearResult.data || [];
+            const options = years.map((year) => `<option value="${htmlSafe(year.id)}">${htmlSafe(year.tahun_ajaran)}${year.is_active ? ' (aktif)' : ''}</option>`).join('');
+            sourceSelect.innerHTML = '<option value="">Pilih tahun ajaran asal</option>' + options;
+            targetSelect.innerHTML = '<option value="">Pilih tahun ajaran tujuan</option>' + options;
+            const activeYear = years.find((year) => year.is_active);
+            if (activeYear) sourceSelect.value = String(activeYear.id);
+        } catch (error) {
+            draft.innerHTML = `<div class="alert alert-danger">${htmlSafe(error.message)}</div>`;
+            return;
+        }
+
+        const loadDraft = async () => {
+            const sourceYearId = sourceSelect.value;
+            const targetYearId = targetSelect.value;
+            if (!sourceYearId || !targetYearId) {
+                draft.innerHTML = '<div class="alert alert-warning">Pilih kedua tahun ajaran terlebih dahulu.</div>';
+                return;
+            }
+            if (sourceYearId === targetYearId) {
+                draft.innerHTML = '<div class="alert alert-warning">Tahun ajaran asal dan tujuan harus berbeda.</div>';
+                return;
+            }
+            draft.innerHTML = '<div class="text-secondary"><span class="spin"></span> Menyiapkan daftar siswa dan kelas tujuan…</div>';
+            try {
+                const [students, classesResponse] = await Promise.all([
+                    window.aksaraFetchAllPages(api, '/api/v1/academic/students', { tahun_ajaran_id: sourceYearId }),
+                    api(`/api/v1/academic/students/classes?tahun_ajaran_id=${encodeURIComponent(targetYearId)}`),
+                ]);
+                const targetClasses = classesResponse.data || [];
+                const eligible = students.filter((student) => !student.arsip && !student.penempatans?.some((placement) => String(placement.tahun_ajaran_id) === String(targetYearId)));
+                const rows = eligible.map((student) => {
+                    const sourcePlacement = student.penempatans?.find((placement) => String(placement.tahun_ajaran_id) === String(sourceYearId));
+                    const sourceClass = sourcePlacement?.kelas;
+                    const matchingClass = targetClasses.find((item) => item.nama_kelas === sourceClass?.nama_kelas) ||
+                        targetClasses.find((item) => String(item.tingkat) === String(sourceClass?.tingkat) && item.jurusan === sourceClass?.jurusan);
+                    const targetOptions = targetClasses.map((item) => `<option value="${htmlSafe(item.id)}" ${String(item.id) === String(matchingClass?.id || '') ? 'selected' : ''}>${htmlSafe(item.nama_kelas)} · Tingkat ${htmlSafe(item.tingkat)} · ${htmlSafe(item.jurusan)}</option>`).join('');
+                    return `<tr><td><input class="form-check-input" type="checkbox" data-promotion-student="${htmlSafe(student.id)}" ${matchingClass ? 'checked' : ''} ${targetClasses.length ? '' : 'disabled'} aria-label="Sertakan ${htmlSafe(student.nama)}"></td><td>${htmlSafe(student.nisn)}</td><td>${htmlSafe(student.nama)}</td><td>${htmlSafe(sourceClass?.nama_kelas || '—')}</td><td><select class="form-select form-select-sm" data-promotion-class="${htmlSafe(student.id)}" ${targetClasses.length ? '' : 'disabled'}><option value="">Pilih kelas tujuan</option>${targetOptions}</select></td></tr>`;
+                }).join('');
+                draft.innerHTML = `
+                    <div class="card mb-3"><div class="card-body">
+                        <div class="d-flex flex-wrap justify-content-between gap-2 align-items-center mb-2"><div><h3 class="h6 mb-1">Draf penempatan tahun ajaran tujuan</h3><p class="small text-secondary mb-0">Centang siswa yang akan diproses dan pastikan kelas tujuannya benar.</p></div><span class="badge text-bg-secondary">${eligible.length} siswa tersedia</span></div>
+                        ${targetClasses.length ? '' : '<div class="alert alert-warning">Belum ada kelas untuk tahun ajaran tujuan. Buat kelas terlebih dahulu melalui menu Kelas.</div>'}
+                        <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Pilih</th><th>NISN</th><th>Nama siswa</th><th>Kelas asal</th><th>Kelas tujuan</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="text-center text-secondary py-3">Tidak ada siswa yang dapat diproses. Pastikan siswa sudah ditempatkan pada tahun asal dan belum memiliki penempatan tahun tujuan.</td></tr>'}</tbody></table></div>
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2"><span class="small text-secondary">Siswa yang sudah punya penempatan di tahun tujuan atau sudah diarsipkan tidak ditampilkan.</span><button class="btn btn-primary" type="button" id="confirmPromotions" ${targetClasses.length && eligible.length ? '' : 'disabled'}>Konfirmasi Kenaikan Kelas</button></div>
+                    </div></div>`;
+                $('confirmPromotions')?.addEventListener('click', async () => {
+                    const selected = Array.from(draft.querySelectorAll('[data-promotion-student]:checked')).map((checkbox) => {
+                        const studentId = checkbox.dataset.promotionStudent;
+                        return { siswa_id: Number(studentId), kelas_id: Number(draft.querySelector(`[data-promotion-class="${studentId}"]`)?.value || 0) };
+                    });
+                    if (!selected.length) { showToast('Pilih minimal satu siswa untuk diproses.'); return; }
+                    if (selected.some((item) => !item.kelas_id)) { showToast('Pilih kelas tujuan untuk setiap siswa yang dicentang.'); return; }
+                    if (!confirm(`Anda akan membuat penempatan untuk ${selected.length} siswa pada tahun ajaran tujuan. Riwayat tahun sebelumnya tidak dihapus. Setelah dikonfirmasi, perubahan tersimpan. Lanjutkan?`)) return;
+                    const button = $('confirmPromotions');
+                    button.disabled = true;
+                    button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Menyimpan…';
+                    try {
+                        const result = await api('/api/v1/academic/students/promote', { method: 'POST', body: {
+                            tahun_ajaran_asal_id: Number(sourceYearId),
+                            tahun_ajaran_tujuan_id: Number(targetYearId),
+                            placements: selected,
+                        }});
+                        showToast(result.message || `Penempatan ${result.count || selected.length} siswa berhasil dibuat.`);
+                        await loadDraft();
+                    } catch (error) {
+                        setFeatureError(error);
+                        button.disabled = false;
+                        button.textContent = 'Konfirmasi Kenaikan Kelas';
+                    }
+                });
+            } catch (error) {
+                draft.innerHTML = `<div class="alert alert-danger">${htmlSafe(error.message)}</div>`;
+            }
+        };
+        $('promotionSetup')?.addEventListener('submit', (event) => { event.preventDefault(); loadDraft(); });
+        targetSelect.addEventListener('change', () => { if (sourceSelect.value && targetSelect.value) loadDraft(); });
+        sourceSelect.addEventListener('change', () => { if (sourceSelect.value && targetSelect.value) loadDraft(); });
+    }
+
+    return { loadOptions, openMaster, openCalendars, openPromotions };
 };
