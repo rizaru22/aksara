@@ -262,13 +262,12 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             const id = event.currentTarget.dataset.id;
             try {
                 if (resource === 'students') {
-                    const placement = { siswa_id: id || null, kelas_id: Number(values.kelas_id), tahun_ajaran_id: Number(values.tahun_ajaran_id) };
+                    const placement = { kelas_id: Number(values.kelas_id), tahun_ajaran_id: Number(values.tahun_ajaran_id) };
                     delete values.kelas_id; delete values.tahun_ajaran_id;
                     if (id) {
-                        await api(`/api/v1/academic/${resource}/${id}`, { method: 'PATCH', body: values });
-                        await api('/api/v1/academic/students/placement', { method: 'PUT', body: placement });
+                        await api(`/api/v1/academic/${resource}/${id}`, { method: 'PATCH', body: { ...values, ...placement } });
                     } else {
-                        const created = await api(`/api/v1/academic/${resource}`, { method: 'POST', body: { ...values, kelas_id: placement.kelas_id, tahun_ajaran_id: placement.tahun_ajaran_id } });
+                        await api(`/api/v1/academic/${resource}`, { method: 'POST', body: { ...values, ...placement } });
                     }
                 } else {
                     await api(`/api/v1/academic/${resource}${id ? `/${id}` : ''}`, { method: id ? 'PATCH' : 'POST', body: values });
