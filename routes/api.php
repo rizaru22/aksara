@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\ProfilePhotoController;
 use App\Http\Controllers\Api\SubstituteTeacherController;
+use App\Http\Controllers\Api\StudentManagementController;
 use App\Http\Controllers\Api\TeacherAttendanceController;
 use App\Http\Controllers\Api\TeacherScheduleController;
 use Illuminate\Support\Facades\Route;
@@ -124,6 +125,15 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
         Route::put('/{calendar}/periods', [KalenderJamPelajaranController::class, 'savePeriods'])->whereNumber('calendar');
         Route::post('/{calendar}/activate', [KalenderJamPelajaranController::class, 'activate'])->whereNumber('calendar');
         Route::post('/{calendar}/deactivate', [KalenderJamPelajaranController::class, 'deactivate'])->whereNumber('calendar');
+    });
+
+    Route::prefix('academic/students')->middleware('permission:kelola-master-data')->group(function (): void {
+        Route::get('/', [StudentManagementController::class, 'index']);
+        Route::get('/classes', [StudentManagementController::class, 'classes']);
+        Route::get('/academic-years', [StudentManagementController::class, 'academicYears']);
+        Route::put('/placement', [StudentManagementController::class, 'place']);
+        Route::post('/promote', [StudentManagementController::class, 'promote']);
+        Route::post('/{siswa}/archive', [StudentManagementController::class, 'archive']);
     });
 
     Route::prefix('academic')->group(function (): void {
