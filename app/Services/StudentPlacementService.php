@@ -48,11 +48,17 @@ class StudentPlacementService
         });
     }
 
-    public function promote(array $placements, int $targetYearId): array
+    public function promote(array $placements, int $sourceYearId, int $targetYearId): array
     {
-        return DB::transaction(function () use ($placements, $targetYearId): array {
+        return DB::transaction(function () use ($placements, $sourceYearId, $targetYearId): array {
+            $sourceYear = TahunAjaran::query()->findOrFail($sourceYearId);
             $targetYear = TahunAjaran::query()->findOrFail($targetYearId);
-            $created = [];
+            if ($sourceYear->id === $targetYear->id) {
+                throw ValidationException::withMessages(['tahun_ajaran_tujuan_id' => 'Tahun ajaran tujuan harus berbeda dari tahun ajaran asal.']);
+            }
+
+            // Validate the complete batch before writing, so one invalid row cannot leave partial placements.
+            $validated = [];
             foreach ($placements as $placement) {
                 $student = Siswa::query()->findOrFail((int) $placement['siswa_id']);
                 $class = Kelas::query()->findOrFail((int) $placement['kelas_id']);
@@ -62,16 +68,23 @@ class StudentPlacementService
                 if (ArsipSiswa::query()->where('siswa_id', $student->id)->exists()) {
                     throw ValidationException::withMessages(['placements' => "Siswa {$student->nama} sudah diarsipkan."]);
                 }
+                if (PenempatanSiswa::query()->where('siswa_id', $student->id)->where('tahun_ajaran_id', $sourceYear->id)->doesntExist()) {
+                    throw ValidationException::withMessages(['placements' => "Siswa {$student->nama} tidak memiliki penempatan pada tahun ajaran asal."]);
+                }
                 if (PenempatanSiswa::query()->where('siswa_id', $student->id)->where('tahun_ajaran_id', $targetYear->id)->exists()) {
                     throw ValidationException::withMessages(['placements' => "Siswa {$student->nama} sudah memiliki penempatan pada tahun ajaran tujuan."]);
                 }
+                $validated[] = ['siswa_id' => $student->id, 'kelas_id' => $class->id];
+            }
+
+            $created = [];
+            foreach ($validated as $placement) {
                 $created[] = PenempatanSiswa::query()->create([
-                    'siswa_id' => $student->id,
-                    'kelas_id' => $class->id,
+                    'siswa_id' => $placement['siswa_id'],
+                    'kelas_id' => $placement['kelas_id'],
                     'tahun_ajaran_id' => $targetYear->id,
                 ]);
             }
             return $created;
         });
-    }
-}
+    }}
