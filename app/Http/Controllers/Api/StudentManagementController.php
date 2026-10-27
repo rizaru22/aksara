@@ -54,12 +54,13 @@ class StudentManagementController extends Controller
     {
         abort_unless($request->user()->can('kelola-master-data'), 403);
         $data = $request->validate([
+            'tahun_ajaran_asal_id' => ['required', 'integer', 'exists:tahun_ajarans,id', 'different:tahun_ajaran_tujuan_id'],
             'tahun_ajaran_tujuan_id' => ['required', 'integer', 'exists:tahun_ajarans,id'],
             'placements' => ['required', 'array', 'min:1', 'max:1000'],
             'placements.*.siswa_id' => ['required', 'integer', 'distinct', 'exists:siswas,id'],
             'placements.*.kelas_id' => ['required', 'integer', 'exists:kelas,id'],
         ]);
-        $created = $service->promote($data['placements'], (int) $data['tahun_ajaran_tujuan_id']);
+        $created = $service->promote($data['placements'], (int) $data['tahun_ajaran_asal_id'], (int) $data['tahun_ajaran_tujuan_id']);
         return response()->json(['message' => 'Penempatan tahun ajaran tujuan berhasil dibuat.', 'count' => count($created), 'data' => $created]);
     }
 
