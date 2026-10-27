@@ -241,9 +241,25 @@ class AcademicImportController extends Controller
 
     private function validateDuplicate(string $resource, array $record, array $previous): void
     {
-        $unique = match ($resource) { 'classes' => ['nama_kelas'], 'students' => ['nisn'], 'subjects' => ['kode_mapel'], default => null };
-        if ($unique && $this->duplicateInDatabase($resource, $record[$unique[0]])) throw ValidationException::withMessages([$unique[0] => 'nilai sudah digunakan']);
-        if ($unique) foreach ($previous as $item) if ($item[$unique[0]] === $record[$unique[0]]) throw ValidationException::withMessages([$unique[0] => 'nilai duplikat pada file']);
+        if ($resource === 'classes') {
+            foreach ($previous as $item) {
+                if ((int) $item['tahun_ajaran_id'] === (int) $record['tahun_ajaran_id'] && $item['nama_kelas'] === $record['nama_kelas']) {
+                    throw ValidationException::withMessages(['nama_kelas' => 'nama kelas duplikat pada tahun ajaran yang sama dalam file']);
+                }
+            }
+            if (Kelas::query()->where('tahun_ajaran_id', $record['tahun_ajaran_id'])->where('nama_kelas', $record['nama_kelas'])->exists()) {
+                throw ValidationException::withMessages(['nama_kelas' => 'nama kelas sudah digunakan pada tahun ajaran yang sama']);
+            }
+            return;
+        }
+        $unique = match ($resource) { 'students' => 'nisn', 'subjects' => 'kode_mapel', default => null };
+        if (! $unique) return;
+        if ($this->duplicateInDatabase($resource, $record[$unique])) {
+            throw ValidationException::withMessages([$unique => 'nilai sudah digunakan']);
+        }
+        foreach ($previous as $item) {
+            if ($item[$unique] === $record[$unique]) throw ValidationException::withMessages([$unique => 'nilai duplikat pada file']);
+        }
     }
 
     private function duplicateInDatabase(string $resource, string $value): bool
