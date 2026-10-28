@@ -39,8 +39,8 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
 
     // Menormalkan nama hanya untuk tampilan; nilai asli dari API/database tidak diubah.
     function formatPersonName(value) {
-        return String(value ?? '').trim().replace(/\\s+/g, ' ').toLocaleLowerCase('id-ID')
-            .replace(/(^|[\\s'-])(\\p{L})/gu, (_, separator, letter) => separator + letter.toLocaleUpperCase('id-ID'));
+        return String(value ?? '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('id-ID')
+            .replace(/(^|[\s'-])(\p{L})/gu, (_, separator, letter) => separator + letter.toLocaleUpperCase('id-ID'));
     }
 
     // Mengekstrak nilai nested dari object yang berasal dari API master data dan relasi model.
