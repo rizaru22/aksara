@@ -68,41 +68,54 @@ class TeacherPushReminderService
 
     private function sendAttendanceReminders($teachers, array $onLeave, ?JadwalPresensiHarian $schedule, CarbonImmutable $now, int &$sent): void
     {
-        $checkInDeadline = $schedule?->jam_masuk_akhir
-            ?? Setting::value('jam_masuk_batas', '07:15:00');
-        $checkInEndsAt = $this->atTime($now, $checkInDeadline);
-        $checkInReminderAt = $checkInEndsAt->subMinutes(10);
+        $checkInStartAt = $schedule?->jam_masuk_mulai
+            ? $this->atTime($now, $schedule->jam_masuk_mulai)
+            : $this->atTime($now, '07:00:00');
+        $checkInEndsAt = $this->atTime(
+            $now,
+            $schedule?->jam_masuk_akhir ?? Setting::value('jam_masuk_batas', '07:15:00'),
+        );
 
-        $checkOutDeadline = $schedule?->jam_pulang_akhir;
-        $checkOutEndsAt = $checkOutDeadline ? $this->atTime($now, $checkOutDeadline) : null;
+        $checkOutStartsAt = $schedule?->jam_pulang_mulai
+            ? $this->atTime($now, $schedule->jam_pulang_mulai)
+            : null;
+        $checkOutEndsAt = $schedule?->jam_pulang_akhir
+            ? $this->atTime($now, $schedule->jam_pulang_akhir)
+            : null;
 
         foreach ($teachers as $teacher) {
-            $teacherIsOnLeave = in_array((int) $teacher->id, $onLeave, true);
+            if (in_array((int) $teacher->id, $onLeave, true)) {
+                continue;
+            }
 
             $attendance = Absensi::query()
                 ->where('user_id', $teacher->id)
                 ->whereDate('tanggal', $now->toDateString())
                 ->first();
 
-            if (! $teacherIsOnLeave && ! $attendance?->jam_masuk && $this->within($now, $checkInReminderAt, $checkInEndsAt)) {
+            if (! $attendance?->jam_masuk
+                && $this->within($now, $checkInStartAt, $checkInEndsAt)) {
+                $slot = intdiv(max(0, $checkInStartAt->diffInMinutes($now)), 30);
                 $sent += $this->sendOnce(
                     $teacher,
-                    "check-in:{$now->toDateString()}:{$teacher->id}",
+                    "check-in:{$now->toDateString()}:{$teacher->id}:{$slot}",
                     'Pengingat absen masuk',
-                    'Waktu absen masuk tinggal 10 menit lagi. Silakan catat kehadiran.',
-                    "check-in-{$now->toDateString()}-{$teacher->id}",
+                    'Presensi masuk Anda belum tercatat. Silakan segera melakukan presensi masuk.',
+                    "check-in-{$now->toDateString()}-{$teacher->id}-{$slot}",
                     $now,
                 );
             }
 
-            if ($attendance?->jam_masuk && ! $attendance->jam_pulang && $checkOutEndsAt
-                && $this->within($now, $checkOutEndsAt, $checkOutEndsAt->addMinutes(5))) {
+            if ($attendance?->jam_masuk && ! $attendance->jam_pulang
+                && $checkOutStartsAt && $checkOutEndsAt
+                && $this->within($now, $checkOutStartsAt, $checkOutEndsAt)) {
+                $slot = intdiv(max(0, $checkOutStartsAt->diffInMinutes($now)), 30);
                 $sent += $this->sendOnce(
                     $teacher,
-                    "check-out:{$now->toDateString()}:{$teacher->id}",
+                    "check-out:{$now->toDateString()}:{$teacher->id}:{$slot}",
                     'Pengingat absen pulang',
-                    'Waktu absen pulang berakhir sekarang. Silakan catat kepulangan.',
-                    "check-out-{$now->toDateString()}-{$teacher->id}",
+                    'Presensi pulang Anda belum tercatat. Silakan melakukan presensi pulang saat periode presensi berlaku.',
+                    "check-out-{$now->toDateString()}-{$teacher->id}-{$slot}",
                     $now,
                 );
             }
@@ -213,18 +226,27 @@ class TeacherPushReminderService
                 );
             }
 
-            if (! $journal || ! $journal->foto_kegiatan) {
-                $body = $journal
-                    ? 'Waktu pelajaran segera berakhir. Silakan unggah foto kegiatan pelajaran.'
-                    : 'Waktu pelajaran segera berakhir. Jurnal dan foto kegiatan belum dilengkapi.';
-
-                if ($this->within($now, $end->subMinutes(5), $end->addMinutes(5))) {
+            if ($journal && $journal->status_sesi === JurnalMengajar::STATUS_DRAFT) {
+                // Cron runs every 15 minutes: keep a window around the planned end so
+                // the main reminder is not missed due to scheduler timing.
+                if ($this->within($now, $end->subMinutes(15), $end->subSecond())) {
                     $sent += $this->sendOnce(
                         $teacher,
-                        "lesson-photo:{$now->toDateString()}:{$schedule->id}:{$teacher->id}",
-                        'Pengingat foto kegiatan',
-                        $body,
-                        "lesson-photo-{$now->toDateString()}-{$schedule->id}-{$teacher->id}",
+                        "journal-finalize:{$now->toDateString()}:{$schedule->id}:{$teacher->id}:main",
+                        'Pengingat finalisasi jurnal',
+                        'Pelajaran akan berakhir dalam sekitar 15 menit. Silakan finalkan jurnal mengajar Anda.',
+                        "journal-finalize-{$now->toDateString()}-{$schedule->id}-{$teacher->id}-main",
+                        $now,
+                    );
+                }
+
+                if ($this->within($now, $end, $end->addMinutes(15))) {
+                    $sent += $this->sendOnce(
+                        $teacher,
+                        "journal-finalize:{$now->toDateString()}:{$schedule->id}:{$teacher->id}:follow-up",
+                        'Tindak lanjut finalisasi jurnal',
+                        'Jurnal sesi pelajaran ini masih berstatus draft. Silakan selesaikan finalisasi jurnal.',
+                        "journal-finalize-{$now->toDateString()}-{$schedule->id}-{$teacher->id}-follow-up",
                         $now,
                     );
                 }
