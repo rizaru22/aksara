@@ -827,7 +827,7 @@ renderStudentPage();
             printStyles.textContent = `
                 #${printContentId} { display: none; }
                 @media print {
-                    @page { size: A4 portrait; margin: 12mm; }
+                    @page { size: auto; margin: 0; }
                     body * { visibility: hidden !important; }
                     #${printContentId}, #${printContentId} * { visibility: visible !important; }
                     #${printContentId} {
@@ -836,6 +836,8 @@ renderStudentPage();
                         left: 0;
                         top: 0;
                         width: 100%;
+                        box-sizing: border-box;
+                        padding: 12mm;
                         color: #111;
                         background: #fff;
                         font-family: Arial, sans-serif;
