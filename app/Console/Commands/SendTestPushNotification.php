@@ -6,7 +6,7 @@ use App\Notifications\TeacherReminderNotification;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 
-class SendTestPushNotification extends Commandyes
+class SendTestPushNotification extends Command
 {
     protected $signature = 'aksara:test-push {email}';
 
