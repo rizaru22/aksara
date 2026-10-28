@@ -140,6 +140,7 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
         Route::get('/imports/templates/{resource}', [AcademicImportController::class, 'template'])->middleware('permission:kelola-master-data')->whereIn('resource', ['classes', 'students', 'subjects', 'materials', 'schedules']);
         Route::post('/imports/{resource}', [AcademicImportController::class, 'import'])->middleware(['permission:kelola-master-data', 'throttle:10,1'])->whereIn('resource', ['classes', 'students', 'subjects', 'materials', 'schedules']);
         Route::post('/imports/dapodik/rombel', [AcademicImportController::class, 'importDapodikRombel'])->middleware(['permission:kelola-master-data', 'throttle:10,1']);
+        Route::post('/imports/dapodik/siswa', [AcademicImportController::class, 'importDapodikSiswa'])->middleware(['permission:kelola-master-data', 'throttle:10,1']);
         Route::get('/teachers', [MasterDataController::class, 'teachers']);
         Route::get('/{resource}', [MasterDataController::class, 'index'])->whereIn('resource', ['academic-years', 'classes', 'students', 'subjects', 'materials', 'schedules', 'agendas']);
         Route::post('/{resource}', [MasterDataController::class, 'store'])->whereIn('resource', ['academic-years', 'classes', 'students', 'subjects', 'materials', 'schedules', 'agendas']);
