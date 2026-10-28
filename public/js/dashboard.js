@@ -788,17 +788,26 @@ renderStudentPage();
         const summary = data.summary || {};
         const rows = (data.students || []).map((student, index) => `<tr><td>${index + 1}</td><td>${htmlSafe(student.nisn || '—')}</td><td>${htmlSafe(student.nama ? formatStudentDisplayName(student.nama) : '—')}</td><td>${student.hadir}</td><td>${student.sakit}</td><td>${student.izin}</td><td>${student.alpha}</td><td>${student.cabut}</td><td>${student.persentase_hadir}%</td></tr>`).join('');
         setWaliPage(`Rekap Presensi · ${data.class?.nama_kelas || 'Kelas'}`, `
-            <form id="waliAttendanceFilter" class="row g-2 align-items-end mb-3"><div class="col-sm-6 col-md-4"><label class="form-label" for="waliAttendanceMonth">Bulan laporan</label><input class="form-control" type="month" id="waliAttendanceMonth" name="month" value="${htmlSafe(month)}" required></div><div class="col-auto"><button class="btn btn-primary" type="submit">Tampilkan</button></div><div class="col-auto"><button class="btn btn-outline-secondary" type="button" data-wali-action="dashboard">Kembali</button></div></form>
+            <form id="waliAttendanceFilter" class="row g-2 align-items-end mb-3"><div class="col-sm-6 col-md-4"><label class="form-label" for="waliAttendanceMonth">Bulan laporan</label><input class="form-control" type="month" id="waliAttendanceMonth" name="month" value="${htmlSafe(month)}" required></div><div class="col-auto"><button class="btn btn-primary" type="submit">Tampilkan</button></div><div class="col-auto"><button class="btn btn-outline-secondary" type="button" data-wali-action="dashboard">Kembali</button></div><div class="col-auto"><button class="btn btn-outline-primary" type="button" id="printWaliAttendance"><i class="bi bi-printer"></i> Cetak Presensi</button></div></form>
+            <div id="waliAttendancePrintArea" class="wali-attendance-print-area">
+            <div class="mb-3"><h2 class="h5 mb-1">Rekap Presensi Siswa</h2><div class="text-secondary small">Kelas: ${htmlSafe(data.class?.nama_kelas || '—')} · Bulan: ${htmlSafe(month)}</div></div>
             <div class="row g-2 mb-3">
                 <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="small text-secondary">Jumlah siswa</div><strong>${Number(summary.total_students || 0)}</strong></div></div></div>
                 <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="small text-secondary">Catatan presensi</div><strong>${Number(summary.total_sessions || 0)}</strong></div></div></div>
                 <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="small text-secondary">Hadir</div><strong>${Number(summary.hadir || 0)}</strong></div></div></div>
                 <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="small text-secondary">Alpha</div><strong>${Number(summary.alpha || 0)}</strong></div></div></div>
             </div>
-            <div class="table-responsive"><table class="table table-striped table-sm align-middle"><thead><tr><th>No.</th><th>NISN</th><th>Nama Siswa</th><th>Hadir</th><th>Sakit</th><th>Izin</th><th>Alpha</th><th>Cabut</th><th>% Hadir</th></tr></thead><tbody>${rows || '<tr><td colspan="9" class="text-center text-secondary">Belum ada data presensi pada bulan ini.</td></tr>'}</tbody></table></div>`);
+            <div class="table-responsive"><table class="table table-striped table-sm align-middle"><thead><tr><th>No.</th><th>NISN</th><th>Nama Siswa</th><th>Hadir</th><th>Sakit</th><th>Izin</th><th>Alpha</th><th>Cabut</th><th>% Hadir</th></tr></thead><tbody>${rows || '<tr><td colspan="9" class="text-center text-secondary">Belum ada data presensi pada bulan ini.</td></tr>'}</tbody></table></div></div>`);
         $('waliAttendanceFilter')?.addEventListener('submit', (event) => {
             event.preventDefault();
             openWaliAttendance(classId, $('waliAttendanceMonth').value).catch((error) => setWaliPage('Rekap Presensi Wali Kelas', `<div class="alert alert-danger">${htmlSafe(error.message)}</div>`));
+        });
+        $('printWaliAttendance')?.addEventListener('click', () => {
+            document.body.classList.add('wali-attendance-printing');
+            const cleanup = () => document.body.classList.remove('wali-attendance-printing');
+            window.addEventListener('afterprint', cleanup, { once: true });
+            window.print();
+            window.setTimeout(cleanup, 1500);
         });
         bindWaliActions();
     }
