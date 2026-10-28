@@ -22,7 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $schedule->call(fn () => app(PendingLeaveRequestReminderService::class)->sendPendingReminders())
             ->name('aksara:remind-pending-leave-requests')
-            ->everyFifteenMinutes()
+            ->everyMinute()
             ->timezone('Asia/Jakarta')
             ->withoutOverlapping();
     })
