@@ -816,9 +816,9 @@ renderStudentPage();
                 <td>${Number(student.persentase_hadir || 0)}%</td>
             </tr>`).join('');
 
-            document.getElementById('waliAttendancePrintArea')?.remove();
+            document.getElementById('waliAttendancePrintDocument')?.remove();
             const printArea = document.createElement('section');
-            printArea.id = 'waliAttendancePrintArea';
+            printArea.id = 'waliAttendancePrintDocument';
             printArea.innerHTML = `
                 <h1>Rekap Presensi Siswa</h1>
                 <div class="wali-print-meta">Kelas: ${htmlSafe(data.class?.nama_kelas || '—')} &nbsp; | &nbsp; Bulan: ${htmlSafe(month)}</div>
