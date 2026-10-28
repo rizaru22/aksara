@@ -35,8 +35,8 @@ class TeacherReminderNotification extends Notification
         return (new WebPushMessage)
             ->title($this->title)
             ->body($this->body)
-            ->icon('/favicon.ico')
-            ->badge('/favicon.ico')
+            ->icon('/favicon.svg')
+            ->badge('/favicon.svg')
             ->tag($this->tag)
             ->data(['url' => '/dashboard.html'])
             ->options(['TTL' => 3600]);
