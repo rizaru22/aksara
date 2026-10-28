@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\SubstituteTeacherController;
 use App\Http\Controllers\Api\StudentManagementController;
 use App\Http\Controllers\Api\TeacherAttendanceController;
 use App\Http\Controllers\Api\TeacherScheduleController;
+use App\Http\Controllers\Api\WaliKelasController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/auth')->group(function (): void {
