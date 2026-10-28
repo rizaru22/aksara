@@ -82,6 +82,13 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
     Route::patch('/student-attendances/{presensiSiswa}', [LessonJournalController::class, 'updateStudentAttendance'])->middleware('permission:kelola-presensi-siswa');
     Route::get('/student-attendances/wali-sessions', [LessonJournalController::class, 'waliSessions'])->middleware('permission:kelola-presensi-siswa');
 
+    Route::prefix('wali-class')->middleware('permission:kelola-presensi-siswa')->group(function (): void {
+        Route::get('/overview', [WaliKelasController::class, 'overview']);
+        Route::get('/classes/{kelas}/students', [WaliKelasController::class, 'students'])->whereNumber('kelas');
+        Route::get('/classes/{kelas}/schedules', [WaliKelasController::class, 'schedules'])->whereNumber('kelas');
+        Route::get('/classes/{kelas}/attendance', [WaliKelasController::class, 'attendance'])->whereNumber('kelas');
+    });
+
     Route::get('/dashboard/curriculum', [DashboardController::class, 'curriculum'])->middleware('permission:view-dashboard-kurikulum');
     Route::get('/dashboard/admin', [DashboardController::class, 'adminLive']);
     Route::get('/admin/reports', [AdminReportController::class, 'index']);
