@@ -26,7 +26,7 @@ class AcademicImportController extends Controller
 {
     private const TEMPLATES = [
         'classes' => ['Kelas', ['tahun_ajaran', 'nama_kelas', 'tingkat', 'jurusan', 'wali_kelas_nip']],
-        'students' => ['Siswa', ['nisn', 'nama', 'jenis_kelamin']],
+        'students' => ['Siswa', ['tahun_ajaran', 'nisn', 'nama', 'jenis_kelamin']],
         'subjects' => ['Mata_Pelajaran', ['kode_mapel', 'nama_mapel']],
         'materials' => ['Materi_Pelajaran', ['kode_mapel', 'urutan_bab', 'judul_bab', 'target_jjp']],
         'schedules' => ['Jadwal_Pelajaran', ['tahun_ajaran', 'semester', 'nip_guru', 'nama_kelas', 'kode_mapel', 'siklus_minggu', 'hari', 'periode_mulai', 'periode_selesai']],
@@ -78,7 +78,7 @@ class AcademicImportController extends Controller
             $missing = array_values(array_diff($expected, $headers));
             if ($missing) throw ValidationException::withMessages(['file' => 'Kolom template tidak lengkap: '.implode(', ', $missing).'. Unduh template terbaru.']);
             if (count($rows) > 2000) throw ValidationException::withMessages(['file' => 'Maksimum 2.000 baris data per impor.']);
-            $records = $this->mapRows($resource, $rows, $classId);
+            $records = $this->mapRows($resource, $rows, $classId, $placementYearId);
             DB::transaction(function () use ($resource, $records, $classId, $placementYearId): void {
                 foreach ($records as $record) {
                     match ($resource) {
@@ -109,7 +109,7 @@ class AcademicImportController extends Controller
      * Memetakan semua baris Excel dari satu resource ke struktur data yang siap divalidasi sebelum disimpan.
      * Setiap baris diperiksa satu per satu agar error bisa diidentifikasi dengan nomor baris yang tepat.
      */
-    private function mapRows(string $resource, array $rows, ?int $classId = null): array
+    private function mapRows(string $resource, array $rows, ?int $classId = null, ?int $placementYearId = null): array
     {
         $mapped = [];
         $errors = [];
@@ -118,7 +118,7 @@ class AcademicImportController extends Controller
             try {
                 $record = match ($resource) {
                     'classes' => $this->classRow($row),
-                    'students' => $this->studentRow($row, $classId),
+                    'students' => $this->studentRow($row, $classId, $placementYearId),
                     'subjects' => $this->subjectRow($row),
                     'materials' => $this->materialRow($row),
                     'schedules' => $this->scheduleRow($row),
@@ -152,9 +152,25 @@ class AcademicImportController extends Controller
     /**
      * Mengubah baris siswa menjadi payload yang sesuai schema model Siswa serta mengikat ke kelas tujuan.
      */
-    private function studentRow(array $row, ?int $classId): array
+    private function studentRow(array $row, ?int $classId, ?int $placementYearId): array
     {
-        return ['nisn' => trim($row['nisn'] ?? ''), 'nama' => trim($row['nama'] ?? ''), 'jenis_kelamin' => strtoupper(trim($row['jenis_kelamin'] ?? ''))];
+        $yearName = trim($row['tahun_ajaran'] ?? '');
+        $year = $yearName !== '' ? TahunAjaran::query()->where('tahun_ajaran', $yearName)->first() : null;
+        if (! $year) {
+            throw new RuntimeException('Tahun ajaran penempatan siswa tidak ditemukan atau kosong.');
+        }
+        if ($placementYearId === null || (int) $year->id !== $placementYearId) {
+            throw new RuntimeException('Tahun ajaran pada file siswa harus sama dengan tahun ajaran penempatan yang dipilih.');
+        }
+        if ($classId === null || (int) Kelas::query()->findOrFail($classId)->tahun_ajaran_id !== (int) $year->id) {
+            throw new RuntimeException('Kelas tujuan harus berada pada tahun ajaran penempatan yang tercantum di file.');
+        }
+
+        return [
+            'nisn' => trim($row['nisn'] ?? ''),
+            'nama' => trim($row['nama'] ?? ''),
+            'jenis_kelamin' => strtoupper(trim($row['jenis_kelamin'] ?? '')),
+        ];
     }
 
     private function subjectRow(array $row): array
