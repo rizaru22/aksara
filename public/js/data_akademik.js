@@ -175,8 +175,9 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
                 window.addEventListener('afterprint', cleanupPrintDocument, { once: true });
                 try {
                     window.print();
-                } finally {
+                } catch (error) {
                     cleanupPrintDocument();
+                    throw error;
                 }
             });
             const importYear = $('studentImportYear');
