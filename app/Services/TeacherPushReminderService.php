@@ -103,7 +103,7 @@ class TeacherPushReminderService
                 $sent += $this->sendOnce(
                     $teacher,
                     "check-in:{$now->toDateString()}:{$teacher->id}:{$slot}",
-                    'Pengingat absen masuk',
+                    'Pengingat presensi masuk',
                     'Presensi masuk Anda belum tercatat. Silakan segera melakukan presensi masuk.',
                     "check-in-{$now->toDateString()}-{$teacher->id}-{$slot}",
                     $now,
@@ -117,7 +117,7 @@ class TeacherPushReminderService
                 $sent += $this->sendOnce(
                     $teacher,
                     "check-out:{$now->toDateString()}:{$teacher->id}:{$slot}",
-                    'Pengingat absen pulang',
+                    'Pengingat presensi pulang',
                     'Presensi pulang Anda belum tercatat. Silakan melakukan presensi pulang saat periode presensi berlaku.',
                     "check-out-{$now->toDateString()}-{$teacher->id}-{$slot}",
                     $now,
