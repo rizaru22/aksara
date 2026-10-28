@@ -722,7 +722,7 @@ renderStudentPage();
         const data = result.data || {};
         const classes = Array.isArray(data.classes) ? data.classes : [];
         const classCards = classes.map((item) => `
-            <div class="col-md-6 col-xl-4"><article class="card h-100"><div class="card-body">
+            <div class="col-md-12 col-xl-12 col-sm-12 col-xs-12"><article class="card h-100"><div class="card-body">
                 <h3 class="h5">${htmlSafe(item.nama_kelas)}</h3>
                 <p class="small text-secondary mb-2">${htmlSafe(item.tingkat || '')} · ${htmlSafe(item.jurusan || '')}</p>
                 <p><strong>${Number(item.penempatans_count || 0)}</strong> siswa</p>
@@ -730,6 +730,7 @@ renderStudentPage();
                     <button class="btn btn-sm btn-outline-primary" data-wali-action="students" data-class-id="${item.id}">Data siswa</button>
                     <button class="btn btn-sm btn-outline-secondary" data-wali-action="schedules" data-class-id="${item.id}">Jadwal</button>
                     <button class="btn btn-sm btn-outline-success" data-wali-action="attendance" data-class-id="${item.id}">Rekap presensi</button>
+                    <button class="btn btn-sm btn-primary" data-wali-action="corrections">Koreksi presensi siswa</button>
                 </div>
             </div></article></div>`).join('');
         setWaliPage('Dashboard Wali Kelas', `
@@ -739,8 +740,8 @@ renderStudentPage();
                 <div class="col-sm-6"><div class="card"><div class="card-body"><div class="small text-secondary">Total siswa</div><strong>${Number(data.total_students || 0)}</strong></div></div></div>
             </div>
             <h3 class="h5 mb-3">Kelas yang menjadi tanggung jawab Anda</h3>
-            <div class="row g-3">${classCards || '<div class="col-12"><div class="alert alert-info">Belum ada kelas yang ditugaskan kepada Anda sebagai wali kelas pada tahun ajaran aktif.</div></div>'}</div>
-            <div class="d-flex flex-wrap gap-2 mt-3"><button class="btn btn-outline-primary" data-wali-action="corrections">Koreksi presensi siswa</button></div>`);
+            <div class="row g-3">${classCards || '<div class="col-12"><div class="alert alert-info">Belum ada kelas yang ditugaskan kepada Anda sebagai wali kelas pada tahun ajaran aktif.</div></div>'}
+            </div>`);
         bindWaliActions();
     }
 
