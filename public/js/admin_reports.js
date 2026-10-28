@@ -196,9 +196,9 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
             window.addEventListener('afterprint', cleanup, { once: true });
             try {
                 window.print();
-            } finally {
-                // Jaga halaman tetap bisa dipakai setelah dialog cetak ditutup.
+            } catch (error) {
                 cleanup();
+                throw error;
             }
         };
         const loadClasses = async () => {
