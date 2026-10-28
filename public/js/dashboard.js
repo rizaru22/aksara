@@ -821,78 +821,69 @@ renderStudentPage();
                 <td>${Number(student.persentase_hadir || 0)}%</td>
             </tr>`).join('');
 
-            const printFrame = document.createElement('iframe');
-            printFrame.setAttribute('title', 'Dokumen cetak rekap presensi');
-            printFrame.setAttribute('aria-hidden', 'true');
-            printFrame.style.position = 'fixed';
-            printFrame.style.right = '0';
-            printFrame.style.bottom = '0';
-            printFrame.style.width = '0';
-            printFrame.style.height = '0';
-            printFrame.style.border = '0';
-            printFrame.style.visibility = 'hidden';
+            const printContentId = 'waliAttendancePrintContent';
+            const styleId = 'waliAttendancePrintStyles';
+            document.getElementById(printContentId)?.remove();
+            document.getElementById(styleId)?.remove();
 
-            const cleanupPrintFrame = () => printFrame.remove();
-
-            printFrame.addEventListener('load', () => {
-                const printWindow = printFrame.contentWindow;
-                if (!printWindow) {
-                    cleanupPrintFrame();
-                    showToast('Dokumen cetak tidak dapat disiapkan. Silakan coba lagi.');
-                    return;
+            const printStyles = document.createElement('style');
+            printStyles.id = styleId;
+            printStyles.textContent = `
+                #${printContentId} { display: none; }
+                @media print {
+                    @page { size: A4 portrait; margin: 12mm; }
+                    body * { visibility: hidden !important; }
+                    #${printContentId}, #${printContentId} * { visibility: visible !important; }
+                    #${printContentId} {
+                        display: block !important;
+                        position: absolute;
+                        left: 0;
+                        top: 0;
+                        width: 100%;
+                        color: #111;
+                        background: #fff;
+                        font-family: Arial, sans-serif;
+                        font-size: 11px;
+                    }
+                    #${printContentId} h1 { font-size: 18px; margin: 0 0 5px; }
+                    #${printContentId} .meta { margin-bottom: 14px; font-size: 11px; }
+                    #${printContentId} .summary { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 14px; }
+                    #${printContentId} .summary span { display: inline-block; }
+                    #${printContentId} table { width: 100%; border-collapse: collapse; }
+                    #${printContentId} th, #${printContentId} td { border: 1px solid #777; padding: 5px 6px; text-align: center; }
+                    #${printContentId} th { background: #e9eeee !important; font-weight: bold; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+                    #${printContentId} th:nth-child(3), #${printContentId} td:nth-child(3) { text-align: left; }
+                    #${printContentId} thead { display: table-header-group; }
+                    #${printContentId} tr { break-inside: avoid; page-break-inside: avoid; }
                 }
+            `;
+            document.head.appendChild(printStyles);
 
-                printWindow.addEventListener('afterprint', cleanupPrintFrame, { once: true });
-                printWindow.focus();
-                printWindow.print();
-            }, { once: true });
+            const printContent = document.createElement('section');
+            printContent.id = printContentId;
+            printContent.innerHTML = `
+                <h1>Rekap Presensi Siswa</h1>
+                <div class="meta">Kelas: ${htmlSafe(data.class?.nama_kelas || '—')} &nbsp; | &nbsp; Bulan: ${htmlSafe(month)}</div>
+                <div class="summary">
+                    <span>Jumlah siswa: <strong>${Number(summary.total_students || (data.students || []).length)}</strong></span>
+                    <span>Catatan presensi: <strong>${Number(summary.total_sessions || 0)}</strong></span>
+                    <span>Hadir: <strong>${Number(summary.hadir || 0)}</strong></span>
+                    <span>Alpha: <strong>${Number(summary.alpha || 0)}</strong></span>
+                </div>
+                <table>
+                    <thead><tr><th>No.</th><th>NISN</th><th>Nama Siswa</th><th>Hadir</th><th>Sakit</th><th>Izin</th><th>Alpha</th><th>Cabut</th><th>% Hadir</th></tr></thead>
+                    <tbody>${printRows || '<tr><td colspan="9">Belum ada data presensi pada bulan ini.</td></tr>'}</tbody>
+                </table>
+            `;
+            document.body.appendChild(printContent);
 
-            document.body.appendChild(printFrame);
-            const printDocument = printFrame.contentDocument;
-            if (!printDocument) {
-                cleanupPrintFrame();
-                showToast('Dokumen cetak tidak dapat disiapkan. Silakan coba lagi.');
-                return;
-            }
-
-            printDocument.open();
-            printDocument.write(`<!doctype html>
-<html lang="id">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Rekap Presensi - ${htmlSafe(data.class?.nama_kelas || 'Kelas')}</title>
-<style>
-    @page { size: A4 portrait; margin: 12mm; }
-    body { font-family: Arial, sans-serif; color: #111; font-size: 11px; }
-    h1 { font-size: 18px; margin: 0 0 5px; }
-    .meta { margin-bottom: 14px; font-size: 11px; }
-    .summary { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 14px; }
-    .summary span { display: inline-block; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1px solid #777; padding: 5px 6px; text-align: center; }
-    th { background: #e9eeee; font-weight: bold; }
-    th:nth-child(3), td:nth-child(3) { text-align: left; }
-    thead { display: table-header-group; }
-    tr { break-inside: avoid; page-break-inside: avoid; }
-</style>
-</head>
-<body>
-    <h1>Rekap Presensi Siswa</h1>
-    <div class="meta">Kelas: ${htmlSafe(data.class?.nama_kelas || '—')} &nbsp; | &nbsp; Bulan: ${htmlSafe(month)}</div>
-    <div class="summary">
-        <span>Jumlah siswa: <strong>${Number(summary.total_students || (data.students || []).length)}</strong></span>
-        <span>Catatan presensi: <strong>${Number(summary.total_sessions || 0)}</strong></span>
-        <span>Hadir: <strong>${Number(summary.hadir || 0)}</strong></span>
-        <span>Alpha: <strong>${Number(summary.alpha || 0)}</strong></span>
-    </div>
-    <table>
-        <thead><tr><th>No.</th><th>NISN</th><th>Nama Siswa</th><th>Hadir</th><th>Sakit</th><th>Izin</th><th>Alpha</th><th>Cabut</th><th>% Hadir</th></tr></thead>
-        <tbody>${printRows || '<tr><td colspan="9">Belum ada data presensi pada bulan ini.</td></tr>'}</tbody>
-    </table>
-</body>
-</html>`);
-            printDocument.close();
+            const cleanupPrint = () => {
+                printContent.remove();
+                printStyles.remove();
+                window.removeEventListener('afterprint', cleanupPrint);
+            };
+            window.addEventListener('afterprint', cleanupPrint, { once: true });
+            window.print();
         });
         bindWaliActions();
     }
