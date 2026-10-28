@@ -74,7 +74,7 @@ class TeacherPushReminderService
         // Keep reminding until the end of the day if check-in is still missing.
         // The configured late boundary (for example 08:45) determines lateness,
         // but must not stop attendance reminders.
-        $checkInEndsAt = $this->atTime($now, '23:59:59');
+        $checkInEndsAt = $this->atTime($now, '18:00:00');
 
         $checkOutStartsAt = $schedule?->jam_pulang_mulai
             ? $this->atTime($now, $schedule->jam_pulang_mulai)
