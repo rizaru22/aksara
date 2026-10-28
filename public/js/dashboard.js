@@ -804,7 +804,7 @@ renderStudentPage();
         });
         $('printWaliAttendance')?.addEventListener('click', () => {
             // Cetak semua siswa dari data API, bukan hanya baris halaman DataTables yang sedang terlihat.
-            const printWindow = window.open('', '_blank', 'width=1100,height=800');
+            const printWindow = window.open('', '', 'width=1100,height=800');
             if (!printWindow) {
                 showToast('Jendela cetak diblokir browser. Izinkan pop-up untuk situs ini lalu coba lagi.');
                 return;
