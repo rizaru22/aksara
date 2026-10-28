@@ -19,6 +19,7 @@ use App\Services\KalenderJamPelajaranResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -308,7 +309,7 @@ class MasterDataController extends Controller
     {
         $relations = match ($resource) {
             'classes' => ['waliKelas:id,nama', 'tahunAjaran:id,tahun_ajaran', 'penempatans'],
-            'students' => ['penempatans.kelas:id,nama_kelas', 'penempatans.tahunAjaran:id,tahun_ajaran'],
+            'students' => ['penempatans.kelas:id,nama_kelas', 'penempatans.tahunAjaran:id,tahun_ajaran,is_active'],
             'materials' => ['mataPelajaran:id,nama_mapel'],
             'schedules' => ['guru:id,nama', 'kelas:id,nama_kelas', 'mataPelajaran:id,nama_mapel', 'tahunAjaran:id,tahun_ajaran'],
             default => [],

@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\SubstituteTeacherController;
 use App\Http\Controllers\Api\StudentManagementController;
 use App\Http\Controllers\Api\TeacherAttendanceController;
 use App\Http\Controllers\Api\TeacherScheduleController;
+use App\Http\Controllers\Api\WaliKelasController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/auth')->group(function (): void {
@@ -82,6 +83,13 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
     Route::patch('/student-attendances/{presensiSiswa}', [LessonJournalController::class, 'updateStudentAttendance'])->middleware('permission:kelola-presensi-siswa');
     Route::get('/student-attendances/wali-sessions', [LessonJournalController::class, 'waliSessions'])->middleware('permission:kelola-presensi-siswa');
 
+    Route::prefix('wali-class')->middleware('permission:kelola-presensi-siswa')->group(function (): void {
+        Route::get('/overview', [WaliKelasController::class, 'overview']);
+        Route::get('/classes/{kelas}/students', [WaliKelasController::class, 'students'])->whereNumber('kelas');
+        Route::get('/classes/{kelas}/schedules', [WaliKelasController::class, 'schedules'])->whereNumber('kelas');
+        Route::get('/classes/{kelas}/attendance', [WaliKelasController::class, 'attendance'])->whereNumber('kelas');
+    });
+
     Route::get('/dashboard/curriculum', [DashboardController::class, 'curriculum'])->middleware('permission:view-dashboard-kurikulum');
     Route::get('/dashboard/admin', [DashboardController::class, 'adminLive']);
     Route::get('/admin/reports', [AdminReportController::class, 'index']);
@@ -139,6 +147,8 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
     Route::prefix('academic')->group(function (): void {
         Route::get('/imports/templates/{resource}', [AcademicImportController::class, 'template'])->middleware('permission:kelola-master-data')->whereIn('resource', ['classes', 'students', 'subjects', 'materials', 'schedules']);
         Route::post('/imports/{resource}', [AcademicImportController::class, 'import'])->middleware(['permission:kelola-master-data', 'throttle:10,1'])->whereIn('resource', ['classes', 'students', 'subjects', 'materials', 'schedules']);
+        Route::post('/imports/dapodik/rombel', [AcademicImportController::class, 'importDapodikRombel'])->middleware(['permission:kelola-master-data', 'throttle:10,1']);
+        Route::post('/imports/dapodik/siswa', [AcademicImportController::class, 'importDapodikSiswa'])->middleware(['permission:kelola-master-data', 'throttle:10,1']);
         Route::get('/teachers', [MasterDataController::class, 'teachers']);
         Route::get('/{resource}', [MasterDataController::class, 'index'])->whereIn('resource', ['academic-years', 'classes', 'students', 'subjects', 'materials', 'schedules', 'agendas']);
         Route::post('/{resource}', [MasterDataController::class, 'store'])->whereIn('resource', ['academic-years', 'classes', 'students', 'subjects', 'materials', 'schedules', 'agendas']);
