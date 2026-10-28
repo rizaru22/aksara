@@ -792,10 +792,10 @@ renderStudentPage();
             <div id="waliAttendancePrintArea" class="wali-attendance-print-area">
             <div class="mb-3"><h2 class="h5 mb-1">Rekap Presensi Siswa</h2><div class="text-secondary small">Kelas: ${htmlSafe(data.class?.nama_kelas || '—')} · Bulan: ${htmlSafe(month)}</div></div>
             <div class="row g-2 mb-3">
-                <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="small text-secondary">Jumlah siswa</div><strong>${Number(summary.total_students || 0)}</strong></div></div></div>
-                <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="small text-secondary">Catatan presensi</div><strong>${Number(summary.total_sessions || 0)}</strong></div></div></div>
-                <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="small text-secondary">Hadir</div><strong>${Number(summary.hadir || 0)}</strong></div></div></div>
-                <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="small text-secondary">Alpha</div><strong>${Number(summary.alpha || 0)}</strong></div></div></div>
+                <div class="col-6"><div class="card"><div class="card-body"><div class="small text-secondary">Jumlah siswa</div><strong>${Number(summary.total_students || 0)}</strong></div></div></div>
+                <div class="col-6"><div class="card"><div class="card-body"><div class="small text-secondary">Catatan presensi</div><strong>${Number(summary.total_sessions || 0)}</strong></div></div></div>
+                <div class="col-6"><div class="card"><div class="card-body"><div class="small text-secondary">Hadir</div><strong>${Number(summary.hadir || 0)}</strong></div></div></div>
+                <div class="col-6"><div class="card"><div class="card-body"><div class="small text-secondary">Alpha</div><strong>${Number(summary.alpha || 0)}</strong></div></div></div>
             </div>
             <div class="table-responsive"><table class="table table-striped table-sm align-middle"><thead><tr><th>No.</th><th>NISN</th><th>Nama Siswa</th><th>Hadir</th><th>Sakit</th><th>Izin</th><th>Alpha</th><th>Cabut</th><th>% Hadir</th></tr></thead><tbody>${rows || '<tr><td colspan="9" class="text-center text-secondary">Belum ada data presensi pada bulan ini.</td></tr>'}</tbody></table></div></div>`);
         $('waliAttendanceFilter')?.addEventListener('submit', (event) => {
