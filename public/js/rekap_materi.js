@@ -9,12 +9,12 @@ window.createAksaraMaterialReport = function ({ api, htmlSafe, setAdminPanel }) 
                 <div class="card-body">
                     <p class="text-secondary small mb-3">Tahun ajaran mengikuti konfigurasi aktif AKSARA. Pilih guru, mata pelajaran, kelas, dan semester untuk melihat urutan materi sebelum mencetak.</p>
                     <div id="materialReportYear" class="alert alert-info py-2">Memuat tahun ajaran aktif...</div>
-                    <form id="materialReportForm" class="row g-3 align-items-end">
-                        <div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="materialReportTeacher">Guru</label><select class="form-select" id="materialReportTeacher" required><option value="">Pilih guru</option></select></div>
-                        <div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="materialReportSubject">Mata Pelajaran</label><select class="form-select" id="materialReportSubject" required disabled><option value="">Pilih mata pelajaran</option></select></div>
-                        <div class="col-12 col-md-6 col-xl-3"><label class="form-label" for="materialReportClass">Kelas</label><select class="form-select" id="materialReportClass" required disabled><option value="">Pilih kelas</option></select></div>
-                        <div class="col-12 col-md-6 col-xl-2"><label class="form-label" for="materialReportSemester">Semester</label><select class="form-select" id="materialReportSemester" required><option value="">Pilih semester</option><option value="Ganjil">Ganjil</option><option value="Genap">Genap</option></select></div>
-                        <div class="col-12 col-xl-1"><button class="btn btn-primary w-100" type="submit">Tampilkan</button></div>
+                    <form id="materialReportForm" class="row g-3">
+                        <div class="col-12 col-md-6"><label class="form-label" for="materialReportTeacher">Guru</label><select class="form-select" id="materialReportTeacher" required><option value="">Pilih guru</option></select></div>
+                        <div class="col-12 col-md-6"><label class="form-label" for="materialReportSubject">Mata Pelajaran</label><select class="form-select" id="materialReportSubject" required disabled><option value="">Pilih mata pelajaran</option></select></div>
+                        <div class="col-12 col-md-6"><label class="form-label" for="materialReportClass">Kelas</label><select class="form-select" id="materialReportClass" required disabled><option value="">Pilih kelas</option></select></div>
+                        <div class="col-12 col-md-3"><label class="form-label" for="materialReportSemester">Semester</label><select class="form-select" id="materialReportSemester" required><option value="">Pilih semester</option><option value="Ganjil">Ganjil</option><option value="Genap">Genap</option></select></div>
+                        <div class="col-12 col-md-3 d-flex align-items-end"><button class="btn btn-primary w-100" type="submit"><i class="bi bi-funnel"></i> Tampilkan</button></div>
                     </form>
                 </div>
             </div>
