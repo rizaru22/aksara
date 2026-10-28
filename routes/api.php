@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\KalenderJamPelajaranController;
 use App\Http\Controllers\Api\JournalMonitoringController;
 use App\Http\Controllers\Api\LessonJournalController;
 use App\Http\Controllers\Api\MasterDataController;
+use App\Http\Controllers\Api\MaterialJournalReportController;
 use App\Http\Controllers\Api\NotificationInboxController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PushSubscriptionController;
@@ -94,6 +95,7 @@ Route::middleware('auth:sanctum')->prefix('v1')->group(function (): void {
     Route::get('/dashboard/admin', [DashboardController::class, 'adminLive']);
     Route::get('/admin/reports', [AdminReportController::class, 'index']);
     Route::get('/admin/reports/student-attendance', [AdminReportController::class, 'studentAttendance']);
+    Route::get('/admin/reports/material-journals', [MaterialJournalReportController::class, 'index']);
     Route::get('/discrepancy-cases', [DiscrepancyController::class, 'index'])->middleware('permission:view-audit-discrepancy');
     Route::patch('/discrepancy-cases/{discrepancyCase}', [DiscrepancyController::class, 'update'])->middleware('permission:view-audit-discrepancy');
 

@@ -303,7 +303,8 @@
     }
 
     const adminDashboard = window.createAksaraAdminDashboard({ $, api, htmlSafe });
-    const adminReports = window.createAksaraAdminReports({ api, htmlSafe, setAdminPanel });
+    const materialJournalReport = window.createAksaraMaterialReport({ api, htmlSafe, setAdminPanel });
+    const adminReports = window.createAksaraAdminReports({ api, htmlSafe, setAdminPanel, onOpenMaterials: () => materialJournalReport.open() });
     const holidayCalendar = window.createAksaraHolidayCalendar({ api, htmlSafe, setFeature, setFeatureError, showToast });
 
     // Mengarahkan tombol menu admin ke handler modul yang sesuai seperti laporan, data akademik, atau moderasi.
