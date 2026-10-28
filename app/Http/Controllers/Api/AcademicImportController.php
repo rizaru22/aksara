@@ -51,6 +51,97 @@ class AcademicImportController extends Controller
     }
 
     /**
+     * Import export Rombongan Belajar dari Dapodik ke tahun ajaran aktif.
+     * Rombel yang sudah ada tidak ditimpa; wali kelas dicocokkan berdasarkan nama jika tersedia.
+     */
+    public function importDapodikRombel(Request $request, SimpleXlsx $xlsx)
+    {
+        $request->validate(['file' => 'required|file|mimes:xlsx|max:10240']);
+        if (! class_exists(\\ZipArchive::class)) {
+            return response()->json(['message' => 'Aktifkan ekstensi PHP zip untuk mengimpor file Excel.'], 503);
+        }
+
+        $year = TahunAjaran::query()->where('is_active', true)->first();
+        if (! $year) {
+            throw ValidationException::withMessages(['tahun_ajaran' => 'Tidak ada tahun ajaran aktif. Aktifkan tahun ajaran terlebih dahulu.']);
+        }
+
+        try {
+            $rows = $xlsx->read($request->file('file')->getRealPath(), true);
+            $records = [];
+            $seen = [];
+            $skippedExisting = 0;
+            $skippedDuplicate = 0;
+            $waliTidakDitemukan = [];
+
+            foreach ($rows as $index => $row) {
+                $line = $index + 1;
+                $name = trim($row['nama rombel'] ?? '');
+                $level = trim($row['tingkat kelas'] ?? '');
+                if ($name === '' || $level === '' || ! ctype_digit($level)) {
+                    throw ValidationException::withMessages(['file' => 'Rombel "'.$name.'" pada data ke-'.$line.' memiliki Nama Rombel atau Tingkat Kelas yang kosong/tidak valid. Tidak ada data yang disimpan.']);
+                }
+                $key = mb_strtolower($name);
+                if (isset($seen[$key])) {
+                    $skippedDuplicate++;
+                    continue;
+                }
+                $seen[$key] = true;
+
+                if (Kelas::query()->where('tahun_ajaran_id', $year->id)->whereRaw('LOWER(nama_kelas) = ?', [$key])->exists()) {
+                    $skippedExisting++;
+                    continue;
+                }
+
+                $waliName = trim($row['wali kelas'] ?? '');
+                $teacher = $waliName === '' ? null : User::query()
+                    ->whereRaw('LOWER(nama) = ?', [mb_strtolower($waliName)])
+                    ->role(['guru', 'admin', 'kurikulum', 'kepsek'])
+                    ->first();
+                if ($waliName !== '' && ! $teacher) $waliTidakDitemukan[] = $name.': '.$waliName;
+
+                $records[] = [
+                    'tahun_ajaran_id' => $year->id,
+                    'nama_kelas' => $name,
+                    'tingkat' => $level,
+                    'jurusan' => trim($row['kurikulum'] ?? '') ?: '-',
+                    'wali_kelas_id' => $teacher?->id,
+                ];
+            }
+
+            DB::transaction(function () use ($records): void {
+                foreach ($records as $record) Kelas::query()->create($record);
+            });
+
+            $message = count($records).' rombel berhasil diimpor ke tahun ajaran '.$year->tahun_ajaran.'.';
+            $message .= ' '.$skippedExisting.' rombel dilewati karena sudah ada; '.$skippedDuplicate.' duplikat di dalam file dilewati.';
+            if ($waliTidakDitemukan) {
+                $message .= ' Wali kelas tidak dicocokkan dan dibiarkan kosong untuk: '.implode(', ', array_slice($waliTidakDitemukan, 0, 10));
+                if (count($waliTidakDitemukan) > 10) $message .= ' dan '.(count($waliTidakDitemukan) - 10).' lainnya';
+                $message .= '.';
+            }
+
+            return response()->json([
+                'message' => $message,
+                'data' => [
+                    'tahun_ajaran' => $year->tahun_ajaran,
+                    'imported' => count($records),
+                    'skipped_existing' => $skippedExisting,
+                    'skipped_duplicate' => $skippedDuplicate,
+                    'wali_kelas_unmatched' => count($waliTidakDitemukan),
+                ],
+            ]);
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (RuntimeException $exception) {
+            throw ValidationException::withMessages(['file' => $exception->getMessage()]);
+        } catch (Throwable $exception) {
+            report($exception);
+            return response()->json(['message' => 'Import Rombel dibatalkan. Tidak ada baris yang disimpan. Periksa struktur file Dapodik dan data kelas.'], 422);
+        }
+    }
+
+    /**
      * Endpoint POST /api/v1/master-data/import/{resource}.
      * Memvalidasi file Excel, memetakan setiap baris ke struktur data backend, lalu mengeksekusi import dalam transaksi database.
      * Flow ini menahan semua proses jika ada data duplikat, konflik jadwal, atau format kolom tidak sesuai template.
