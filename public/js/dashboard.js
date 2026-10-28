@@ -820,8 +820,43 @@ renderStudentPage();
                 <td>${Number(student.cabut || 0)}</td>
                 <td>${Number(student.persentase_hadir || 0)}%</td>
             </tr>`).join('');
-            printWindow.document.open();
-            printWindow.document.write(`<!doctype html>
+
+            const printFrame = document.createElement('iframe');
+            printFrame.setAttribute('title', 'Dokumen cetak rekap presensi');
+            printFrame.setAttribute('aria-hidden', 'true');
+            printFrame.style.position = 'fixed';
+            printFrame.style.right = '0';
+            printFrame.style.bottom = '0';
+            printFrame.style.width = '0';
+            printFrame.style.height = '0';
+            printFrame.style.border = '0';
+            printFrame.style.visibility = 'hidden';
+
+            const cleanupPrintFrame = () => printFrame.remove();
+
+            printFrame.addEventListener('load', () => {
+                const printWindow = printFrame.contentWindow;
+                if (!printWindow) {
+                    cleanupPrintFrame();
+                    showToast('Dokumen cetak tidak dapat disiapkan. Silakan coba lagi.');
+                    return;
+                }
+
+                printWindow.addEventListener('afterprint', cleanupPrintFrame, { once: true });
+                printWindow.focus();
+                printWindow.print();
+            }, { once: true });
+
+            document.body.appendChild(printFrame);
+            const printDocument = printFrame.contentDocument;
+            if (!printDocument) {
+                cleanupPrintFrame();
+                showToast('Dokumen cetak tidak dapat disiapkan. Silakan coba lagi.');
+                return;
+            }
+
+            printDocument.open();
+            printDocument.write(`<!doctype html>
 <html lang="id">
 <head>
 <meta charset="utf-8">
@@ -855,10 +890,9 @@ renderStudentPage();
         <thead><tr><th>No.</th><th>NISN</th><th>Nama Siswa</th><th>Hadir</th><th>Sakit</th><th>Izin</th><th>Alpha</th><th>Cabut</th><th>% Hadir</th></tr></thead>
         <tbody>${printRows || '<tr><td colspan="9">Belum ada data presensi pada bulan ini.</td></tr>'}</tbody>
     </table>
-    <script>window.addEventListener('load', () => { window.focus(); window.print(); });<\/script>
 </body>
 </html>`);
-            printWindow.document.close();
+            printDocument.close();
         });
         bindWaliActions();
     }
