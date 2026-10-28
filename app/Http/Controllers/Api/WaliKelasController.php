@@ -1,16 +1,15 @@
 <?php
 
-namespace App\\Http\\Controllers\\Api;
+namespace App\Http\Controllers\Api;
 
-use App\\Http\\Controllers\\Controller;
-use App\\Models\\JadwalPelajaran;
-use App\\Models\\JurnalMengajar;
-use App\\Models\\Kelas;
-use App\\Models\\PresensiSiswa;
-use App\\Models\\Siswa;
-use App\\Models\\TahunAjaran;
-use Carbon\\Carbon;
-use Illuminate\\Http\\Request;
+use App\Http\Controllers\Controller;
+use App\Models\JadwalPelajaran;
+use App\Models\JurnalMengajar;
+use App\Models\Kelas;
+use App\Models\PresensiSiswa;
+use App\Models\Siswa;
+use App\Models\TahunAjaran;
+use Illuminate\Http\Request;
 
 class WaliKelasController extends Controller
 {
