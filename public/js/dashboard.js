@@ -288,7 +288,6 @@
         const quickLinks = [
             { key: 'reports', icon: 'bi-clipboard-data', label: 'Laporan Presensi Guru', text: 'Rekap presensi masuk, pulang, izin, sakit, dan dinas luar.' },
             { key: 'class-attendance-report', icon: 'bi-calendar2-check', label: 'Laporan Jurnal Mengajar', text: 'Cetak laporan harian per kelas dan rekap mingguan beserta persentase pengisian jurnal.' },
-            { key: 'material-journal-report', icon: 'bi-journal-text', label: 'Rekap Materi', text: 'Cetak urutan materi jurnal per guru, mata pelajaran, kelas, dan semester pada tahun ajaran aktif.' },
             ...dashboardModules.filter((module) => ['flagged', 'journal-monitoring', 'monitoring', 'substitute-approvals', 'leave-approvals', 'discrepancy', 'student-attendance-report'].includes(module.key)).map((module) => ({ key: module.key, icon: module.icon, label: module.title, text: module.description, module })),
             { key: 'classes', icon: 'bi-building', label: 'Kelola Kelas', text: 'Data kelas, tingkat, jurusan, dan wali kelas.' },
             { key: 'students', icon: 'bi-people', label: 'Kelola Siswa', text: 'Data siswa dan penempatan kelas.' },
@@ -304,8 +303,8 @@
     }
 
     const adminDashboard = window.createAksaraAdminDashboard({ $, api, htmlSafe });
-    const adminReports = window.createAksaraAdminReports({ api, htmlSafe, setAdminPanel });
     const materialJournalReport = window.createAksaraMaterialReport({ api, htmlSafe, setAdminPanel });
+    const adminReports = window.createAksaraAdminReports({ api, htmlSafe, setAdminPanel, onOpenMaterials: () => materialJournalReport.open() });
     const holidayCalendar = window.createAksaraHolidayCalendar({ api, htmlSafe, setFeature, setFeatureError, showToast });
 
     // Mengarahkan tombol menu admin ke handler modul yang sesuai seperti laporan, data akademik, atau moderasi.
@@ -315,7 +314,6 @@
         if (action === 'home') return renderAdminHome();
         if (action === 'reports') return adminReports.open();
         if (action === 'class-attendance-report') return adminReports.open('daily', { dedicatedClass: true });
-        if (action === 'material-journal-report') return materialJournalReport.open();
         if (action === 'student-attendance-report') return adminReports.open('student-monthly', { dedicatedStudent: true });
         if (action === 'substitute-approvals') return openSubstituteApprovals();
         if (action === 'lesson-calendar') return academicData.openCalendars();
