@@ -145,57 +145,61 @@ window.createAksaraAdminReports = function ({ api, htmlSafe, setAdminPanel }) {
         const buttons = [...document.querySelectorAll('[data-report-period]')];
         const print = () => {
             const results = document.getElementById('adminReportResults');
-            const targetTable = results?.querySelector('table');
-            if (targetTable && window.DataTable && window.DataTable.isDataTable(targetTable)) {
-                const dt = new window.DataTable(targetTable);
-                dt.destroy();
-            }
             const reportTables = [...(results?.querySelectorAll('table') || [])];
             const tableIndex = window.aksaraDedicatedClassReport ? 0 : (period === 'daily' || period === 'weekly' ? 1 : 0);
-            const printableTable = reportTables[tableIndex]?.cloneNode(true);
+            const sourceTable = reportTables[tableIndex];
+            const printableTable = sourceTable?.cloneNode(true);
+
             if (printableTable) {
+                // Ambil seluruh baris hasil filter DataTables tanpa merusak tabel di dashboard.
+                if (window.DataTable?.isDataTable?.(sourceTable)) {
+                    const dataTable = new window.DataTable(sourceTable);
+                    const rows = dataTable.rows({ search: 'applied' }).nodes().toArray();
+                    const body = printableTable.tBodies[0];
+                    if (body) body.replaceChildren(...rows.map((row) => row.cloneNode(true)));
+                }
                 printableTable.querySelectorAll('*').forEach((node) => {
                     ['id', 'data-dt-order', 'data-dt-length', 'aria-controls', 'aria-label', 'tabindex', 'role'].forEach((attr) => node.removeAttribute(attr));
                     node.classList?.remove('sorting', 'sorting_asc', 'sorting_desc', 'dt-head-center', 'dt-orderable-asc', 'dt-orderable-desc', 'dt-body-center');
                 });
                 printableTable.removeAttribute('style');
                 printableTable.querySelectorAll('thead th, tbody td').forEach((cell) => cell.removeAttribute('style'));
-                const printWindow = window.open('', '_blank', 'width=1200,height=900');
-                if (!printWindow) {
-                    const oldTitle = document.title;
-                    const label = document.getElementById('adminReportPeriodLabel')?.textContent || 'Laporan';
-                    document.title = `AKSARA - ${label}`;
-                    const restoreTitle = () => {
-                        document.title = oldTitle;
-                        window.removeEventListener('afterprint', restoreTitle);
-                    };
-                    window.addEventListener('afterprint', restoreTitle);
-                    window.print();
-                    return;
-                }
-                const reportLabel = document.getElementById('adminReportPeriodLabel')?.textContent || 'Laporan';
-                const schoolName = window.aksaraReportSchoolName || 'Nama Sekolah';
-                const reportTitle = `${reportHeadingForPrint()}`;
-                const signatories = window.aksaraReportSignatories || {};
-                const principal = signatories.principal || {};
-                const curriculum = signatories.curriculum || {};
-                const signatureHtml = `<section class="signature-block"><div class="signature-column"><p class="signature-title">Kepala Sekolah</p><div class="signature-space"></div><p class="signature-name">${htmlSafe(principal.name || 'Nama Kepala Sekolah')}</p><p class="signature-nip">NIP. ${htmlSafe(principal.nip || '................................')}</p></div><div class="signature-column"><p class="signature-title">Waka Kurikulum</p><div class="signature-space"></div><p class="signature-name">${htmlSafe(curriculum.name || 'Nama Waka Kurikulum')}</p><p class="signature-nip">NIP. ${htmlSafe(curriculum.nip || '................................')}</p></div></section>`;
-                printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${htmlSafe(schoolName)} - ${htmlSafe(reportTitle)}</title><style>@page{size:auto;margin:0}body{font-family:Arial,sans-serif;padding:18mm;color:#111}header{text-align:center;margin:0 0 22px;padding:0 0 14px;border-bottom:2px solid #222}h1{font-size:22pt;margin:0 0 8px;font-weight:700}h3{font-size:14pt;margin:0;font-weight:700}.signature-block{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:56px;break-inside:avoid;page-break-inside:avoid;font-size:12px}.signature-column{display:flex;flex-direction:column;min-height:132px}.signature-title{margin-bottom:0}.signature-space{height:76px}.signature-name{margin:0 0 8px}.signature-nip{margin:0}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #d1d5db;padding:8px 10px;text-align:left;vertical-align:top}thead th{background:#f3f4f6;font-weight:700}.badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#e5e7eb;color:#111;font-size:11px}.text-secondary{color:#4b5563}.small{font-size:11px}.text-center{text-align:center}.text-nowrap{white-space:nowrap}@media print{thead{display:table-header-group}tr{break-inside:avoid}}</style></head><body><header><h1>${htmlSafe(schoolName)}</h1><h3>${htmlSafe(reportTitle)}</h3></header>${printableTable.outerHTML}${signatureHtml}</body></html>`);
-                printWindow.document.close();
-                printWindow.focus();
-                printWindow.print();
-                printWindow.onafterprint = () => printWindow.close();
-                return;
             }
+
+            const reportLabel = document.getElementById('adminReportPeriodLabel')?.textContent || 'Laporan';
+            const schoolName = window.aksaraReportSchoolName || 'Nama Sekolah';
+            const reportTitle = reportHeadingForPrint();
+            const signatories = window.aksaraReportSignatories || {};
+            const principal = signatories.principal || {};
+            const curriculum = signatories.curriculum || {};
+            const signatureHtml = `<section class="signature-block"><div class="signature-column"><p class="signature-title">Kepala Sekolah</p><div class="signature-space"></div><p class="signature-name">${htmlSafe(principal.name || 'Nama Kepala Sekolah')}</p><p class="signature-nip">NIP. ${htmlSafe(principal.nip || '................................')}</p></div><div class="signature-column"><p class="signature-title">Waka Kurikulum</p><div class="signature-space"></div><p class="signature-name">${htmlSafe(curriculum.name || 'Nama Waka Kurikulum')}</p><p class="signature-nip">NIP. ${htmlSafe(curriculum.nip || '................................')}</p></div></section>`;
+            const printDocument = document.createElement('section');
+            printDocument.id = 'aksaraAdminPrintDocument';
+            printDocument.innerHTML = `<header class="aksara-print-header"><h1>${htmlSafe(schoolName)}</h1><h2>${htmlSafe(reportTitle || reportLabel)}</h2></header>${printableTable ? printableTable.outerHTML : (results?.innerHTML || '<p>Tidak ada data laporan untuk dicetak.</p>')}${signatureHtml}`;
+
             const oldTitle = document.title;
-            const label = document.getElementById('adminReportPeriodLabel')?.textContent || 'Laporan';
-            document.title = `AKSARA - ${label}`;
-            const restoreTitle = () => {
+            printDocument.setAttribute('aria-label', 'Dokumen cetak laporan admin');
+            document.body.appendChild(printDocument);
+            document.body.classList.add('aksara-admin-printing');
+            document.title = `AKSARA - ${reportLabel}`;
+
+            let cleaned = false;
+            const cleanup = () => {
+                if (cleaned) return;
+                cleaned = true;
+                document.body.classList.remove('aksara-admin-printing');
+                printDocument.remove();
                 document.title = oldTitle;
-                window.removeEventListener('afterprint', restoreTitle);
+                window.removeEventListener('afterprint', cleanup);
             };
-            window.addEventListener('afterprint', restoreTitle);
-            window.print();
+
+            window.addEventListener('afterprint', cleanup, { once: true });
+            try {
+                window.print();
+            } finally {
+                // Jaga halaman tetap bisa dipakai setelah dialog cetak ditutup.
+                cleanup();
+            }
         };
         const loadClasses = async () => {
             try {

@@ -156,25 +156,28 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
                 const rows = items.filter((student) => (student.penempatans || []).some((placement) => String(placement.tahun_ajaran_id) === String(yearId) && String(placement.kelas_id) === String(classId))).sort((a, b) => String(a.nama || '').localeCompare(String(b.nama || ''), 'id'));
                 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
                 const tableRows = rows.map((student, index) => '<tr><td>' + (index + 1) + '</td><td>' + esc(student.nisn) + '</td><td>' + esc(formatPersonName(student.nama)) + '</td><td>' + esc(student.jenis_kelamin) + '</td></tr>').join('') || '<tr><td colspan="4" style="text-align:center">Tidak ada siswa pada kelas ini.</td></tr>';
-                const printFrame = document.createElement('iframe');
-                printFrame.setAttribute('title', 'Pratinjau cetak daftar siswa');
-                printFrame.style.position = 'fixed';
-                printFrame.style.right = '0';
-                printFrame.style.bottom = '0';
-                printFrame.style.width = '0';
-                printFrame.style.height = '0';
-                printFrame.style.border = '0';
-                document.body.appendChild(printFrame);
-                const cleanupPrintFrame = () => { printFrame.remove(); };
-                printFrame.onload = () => {
-                    printFrame.contentWindow.focus();
-                    printFrame.contentWindow.print();
-                    printFrame.contentWindow.addEventListener('afterprint', cleanupPrintFrame, { once: true });
+                const printDocument = document.createElement('section');
+                printDocument.id = 'aksaraAdminPrintDocument';
+                printDocument.innerHTML = '<header class="aksara-print-header"><h1>DAFTAR SISWA</h1><h2>TAHUN AJARAN ' + esc(year?.tahun_ajaran || '') + '</h2><p>Kelas: <strong>' + esc(klass?.nama_kelas || '') + '</strong></p><p>Jumlah siswa: ' + rows.length + '</p></header><table><thead><tr><th>No.</th><th>NISN</th><th>Nama Siswa</th><th>L/P</th></tr></thead><tbody>' + tableRows + '</tbody></table><div class="signature"><p>Mengetahui,</p><p>Wali Kelas</p><br><br><p>(' + esc(klass?.wali_kelas?.nama ? formatPersonName(klass.wali_kelas.nama) : 'Belum ditentukan') + ')</p></div>';
+                document.body.appendChild(printDocument);
+                document.body.classList.add('aksara-admin-printing');
+                const oldTitle = document.title;
+                document.title = 'AKSARA - Daftar Siswa';
+                let cleaned = false;
+                const cleanupPrintDocument = () => {
+                    if (cleaned) return;
+                    cleaned = true;
+                    document.body.classList.remove('aksara-admin-printing');
+                    printDocument.remove();
+                    document.title = oldTitle;
+                    window.removeEventListener('afterprint', cleanupPrintDocument);
                 };
-                const printDocument = printFrame.contentDocument;
-                printDocument.open();
-                printDocument.write('<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Daftar Siswa</title><style>body{font-family:Arial,sans-serif;color:#111;margin:24px}h2,p{text-align:center;margin:4px}table{width:100%;border-collapse:collapse;margin-top:22px;font-size:12px}th,td{border:1px solid #333;padding:6px 8px}th{background:#eee}.signature{margin:36px 30px 0 auto;width:220px;text-align:center}@media print{body{margin:10mm}}</style></head><body><h2>DAFTAR SISWA</h2><p>TAHUN AJARAN ' + esc(year?.tahun_ajaran || '') + '</p><p>Kelas: <strong>' + esc(klass?.nama_kelas || '') + '</strong></p><p>Jumlah siswa: ' + rows.length + '</p><table><thead><tr><th>No.</th><th>NISN</th><th>Nama Siswa</th><th>L/P</th></tr></thead><tbody>' + tableRows + '</tbody></table><div class="signature"><p>Mengetahui,</p><p>Wali Kelas</p><br><br><p>(' + esc(klass?.wali_kelas?.nama ? formatPersonName(klass.wali_kelas.nama) : 'Belum ditentukan') + ')</p></div></body></html>');
-                printDocument.close();
+                window.addEventListener('afterprint', cleanupPrintDocument, { once: true });
+                try {
+                    window.print();
+                } finally {
+                    cleanupPrintDocument();
+                }
             });
             const importYear = $('studentImportYear');
             const importClass = $('studentImportClass');

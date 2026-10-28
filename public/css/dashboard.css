@@ -696,3 +696,107 @@ body.kepsek-dashboard .module-card .btn { min-height: 42px; padding: 7px 12px; f
         page-break-inside: avoid;
     }
 }
+
+
+/* Cetak laporan admin di halaman aktif; tanpa popup atau iframe tersembunyi. */
+@media print {
+    @page { size: A4 portrait; margin: 12mm; }
+
+    body.aksara-admin-printing * {
+        visibility: hidden !important;
+    }
+
+    body.aksara-admin-printing #aksaraAdminPrintDocument,
+    body.aksara-admin-printing #aksaraAdminPrintDocument * {
+        visibility: visible !important;
+    }
+
+    body.aksara-admin-printing #aksaraAdminPrintDocument {
+        display: block !important;
+        position: absolute !important;
+        inset: 0 auto auto 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        color: #111 !important;
+        background: #fff !important;
+        font: 10pt/1.35 Arial, sans-serif !important;
+    }
+
+    #aksaraAdminPrintDocument .aksara-print-header {
+        text-align: center;
+        margin: 0 0 8mm;
+        padding: 0 0 5mm;
+        border-bottom: 1.5pt solid #222;
+    }
+
+    #aksaraAdminPrintDocument .aksara-print-header h1 {
+        margin: 0 0 2mm;
+        color: #111;
+        font-size: 19pt;
+    }
+
+    #aksaraAdminPrintDocument .aksara-print-header h2 {
+        margin: 0 0 2mm;
+        color: #111;
+        font-size: 13pt;
+    }
+
+    #aksaraAdminPrintDocument .aksara-print-header p {
+        margin: 1mm 0;
+    }
+
+    #aksaraAdminPrintDocument table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        font-size: 9pt !important;
+    }
+
+    #aksaraAdminPrintDocument th,
+    #aksaraAdminPrintDocument td {
+        border: 0.6pt solid #555 !important;
+        padding: 2mm !important;
+        color: #111 !important;
+        vertical-align: top !important;
+    }
+
+    #aksaraAdminPrintDocument th {
+        background: #eee !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+    }
+
+    #aksaraAdminPrintDocument thead {
+        display: table-header-group;
+    }
+
+    #aksaraAdminPrintDocument tr {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    #aksaraAdminPrintDocument .signature,
+    #aksaraAdminPrintDocument .signature-block {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    #aksaraAdminPrintDocument .signature {
+        margin: 12mm 10mm 0 auto;
+        width: 60mm;
+        text-align: center;
+    }
+
+    #aksaraAdminPrintDocument .signature-block {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12mm;
+        margin-top: 18mm;
+        font-size: 9pt;
+    }
+
+    #aksaraAdminPrintDocument .signature-space {
+        height: 20mm;
+    }
+}
