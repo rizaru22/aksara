@@ -95,7 +95,7 @@ class TeacherPushReminderService
 
             if (! $attendance?->jam_masuk
                 && $this->within($now, $checkInStartAt, $checkInEndsAt)) {
-                $slot = intdiv(max(0, $checkInStartAt->diffInMinutes($now)), 30);
+                $slot = intdiv(max(0, (int) $checkInStartAt->diffInMinutes($now)), 30);
                 $sent += $this->sendOnce(
                     $teacher,
                     "check-in:{$now->toDateString()}:{$teacher->id}:{$slot}",
@@ -109,7 +109,7 @@ class TeacherPushReminderService
             if ($attendance?->jam_masuk && ! $attendance->jam_pulang
                 && $checkOutStartsAt && $checkOutEndsAt
                 && $this->within($now, $checkOutStartsAt, $checkOutEndsAt)) {
-                $slot = intdiv(max(0, $checkOutStartsAt->diffInMinutes($now)), 30);
+                $slot = intdiv(max(0, (int) $checkOutStartsAt->diffInMinutes($now)), 30);
                 $sent += $this->sendOnce(
                     $teacher,
                     "check-out:{$now->toDateString()}:{$teacher->id}:{$slot}",
