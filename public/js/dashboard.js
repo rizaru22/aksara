@@ -779,7 +779,7 @@ renderStudentPage();
     function formatStudentDisplayName(value) {
         return String(value ?? '')
             .toLocaleLowerCase('id-ID')
-            .replace(/(^|[\\s'-])(\\p{L})/gu, (_, separator, letter) => separator + letter.toLocaleUpperCase('id-ID'));
+            .replace(/(^|[\s'-])(\p{L})/gu, (_, separator, letter) => separator + letter.toLocaleUpperCase('id-ID'));
     }
 
     async function openWaliAttendance(classId, month = new Date().toISOString().slice(0, 7)) {
