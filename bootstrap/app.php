@@ -1,5 +1,6 @@
 <?php
 
+use App\Services\PendingLeaveRequestReminderService;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,13 +19,19 @@ return Application::configure(basePath: dirname(__DIR__))
             ->everyMinute()
             ->timezone('Asia/Jakarta')
             ->withoutOverlapping();
+
+        $schedule->call(fn () => app(PendingLeaveRequestReminderService::class)->sendPendingReminders())
+            ->name('aksara:remind-pending-leave-requests')
+            ->everyFifteenMinutes()
+            ->timezone('Asia/Jakarta')
+            ->withoutOverlapping();
     })
     ->withCommands()
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
-            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
-            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+            'role' => \\Spatie\\Permission\\Middleware\\RoleMiddleware::class,
+            'permission' => \\Spatie\\Permission\\Middleware\\PermissionMiddleware::class,
+            'role_or_permission' => \\Spatie\\Permission\\Middleware\\RoleOrPermissionMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
