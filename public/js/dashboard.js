@@ -775,11 +775,18 @@ renderStudentPage();
         bindWaliActions();
     }
 
+    // Menyeragamkan kapitalisasi nama siswa hanya pada tampilan, tanpa mengubah data sumber.
+    function formatStudentDisplayName(value) {
+        return String(value ?? '')
+            .toLocaleLowerCase('id-ID')
+            .replace(/(^|[\\s'-])(\\p{L})/gu, (_, separator, letter) => separator + letter.toLocaleUpperCase('id-ID'));
+    }
+
     async function openWaliAttendance(classId, month = new Date().toISOString().slice(0, 7)) {
         const result = await api(`/api/v1/wali-class/classes/${encodeURIComponent(classId)}/attendance?month=${encodeURIComponent(month)}`);
         const data = result.data || {};
         const summary = data.summary || {};
-        const rows = (data.students || []).map((student, index) => `<tr><td>${index + 1}</td><td>${htmlSafe(student.nisn || '—')}</td><td>${htmlSafe(student.nama || '—')}</td><td>${student.hadir}</td><td>${student.sakit}</td><td>${student.izin}</td><td>${student.alpha}</td><td>${student.cabut}</td><td>${student.persentase_hadir}%</td></tr>`).join('');
+        const rows = (data.students || []).map((student, index) => `<tr><td>${index + 1}</td><td>${htmlSafe(student.nisn || '—')}</td><td>${htmlSafe(student.nama ? formatStudentDisplayName(student.nama) : '—')}</td><td>${student.hadir}</td><td>${student.sakit}</td><td>${student.izin}</td><td>${student.alpha}</td><td>${student.cabut}</td><td>${student.persentase_hadir}%</td></tr>`).join('');
         setWaliPage(`Rekap Presensi · ${data.class?.nama_kelas || 'Kelas'}`, `
             <form id="waliAttendanceFilter" class="row g-2 align-items-end mb-3"><div class="col-sm-6 col-md-4"><label class="form-label" for="waliAttendanceMonth">Bulan laporan</label><input class="form-control" type="month" id="waliAttendanceMonth" name="month" value="${htmlSafe(month)}" required></div><div class="col-auto"><button class="btn btn-primary" type="submit">Tampilkan</button></div><div class="col-auto"><button class="btn btn-outline-secondary" type="button" data-wali-action="dashboard">Kembali</button></div></form>
             <div class="row g-2 mb-3">
