@@ -710,6 +710,91 @@ renderStudentPage();
         }, { once: true });
     }
 
+    // Dashboard wali kelas hanya memuat kelas yang memang ditugaskan kepada akun aktif.
+    async function openWaliDashboard() {
+        const result = await api('/api/v1/wali-class/overview');
+        const data = result.data || {};
+        const classes = Array.isArray(data.classes) ? data.classes : [];
+        const classCards = classes.map((item) => `
+            <div class="col-md-6 col-xl-4"><article class="card h-100"><div class="card-body">
+                <h3 class="h5">${htmlSafe(item.nama_kelas)}</h3>
+                <p class="small text-secondary mb-2">${htmlSafe(item.tingkat || '')} · ${htmlSafe(item.jurusan || '')}</p>
+                <p><strong>${Number(item.penempatans_count || 0)}</strong> siswa</p>
+                <div class="d-flex flex-wrap gap-2">
+                    <button class="btn btn-sm btn-outline-primary" data-wali-action="students" data-class-id="${item.id}">Data siswa</button>
+                    <button class="btn btn-sm btn-outline-secondary" data-wali-action="schedules" data-class-id="${item.id}">Jadwal</button>
+                    <button class="btn btn-sm btn-outline-success" data-wali-action="attendance" data-class-id="${item.id}">Rekap presensi</button>
+                </div>
+            </div></article></div>`).join('');
+        setFeature('Dashboard Wali Kelas', `
+            <div class="row g-3 mb-3">
+                <div class="col-sm-6"><div class="card"><div class="card-body"><div class="small text-secondary">Tahun ajaran aktif</div><strong>${htmlSafe(data.academic_year || 'Belum ditetapkan')}</strong></div></div></div>
+                <div class="col-sm-6"><div class="card"><div class="card-body"><div class="small text-secondary">Kelas perwalian</div><strong>${Number(data.total_classes || 0)}</strong></div></div></div>
+                <div class="col-sm-6"><div class="card"><div class="card-body"><div class="small text-secondary">Total siswa</div><strong>${Number(data.total_students || 0)}</strong></div></div></div>
+            </div>
+            <h3 class="h5 mb-3">Kelas yang menjadi tanggung jawab Anda</h3>
+            <div class="row g-3">${classCards || '<div class="col-12"><div class="alert alert-info">Belum ada kelas yang ditugaskan kepada Anda sebagai wali kelas pada tahun ajaran aktif.</div></div>'}</div>
+            <div class="d-flex flex-wrap gap-2 mt-3"><button class="btn btn-outline-primary" data-wali-action="corrections">Koreksi presensi siswa</button></div>`);
+        bindWaliActions();
+    }
+
+    async function openWaliStudents(classId) {
+        const result = await api(`/api/v1/wali-class/classes/${encodeURIComponent(classId)}/students`);
+        const data = result.data || {};
+        const rows = (data.students || []).map((student, index) => `<tr><td>${index + 1}</td><td>${htmlSafe(student.nisn || '—')}</td><td>${htmlSafe(student.nama || '—')}</td><td>${htmlSafe(student.jenis_kelamin || '—')}</td></tr>`).join('');
+        setFeature(`Data Siswa · ${data.class?.nama_kelas || 'Kelas'}`, `
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><div class="text-secondary small">Tahun ajaran ${htmlSafe(data.academic_year || '—')} · ${Number(data.total_students || 0)} siswa</div><button class="btn btn-outline-secondary btn-sm" data-wali-action="dashboard">Kembali ke dashboard wali kelas</button></div>
+            <div class="table-responsive"><table class="table table-striped table-sm align-middle"><thead><tr><th>No.</th><th>NISN</th><th>Nama Siswa</th><th>Jenis Kelamin</th></tr></thead><tbody>${rows || '<tr><td colspan="4" class="text-center text-secondary">Belum ada siswa pada kelas ini.</td></tr>'}</tbody></table></div>`);
+        bindWaliActions();
+    }
+
+    async function openWaliSchedules(classId) {
+        const result = await api(`/api/v1/wali-class/classes/${encodeURIComponent(classId)}/schedules`);
+        const data = result.data || {};
+        const rows = (data.schedules || []).map((item, index) => `<tr><td>${index + 1}</td><td>${htmlSafe(item.hari || '—')}</td><td>${htmlSafe(String(item.jam_mulai || '').slice(0, 5) || '—')}–${htmlSafe(String(item.jam_selesai || '').slice(0, 5) || '—')}</td><td>${htmlSafe(item.mata_pelajaran?.nama_mapel || '—')}</td><td>${htmlSafe(item.guru?.nama || '—')}</td></tr>`).join('');
+        setFeature(`Jadwal Kelas · ${data.class?.nama_kelas || 'Kelas'}`, `
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3"><div class="text-secondary small">Tahun ajaran ${htmlSafe(data.academic_year || '—')}</div><button class="btn btn-outline-secondary btn-sm" data-wali-action="dashboard">Kembali ke dashboard wali kelas</button></div>
+            <div class="table-responsive"><table class="table table-striped table-sm align-middle"><thead><tr><th>No.</th><th>Hari</th><th>Jam</th><th>Mata Pelajaran</th><th>Guru</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="text-center text-secondary">Belum ada jadwal untuk kelas ini.</td></tr>'}</tbody></table></div>`);
+        bindWaliActions();
+    }
+
+    async function openWaliAttendance(classId, month = new Date().toISOString().slice(0, 7)) {
+        const result = await api(`/api/v1/wali-class/classes/${encodeURIComponent(classId)}/attendance?month=${encodeURIComponent(month)}`);
+        const data = result.data || {};
+        const summary = data.summary || {};
+        const rows = (data.students || []).map((student, index) => `<tr><td>${index + 1}</td><td>${htmlSafe(student.nisn || '—')}</td><td>${htmlSafe(student.nama || '—')}</td><td>${student.hadir}</td><td>${student.sakit}</td><td>${student.izin}</td><td>${student.alpha}</td><td>${student.cabut}</td><td>${student.persentase_hadir}%</td></tr>`).join('');
+        setFeature(`Rekap Presensi · ${data.class?.nama_kelas || 'Kelas'}`, `
+            <form id="waliAttendanceFilter" class="row g-2 align-items-end mb-3"><div class="col-sm-6 col-md-4"><label class="form-label" for="waliAttendanceMonth">Bulan laporan</label><input class="form-control" type="month" id="waliAttendanceMonth" name="month" value="${htmlSafe(month)}" required></div><div class="col-auto"><button class="btn btn-primary" type="submit">Tampilkan</button></div><div class="col-auto"><button class="btn btn-outline-secondary" type="button" data-wali-action="dashboard">Kembali</button></div></form>
+            <div class="row g-2 mb-3">
+                <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="small text-secondary">Jumlah siswa</div><strong>${Number(summary.total_students || 0)}</strong></div></div></div>
+                <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="small text-secondary">Catatan presensi</div><strong>${Number(summary.total_sessions || 0)}</strong></div></div></div>
+                <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="small text-secondary">Hadir</div><strong>${Number(summary.hadir || 0)}</strong></div></div></div>
+                <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="small text-secondary">Alpha</div><strong>${Number(summary.alpha || 0)}</strong></div></div></div>
+            </div>
+            <div class="table-responsive"><table class="table table-striped table-sm align-middle"><thead><tr><th>No.</th><th>NISN</th><th>Nama Siswa</th><th>Hadir</th><th>Sakit</th><th>Izin</th><th>Alpha</th><th>Cabut</th><th>% Hadir</th></tr></thead><tbody>${rows || '<tr><td colspan="9" class="text-center text-secondary">Belum ada data presensi pada bulan ini.</td></tr>'}</tbody></table></div>`);
+        $('waliAttendanceFilter')?.addEventListener('submit', (event) => {
+            event.preventDefault();
+            openWaliAttendance(classId, $('waliAttendanceMonth').value).catch((error) => setFeature('Rekap Presensi Wali Kelas', `<div class="alert alert-danger">${htmlSafe(error.message)}</div>`));
+        });
+        bindWaliActions();
+    }
+
+    function bindWaliActions() {
+        document.querySelectorAll('[data-wali-action]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const action = button.dataset.waliAction;
+                const classId = button.dataset.classId;
+                const work = action === 'dashboard' ? openWaliDashboard()
+                    : action === 'students' ? openWaliStudents(classId)
+                    : action === 'schedules' ? openWaliSchedules(classId)
+                    : action === 'attendance' ? openWaliAttendance(classId)
+                    : action === 'corrections' ? openWaliSessions()
+                    : Promise.resolve();
+                work.catch((error) => setFeature('Menu Wali Kelas', `<div class="alert alert-danger mb-0">${htmlSafe(error.message)}</div>`));
+            }, { once: true });
+        });
+    }
+
     // Menampilkan sesi presensi siswa yang menjadi tanggung jawab wali kelas agar bisa dikoreksi secara cepat.
     async function openWaliSessions() {
         const result = await api('/api/v1/student-attendances/wali-sessions');
@@ -1527,6 +1612,7 @@ renderStudentPage();
             if (module.key === 'leave-approvals' || module.key === 'leave-submit') return openLeave(module.key === 'leave-submit');
             if (module.key === 'substitute-approvals') return openSubstituteApprovals();
             if (module.key === 'journal-monitoring') return openJournalMonitoring();
+            if (['wali-class-dashboard', 'wali-class-students', 'wali-class-schedules', 'wali-class-attendance'].includes(module.key)) return openWaliDashboard();
             if (module.key === 'student-attendance') return openWaliSessions();
             if (module.key === 'student-attendance-report') return adminReports.open('student-monthly', { dedicatedStudent: true });
             if (module.key === 'settings') return openSettings();
@@ -1635,8 +1721,12 @@ renderStudentPage();
             if (condition && has(permission) && !modules.some((module) => module.key === key)) modules.push({ key, icon, title, description });
         };
 
-        if (is('guru')) {
-            add('student-attendance', 'kelola-presensi-siswa', 'bi-people', 'Koreksi Presensi Siswa', 'Koreksi status pada sesi jurnal di kelas yang Anda ampu.', Boolean(user.is_wali_kelas));
+        if (is('guru') && Boolean(user.is_wali_kelas)) {
+            add('wali-class-dashboard', 'kelola-presensi-siswa', 'bi-speedometer2', 'Dashboard Wali Kelas', 'Ringkasan kelas perwalian dan akses cepat fitur wali kelas.');
+            add('wali-class-students', 'kelola-presensi-siswa', 'bi-people', 'Data Siswa Wali Kelas', 'Lihat daftar siswa pada kelas yang ditugaskan.');
+            add('wali-class-schedules', 'kelola-presensi-siswa', 'bi-calendar-week', 'Jadwal Kelas Perwalian', 'Lihat jadwal pembelajaran kelas perwalian.');
+            add('wali-class-attendance', 'kelola-presensi-siswa', 'bi-clipboard-data', 'Rekap Presensi Siswa', 'Lihat rekap bulanan presensi siswa per kelas.');
+            add('student-attendance', 'kelola-presensi-siswa', 'bi-clipboard-check', 'Koreksi Presensi Siswa', 'Lihat dan koreksi presensi pada kelas yang ditugaskan.');
         }
         if (is('kurikulum')) {
             add('student-attendance-report', 'view-dashboard-kurikulum', 'bi-people-fill', 'Laporan Presensi Siswa', 'Rekap kehadiran siswa per bulan dan kelas.');
