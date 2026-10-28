@@ -1,0 +1,115 @@
+app/Http/Controllers/Api/AcademicImportController.php:28:        'schedules' => ['Jadwal_Pelajaran', ['tahun_ajaran', 'semester', 'nip_guru', 'nama_kelas', 'kode_mapel', 'siklus_minggu', 'hari', 'jam_mulai', 'jam_selesai']],
+app/Http/Controllers/Api/AcademicImportController.php:170:            'jam_mulai' => $this->timeValue($row['jam_mulai'] ?? ''), 'jam_selesai' => $this->timeValue($row['jam_selesai'] ?? ''),
+app/Http/Controllers/Api/AcademicImportController.php:198:            'schedules' => ['tahun_ajaran_id' => 'required|exists:tahun_ajarans,id', 'semester' => 'required|in:Ganjil,Genap', 'user_id' => 'required|exists:users,id', 'kelas_id' => 'required|exists:kelas,id', 'mata_pelajaran_id' => 'required|exists:mata_pelajarans,id', 'siklus_minggu' => 'nullable|integer|in:1,2,3', 'hari' => 'required|in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu', 'jam_mulai' => 'required|date_format:H:i', 'jam_selesai' => 'required|date_format:H:i|after:jam_mulai'],
+app/Http/Controllers/Api/AcademicImportController.php:224:            && $record['jam_mulai'] < $other['jam_selesai'] && $record['jam_selesai'] > $other['jam_mulai']
+app/Http/Controllers/Api/AcademicImportController.php:227:            ->where('hari', $record['hari'])->where('jam_mulai', '<', $record['jam_selesai'])->where('jam_selesai', '>', $record['jam_mulai'])
+app/Http/Controllers/Api/AdminReportController.php:356:            $schedules = $schedules->reject(fn (JadwalPelajaran $schedule) => $overrides->contains(fn (AgendaSekolah $agenda) => $agenda->jam_mulai < $schedule->jam_selesai && $agenda->jam_selesai > $schedule->jam_mulai))->values();
+app/Http/Controllers/Api/AdminReportController.php:364:                    'start' => substr((string) $schedule->jam_mulai, 0, 5), 'end' => substr((string) $schedule->jam_selesai, 0, 5),
+app/Http/Controllers/Api/AdminSettingsController.php:18:        'jam_masuk_akhir' => '07:45',
+app/Http/Controllers/Api/AdminSettingsController.php:33:        'jam_masuk_batas' => ['group' => 'presensi', 'type' => 'time', 'label' => 'Batas Jam Masuk'],
+app/Http/Controllers/Api/AdminSettingsController.php:50:            'jam_masuk_akhir' => substr($dailySchedules->get($day)?->jam_masuk_akhir ?: self::DEFAULT_DAILY_SCHEDULE['jam_masuk_akhir'], 0, 5),
+app/Http/Controllers/Api/AdminSettingsController.php:80:            'settings.jam_masuk_batas' => ['sometimes', 'date_format:H:i,H:i:s'],
+app/Http/Controllers/Api/AdminSettingsController.php:85:            'settings.attendance_schedule.*.jam_masuk_akhir' => ['required', 'date_format:H:i,H:i:s'],
+app/Http/Controllers/Api/AdminSettingsController.php:91:            if (! empty($schedule['jam_masuk_mulai']) && $schedule['jam_masuk_mulai'] > $schedule['jam_masuk_akhir']) {
+app/Http/Controllers/Api/AdminSettingsController.php:103:        if (isset($data['settings']['jam_masuk_batas'])) {
+app/Http/Controllers/Api/AdminSettingsController.php:104:            $data['settings']['jam_masuk_batas'] = substr($data['settings']['jam_masuk_batas'], 0, 5);
+app/Http/Controllers/Api/AdminSettingsController.php:125:                        'jam_masuk_akhir' => substr($schedule['jam_masuk_akhir'], 0, 5),
+app/Http/Controllers/Api/DashboardController.php:110:                ->whereTime('jam_mulai', '<=', $now->format('H:i:s'))
+app/Http/Controllers/Api/DashboardController.php:111:                ->whereTime('jam_selesai', '>', $now->format('H:i:s'))
+app/Http/Controllers/Api/DashboardController.php:112:                ->orderBy('jam_mulai')
+app/Http/Controllers/Api/DashboardController.php:114:                ->reject(fn (JadwalPelajaran $schedule) => $overrides->contains(fn (AgendaSekolah $agenda) => $agenda->jam_mulai < $schedule->jam_selesai && $agenda->jam_selesai > $schedule->jam_mulai))
+app/Http/Controllers/Api/DashboardController.php:128:                    'start' => substr((string) $schedule->jam_mulai, 0, 5),
+app/Http/Controllers/Api/DashboardController.php:129:                    'end' => substr((string) $schedule->jam_selesai, 0, 5),
+app/Http/Controllers/Api/JournalMonitoringController.php:58:                'jadwalPelajaran:id,jam_mulai,jam_selesai,kelas_id,mata_pelajaran_id,user_id',
+app/Http/Controllers/Api/JournalMonitoringController.php:136:                'jam_mulai'             => $jadwal?->jam_mulai,
+app/Http/Controllers/Api/JournalMonitoringController.php:137:                'jam_selesai'           => $jadwal?->jam_selesai,
+app/Http/Controllers/Api/JournalMonitoringController.php:160:                'jam_mulai_realisasi'   => $journal->jam_mulai_realisasi,
+app/Http/Controllers/Api/JournalMonitoringController.php:161:                'jam_selesai_realisasi' => $journal->jam_selesai_realisasi,
+app/Http/Controllers/Api/JournalMonitoringController.php:227:            'jadwalPelajaran:id,jam_mulai,jam_selesai,kelas_id,mata_pelajaran_id,user_id',
+app/Http/Controllers/Api/JournalMonitoringController.php:258:        if (! $jurnalMengajar->jam_selesai_realisasi && $jurnalMengajar->status_sesi === 'draft') {
+app/Http/Controllers/Api/JournalMonitoringController.php:292:                'jam_mulai'              => $jadwal?->jam_mulai,
+app/Http/Controllers/Api/JournalMonitoringController.php:293:                'jam_selesai'            => $jadwal?->jam_selesai,
+app/Http/Controllers/Api/JournalMonitoringController.php:294:                'jam_mulai_realisasi'    => $jurnalMengajar->jam_mulai_realisasi,
+app/Http/Controllers/Api/JournalMonitoringController.php:295:                'jam_selesai_realisasi'  => $jurnalMengajar->jam_selesai_realisasi,
+app/Http/Controllers/Api/LessonJournalController.php:117:                ->where('jam_mulai', '<', $lockedSchedule->jam_selesai)
+app/Http/Controllers/Api/LessonJournalController.php:118:                ->where('jam_selesai', '>', $lockedSchedule->jam_mulai)
+app/Http/Controllers/Api/LessonJournalController.php:141:                'jam_mulai_realisasi' => $journal->jam_mulai_realisasi ?? $now,
+app/Http/Controllers/Api/LessonJournalController.php:142:                'jam_selesai_realisasi' => null,
+app/Http/Controllers/Api/LessonJournalController.php:264:                'jam_mulai_realisasi' => $journal->jam_mulai_realisasi,
+app/Http/Controllers/Api/LessonJournalController.php:265:                'jam_selesai_realisasi' => $journal->jam_selesai_realisasi,
+app/Http/Controllers/Api/LessonJournalController.php:348:            $sessionEnd = Carbon::parse($sessionDate.' '.$schedule->jam_selesai, config('app.timezone'));
+app/Http/Controllers/Api/LessonJournalController.php:394:                    'jam_selesai_realisasi' => $now,
+app/Http/Controllers/Api/LessonJournalController.php:524:        $start = Carbon::parse($now->toDateString().' '.$schedule->jam_mulai, config('app.timezone'));
+app/Http/Controllers/Api/LessonJournalController.php:525:        $end = Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
+app/Http/Controllers/Api/LessonJournalController.php:538:        $sessionStart = Carbon::parse($now->toDateString().' '.$schedule->jam_mulai, config('app.timezone'));
+app/Http/Controllers/Api/LessonJournalController.php:539:        $sessionEnd = Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
+app/Http/Controllers/Api/MasterDataController.php:210:                'jam_mulai' => $prefix.'required|date_format:H:i',
+app/Http/Controllers/Api/MasterDataController.php:211:                'jam_selesai' => $prefix.'required|date_format:H:i|after:jam_mulai',
+app/Http/Controllers/Api/MasterDataController.php:216:                'jam_mulai' => $prefix.'required|date_format:H:i',
+app/Http/Controllers/Api/MasterDataController.php:217:                'jam_selesai' => $prefix.'required|date_format:H:i|after:jam_mulai',
+app/Http/Controllers/Api/MasterDataController.php:234:        if ($data['jam_mulai'] >= $data['jam_selesai']) {
+app/Http/Controllers/Api/MasterDataController.php:235:            throw ValidationException::withMessages(['jam_mulai' => 'Jam mulai harus sebelum jam selesai.']);
+app/Http/Controllers/Api/MasterDataController.php:242:            ->where('jam_mulai', '<', $data['jam_selesai'])
+app/Http/Controllers/Api/MasterDataController.php:243:            ->where('jam_selesai', '>', $data['jam_mulai']);
+app/Http/Controllers/Api/TeacherAttendanceController.php:200:                $deadline = $schedule?->jam_masuk_akhir ?? Setting::value('jam_masuk_batas', '07:15:00');
+app/Http/Controllers/Api/TeacherScheduleController.php:63:            ->orderBy('jam_mulai')
+app/Http/Controllers/Api/TeacherScheduleController.php:90:            $agenda = $agendas->first(fn (AgendaSekolah $item) => $item->jam_mulai < $schedule->jam_selesai && $item->jam_selesai > $schedule->jam_mulai);
+app/Http/Controllers/Api/TeacherScheduleController.php:93:            $journalStartsAt = Carbon::parse($now->toDateString().' '.$schedule->jam_mulai, config('app.timezone'));
+app/Http/Controllers/Api/TeacherScheduleController.php:94:            $scheduleEndsAt = Carbon::parse($now->toDateString().' '.$schedule->jam_selesai, config('app.timezone'));
+app/Http/Controllers/Api/TeacherScheduleController.php:159:            ->orderBy('jam_mulai')
+app/Http/Controllers/Api/TeacherScheduleController.php:161:            ->get(['id', 'nama_agenda', 'tanggal', 'jam_mulai', 'jam_selesai', 'override_kbm']);
+app/Models/AgendaSekolah.php:10:        'nama_agenda', 'tanggal', 'jam_mulai', 'jam_selesai', 'scope',
+app/Models/JadwalPelajaran.php:13:        'siklus_minggu', 'hari', 'jam_mulai', 'jam_selesai'
+app/Models/JadwalPresensiHarian.php:9:    protected $fillable = ['hari', 'jam_masuk_mulai', 'jam_masuk_akhir', 'jam_pulang_mulai', 'jam_pulang_akhir'];
+app/Models/JurnalMengajar.php:27:        'jam_mulai_realisasi', 'jam_selesai_realisasi', 'status_sesi', 'catatan_penutupan',
+app/Services/TeacherPushReminderService.php:69:        $checkInDeadline = $schedule?->jam_masuk_akhir
+app/Services/TeacherPushReminderService.php:70:            ?? Setting::value('jam_masuk_batas', '07:15:00');
+app/Services/TeacherPushReminderService.php:148:                $agenda->jam_mulai < $schedule->jam_selesai && $agenda->jam_selesai > $schedule->jam_mulai
+app/Services/TeacherPushReminderService.php:154:            $start = $this->atTime($now, $schedule->jam_mulai);
+app/Services/TeacherPushReminderService.php:155:            $end = $this->atTime($now, $schedule->jam_selesai);
+database/migrations/2026_08_12_114718_create_aksara_domain_tables.php:100:            $table->time('jam_mulai');
+database/migrations/2026_08_12_114718_create_aksara_domain_tables.php:101:            $table->time('jam_selesai');
+database/migrations/2026_08_12_114718_create_aksara_domain_tables.php:122:            $table->timestamp('jam_mulai_realisasi')->nullable();
+database/migrations/2026_08_12_114718_create_aksara_domain_tables.php:123:            $table->timestamp('jam_selesai_realisasi')->nullable();
+database/migrations/2026_08_12_114718_create_aksara_domain_tables.php:156:            $table->time('jam_mulai');
+database/migrations/2026_08_12_114718_create_aksara_domain_tables.php:157:            $table->time('jam_selesai');
+database/migrations/2026_08_12_114718_create_aksara_domain_tables.php:203:            $table->time('jam_masuk_akhir')->nullable();
+database/seeders/SettingSeeder.php:77:                'key'         => 'jam_masuk_batas',
+public/js/dashboard.js:187:            return `<article class="list-group-item"><div class="d-flex justify-content-between gap-2"><strong>${htmlSafe(schedule.kelas?.nama_kelas)} · ${htmlSafe(schedule.mata_pelajaran?.nama_mapel)}</strong><span class="small">${htmlSafe(schedule.jam_mulai)}–${htmlSafe(schedule.jam_selesai)}</span></div><div class="small text-secondary">${htmlSafe(schedule.hari)} · Siklus ${htmlSafe(schedule.siklus_minggu || 'Mingguan')}</div>${schedule.substitute_active ? `<div class="alert alert-info mt-2 mb-0 small"><i class="bi bi-person-badge"></i> Mengajar pengganti: ${htmlSafe(schedule.substitute_teacher?.nama || 'Guru pengganti')}</div>` : ''}${schedule.kbm_ditangguhkan ? `<div class="alert alert-warning mt-2 mb-0 small">KBM ditangguhkan: ${htmlSafe(schedule.agenda_pengganti)}</div>` : `<div class="d-flex flex-wrap align-items-center justify-content-end gap-1 mt-2">${renderJournalAction(schedule)}${substituteAction}</div>`}</article>`;
+public/js/dashboard.js:240:                return `<article class="schedule-item ${schedule.kbm_ditangguhkan ? '' : 'current'}"><span><strong>${htmlSafe(schedule.kelas?.nama_kelas || 'Kelas')} · ${htmlSafe(schedule.mata_pelajaran?.nama_mapel || 'Mata pelajaran')}</strong><br><span>${htmlSafe(schedule.jam_mulai)}–${htmlSafe(schedule.jam_selesai)} · Siklus ${htmlSafe(schedule.siklus_minggu || 'Mingguan')}</span>${schedule.agenda_pengganti ? `<br><small>${htmlSafe(schedule.agenda_pengganti)}</small>` : ''}${substituteBadge}${subAction}</span>${action}</article>`;
+public/js/dashboard.js:345:                            <dt class="col-sm-4">Jam mulai</dt><dd class="col-sm-8">${htmlSafe(journal.jam_mulai_realisasi || '—')}</dd>
+public/js/dashboard.js:346:                            <dt class="col-sm-4">Jam selesai</dt><dd class="col-sm-8">${htmlSafe(journal.jam_selesai_realisasi || '—')}</dd>
+public/js/dashboard.js:854:                        Waktu: ${htmlSafe(schedule.jam_mulai)}–${htmlSafe(schedule.jam_selesai)} (${htmlSafe(schedule.hari)}) · Siklus ${htmlSafe(schedule.siklus_minggu || 'Mingguan')}
+public/js/dashboard.js:1191:            const waktu = item.jam_mulai && item.jam_selesai ? `${htmlSafe(item.jam_mulai)}–${htmlSafe(item.jam_selesai)}` : '—';
+public/js/dashboard.js:1334:        const jadwalWaktu = journal.jam_mulai && journal.jam_selesai
+public/js/dashboard.js:1335:            ? `${htmlSafe(journal.jam_mulai)}–${htmlSafe(journal.jam_selesai)}`
+public/js/dashboard.js:1353:        const finalisasiWaktu = journal.status_sesi === 'final' && journal.jam_selesai_realisasi
+public/js/dashboard.js:1354:            ? fmtDt(journal.jam_selesai_realisasi)
+public/js/dashboard.js:1405:                        <dd class="col-sm-8">${fmtDt(journal.jam_mulai_realisasi)}</dd>
+public/js/dashboard.js:1457:        const scheduleRows = attendanceSchedule.map((schedule) => `<tr><th scope="row" class="align-middle">${htmlSafe(schedule.hari)}</th><td><input class="form-control" type="time" name="attendance_jam_masuk_mulai[${htmlSafe(schedule.hari)}]" value="${htmlSafe(schedule.jam_masuk_mulai || '')}" aria-label="Awal absen masuk ${htmlSafe(schedule.hari)}"></td><td><input class="form-control" type="time" name="attendance_jam_masuk_akhir[${htmlSafe(schedule.hari)}]" value="${htmlSafe(schedule.jam_masuk_akhir)}" required aria-label="Batas terlambat masuk ${htmlSafe(schedule.hari)}"></td><td><input class="form-control" type="time" name="attendance_jam_pulang_mulai[${htmlSafe(schedule.hari)}]" value="${htmlSafe(schedule.jam_pulang_mulai || '')}" aria-label="Awal absen pulang ${htmlSafe(schedule.hari)}"></td><td><input class="form-control" type="time" name="attendance_jam_pulang_akhir[${htmlSafe(schedule.hari)}]" value="${htmlSafe(schedule.jam_pulang_akhir || '')}" aria-label="Batas akhir absen pulang ${htmlSafe(schedule.hari)}"></td></tr>`).join('');
+public/js/dashboard.js:1481:                jam_masuk_akhir: formData.get(`attendance_jam_masuk_akhir[${schedule.hari}]`),
+public/js/data_akademik.js:18:        schedules: { title: 'Jadwal Pelajaran', columns: ['hari', 'jam_mulai', 'jam_selesai', 'kelas.nama_kelas', 'mata_pelajaran.nama_mapel'], columnLabels: { hari: 'Hari', jam_mulai: 'Jam Mulai', jam_selesai: 'Jam Selesai', 'kelas.nama_kelas': 'Kelas', 'mata_pelajaran.nama_mapel': 'Mata Pelajaran' }, fields: [
+public/js/data_akademik.js:26:            { name: 'jam_mulai', label: 'Jam mulai', type: 'time', required: true }, { name: 'jam_selesai', label: 'Jam selesai', type: 'time', required: true },
+public/js/data_akademik.js:28:        agendas: { title: 'Agenda Sekolah', columns: ['nama_agenda', 'tanggal', 'jam_mulai', 'jam_selesai', 'override_kbm'], columnLabels: { nama_agenda: 'Nama Agenda', tanggal: 'Tanggal', jam_mulai: 'Jam Mulai', jam_selesai: 'Jam Selesai', override_kbm: 'Override KBM' }, fields: [
+public/js/data_akademik.js:30:            { name: 'jam_mulai', label: 'Jam mulai', type: 'time', required: true }, { name: 'jam_selesai', label: 'Jam selesai', type: 'time', required: true },
+public/js/notifikasi.js:7:            list.innerHTML = items.length ? items.map((item) => `<article class="notice"><span class="notice-icon blue"><i class="bi bi-megaphone"></i></span><div class="notice-title">${htmlSafe(item.nama_agenda)}${item.override_kbm ? '<br><span class="text-warning-emphasis">Perubahan kegiatan belajar</span>' : ''}</div><time>${htmlSafe(new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short' }).format(new Date(`${item.tanggal}T00:00:00`)))}<br>${htmlSafe(String(item.jam_mulai).slice(0, 5))}</time></article>`).join('') : '<div class="text-secondary small py-2">Belum ada pengumuman atau agenda sekolah mendatang.</div>';
+tests/Feature/LessonJournalTransactionTest.php:64:            'jam_mulai' => Carbon::now(config('app.timezone'))->copy()->subHours(2)->format('H:i'),
+tests/Feature/LessonJournalTransactionTest.php:65:            'jam_selesai' => Carbon::now(config('app.timezone'))->copy()->subMinutes(5)->format('H:i'),
+tests/Feature/LessonJournalTransactionTest.php:90:            'jam_mulai' => Carbon::now(config('app.timezone'))->copy()->subHours(2)->format('H:i'),
+tests/Feature/LessonJournalTransactionTest.php:91:            'jam_selesai' => Carbon::now(config('app.timezone'))->copy()->subMinutes(5)->format('H:i'),
+tests/Feature/LessonJournalTransactionTest.php:129:            'jam_mulai_realisasi' => $finalDate->copy()->setTime(8, 0)->toDateTimeString(),
+tests/Feature/LessonJournalTransactionTest.php:130:            'jam_selesai_realisasi' => $finalDate->copy()->setTime(9, 0)->toDateTimeString(),
+tests/Feature/LessonJournalTransactionTest.php:155:            'jam_mulai' => $now->copy()->subMinutes(15)->format('H:i'),
+tests/Feature/LessonJournalTransactionTest.php:156:            'jam_selesai' => $now->copy()->addMinutes(40)->format('H:i'),
+tests/Feature/LessonJournalTransactionTest.php:172:            'jam_mulai' => $now->copy()->subHours(2)->format('H:i'),
+tests/Feature/LessonJournalTransactionTest.php:173:            'jam_selesai' => $now->copy()->subMinutes(5)->format('H:i'),
+tests/Feature/LessonJournalTransactionTest.php:192:            'jam_mulai' => $now->copy()->subMinutes(15)->format('H:i'),
+tests/Feature/LessonJournalTransactionTest.php:193:            'jam_selesai' => $now->copy()->addMinutes(40)->format('H:i'),
+tests/Feature/LessonJournalTransactionTest.php:225:            'jam_mulai' => $now->copy()->subHours(2)->format('H:i'),
+tests/Feature/LessonJournalTransactionTest.php:226:            'jam_selesai' => $now->copy()->subMinutes(5)->format('H:i'),
+tests/Feature/LessonJournalTransactionTest.php:263:        $schedule->update(['jam_selesai' => $now->copy()->subMinutes(5)->format('H:i')]);
+tests/Feature/LessonJournalTransactionTest.php:435:            'jam_mulai' => $now->copy()->subMinutes(15)->format('H:i'),
+tests/Feature/LessonJournalTransactionTest.php:436:            'jam_selesai' => $now->copy()->addMinutes(20)->format('H:i'),
+tests/Feature/SubstituteTeacherRequestTest.php:111:            'jam_mulai' => $today->copy()->subMinutes(15)->format('H:i'),
+tests/Feature/SubstituteTeacherRequestTest.php:112:            'jam_selesai' => $today->copy()->addMinutes(20)->format('H:i'),
+tests/Feature/TeacherAttendanceTest.php:77:            ['geofence_latitude', '0'], ['geofence_longitude', '0'], ['geofence_radius_meters', '100'], ['geofence_location_verified', '1'], ['is_geofence_strict', $strict ? '1' : '0'], ['jam_masuk_batas', '23:59:59'],
