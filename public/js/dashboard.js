@@ -803,11 +803,62 @@ renderStudentPage();
             openWaliAttendance(classId, $('waliAttendanceMonth').value).catch((error) => setWaliPage('Rekap Presensi Wali Kelas', `<div class="alert alert-danger">${htmlSafe(error.message)}</div>`));
         });
         $('printWaliAttendance')?.addEventListener('click', () => {
-            document.body.classList.add('wali-attendance-printing');
-            const cleanup = () => document.body.classList.remove('wali-attendance-printing');
-            window.addEventListener('afterprint', cleanup, { once: true });
-            window.print();
-            window.setTimeout(cleanup, 1500);
+            // Cetak semua siswa dari data API, bukan hanya baris halaman DataTables yang sedang terlihat.
+            const printWindow = window.open('', '_blank', 'width=1100,height=800');
+            if (!printWindow) {
+                showToast('Jendela cetak diblokir browser. Izinkan pop-up untuk situs ini lalu coba lagi.');
+                return;
+            }
+            const printRows = (data.students || []).map((student, index) => `<tr>
+                <td>${index + 1}</td>
+                <td>${htmlSafe(student.nisn || '—')}</td>
+                <td>${htmlSafe(student.nama ? formatStudentDisplayName(student.nama) : '—')}</td>
+                <td>${Number(student.hadir || 0)}</td>
+                <td>${Number(student.sakit || 0)}</td>
+                <td>${Number(student.izin || 0)}</td>
+                <td>${Number(student.alpha || 0)}</td>
+                <td>${Number(student.cabut || 0)}</td>
+                <td>${Number(student.persentase_hadir || 0)}%</td>
+            </tr>`).join('');
+            printWindow.document.open();
+            printWindow.document.write(`<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rekap Presensi - ${htmlSafe(data.class?.nama_kelas || 'Kelas')}</title>
+<style>
+    @page { size: A4 portrait; margin: 12mm; }
+    body { font-family: Arial, sans-serif; color: #111; font-size: 11px; }
+    h1 { font-size: 18px; margin: 0 0 5px; }
+    .meta { margin-bottom: 14px; font-size: 11px; }
+    .summary { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 14px; }
+    .summary span { display: inline-block; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #777; padding: 5px 6px; text-align: center; }
+    th { background: #e9eeee; font-weight: bold; }
+    th:nth-child(3), td:nth-child(3) { text-align: left; }
+    thead { display: table-header-group; }
+    tr { break-inside: avoid; page-break-inside: avoid; }
+</style>
+</head>
+<body>
+    <h1>Rekap Presensi Siswa</h1>
+    <div class="meta">Kelas: ${htmlSafe(data.class?.nama_kelas || '—')} &nbsp; | &nbsp; Bulan: ${htmlSafe(month)}</div>
+    <div class="summary">
+        <span>Jumlah siswa: <strong>${Number(summary.total_students || (data.students || []).length)}</strong></span>
+        <span>Catatan presensi: <strong>${Number(summary.total_sessions || 0)}</strong></span>
+        <span>Hadir: <strong>${Number(summary.hadir || 0)}</strong></span>
+        <span>Alpha: <strong>${Number(summary.alpha || 0)}</strong></span>
+    </div>
+    <table>
+        <thead><tr><th>No.</th><th>NISN</th><th>Nama Siswa</th><th>Hadir</th><th>Sakit</th><th>Izin</th><th>Alpha</th><th>Cabut</th><th>% Hadir</th></tr></thead>
+        <tbody>${printRows || '<tr><td colspan="9">Belum ada data presensi pada bulan ini.</td></tr>'}</tbody>
+    </table>
+    <script>window.addEventListener('load', () => { window.focus(); window.print(); });<\/script>
+</body>
+</html>`);
+            printWindow.document.close();
         });
         bindWaliActions();
     }
