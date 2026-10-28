@@ -1,14 +1,12 @@
 <?php
-
 namespace App\Console\Commands;
 
-use Illuminate\Console\Attributes\Description;
-use Illuminate\Console\Attributes\Signature;
+use App\Models\User;
+use App\Notifications\TeacherReminderNotification;
 use Illuminate\Console\Command;
+use Illuminate\Support\Str;
 
-#[Signature('app:send-test-push-notification')]
-#[Description('Command description')]
-class SendTestPushNotification extends Command
+class SendTestPushNotification extends Commandyes
 {
     protected $signature = 'aksara:test-push {email}';
 
@@ -43,7 +41,9 @@ class SendTestPushNotification extends Command
                 'test-push-' . Str::uuid(),
             ));
 
-            $this->info('Notifikasi tes diproses untuk: ' . $user->email);
+            $this->info(
+                'Notifikasi tes diproses untuk: ' . $user->email
+            );
 
             return self::SUCCESS;
         } catch (\Throwable $e) {
