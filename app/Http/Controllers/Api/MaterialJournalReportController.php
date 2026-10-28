@@ -45,7 +45,7 @@ class MaterialJournalReportController extends Controller
         }
 
         $scheduleQuery = JadwalPelajaran::query()
-            ->where('tahun_ajaran_id', $activeYear->id)
+            ->where('jadwal_pelajarans.tahun_ajaran_id', $activeYear->id)
             ->when(isset($filters['semester']), fn ($q) => $q->where('semester', $filters['semester']))
             ->when(isset($filters['teacher_id']), fn ($q) => $q->where('user_id', $filters['teacher_id']))
             ->when(isset($filters['subject_id']), fn ($q) => $q->where('mata_pelajaran_id', $filters['subject_id']))
