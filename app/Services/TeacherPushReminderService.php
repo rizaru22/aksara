@@ -79,9 +79,9 @@ class TeacherPushReminderService
         $checkOutStartsAt = $schedule?->jam_pulang_mulai
             ? $this->atTime($now, $schedule->jam_pulang_mulai)
             : null;
-        $checkOutEndsAt = $schedule?->jam_pulang_akhir
-            ? $this->atTime($now, $schedule->jam_pulang_akhir)
-            : null;
+        // Keep reminding about check-out until 18:00 even when the configured
+        // school dismissal time is earlier.
+        $checkOutEndsAt = $this->atTime($now, '18:00:00');
 
         foreach ($teachers as $teacher) {
             if (in_array((int) $teacher->id, $onLeave, true)) {
