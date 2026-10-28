@@ -8,6 +8,7 @@ use App\Models\JadwalPelajaran;
 use App\Models\Kelas;
 use App\Models\KalenderJamPelajaran;
 use App\Models\MataPelajaran;
+use App\Models\PenempatanSiswa;
 use App\Models\MateriPelajaran;
 use App\Models\Siswa;
 use App\Models\TahunAjaran;
@@ -93,9 +94,31 @@ class MasterDataController extends Controller
         $input = $resource === 'schedules' ? $this->resolveScheduleInput($request->all()) : $request->all();
         $data = Validator::make($input, $this->rules($resource))->validate();
         $this->validateScheduleConflict($resource, $data);
+        $placement = null;
+        if ($resource === 'students') {
+            $placement = [
+                'kelas_id' => (int) ($input['kelas_id'] ?? 0),
+                'tahun_ajaran_id' => (int) ($input['tahun_ajaran_id'] ?? 0),
+            ];
+            Validator::make($placement, [
+                'kelas_id' => ['required', 'integer', 'exists:kelas,id'],
+                'tahun_ajaran_id' => ['required', 'integer', 'exists:tahun_ajarans,id'],
+            ])->validate();
+            $class = Kelas::query()->findOrFail($placement['kelas_id']);
+            if ((int) $class->tahun_ajaran_id !== $placement['tahun_ajaran_id']) {
+                throw ValidationException::withMessages(['kelas_id' => 'Kelas tidak termasuk tahun ajaran yang dipilih.']);
+            }
+        }
 
         /** @var Model $model */
         $model = $modelClass::query()->create($data);
+        if ($resource === 'students' && $placement) {
+            PenempatanSiswa::query()->create([
+                'siswa_id' => $model->id,
+                'kelas_id' => $placement['kelas_id'],
+                'tahun_ajaran_id' => $placement['tahun_ajaran_id'],
+            ]);
+        }
 
         return response()->json(['message' => 'Data berhasil dibuat.', 'data' => $model->refresh()], 201);
     }
@@ -112,7 +135,29 @@ class MasterDataController extends Controller
         if ($resource === 'schedules') $input = $this->resolveScheduleInput($input);
         $data = Validator::make($input, $this->rules($resource, $id, true))->validate();
         $this->validateScheduleConflict($resource, array_merge($model->getAttributes(), $data), $model->id);
-        $model->fill($data)->save();
+
+        $placement = null;
+        if ($resource === 'students' && ($request->exists('kelas_id') || $request->exists('tahun_ajaran_id'))) {
+            $placement = Validator::make($request->all(), [
+                'kelas_id' => ['required', 'integer', 'exists:kelas,id'],
+                'tahun_ajaran_id' => ['required', 'integer', 'exists:tahun_ajarans,id'],
+            ])->validate();
+            $class = Kelas::query()->findOrFail($placement['kelas_id']);
+            if ((int) $class->tahun_ajaran_id !== (int) $placement['tahun_ajaran_id']) {
+                throw ValidationException::withMessages(['kelas_id' => 'Kelas tidak termasuk tahun ajaran yang dipilih.']);
+            }
+            unset($data['kelas_id'], $data['tahun_ajaran_id']);
+        }
+
+        DB::transaction(function () use ($model, $data, $resource, $placement): void {
+            $model->fill($data)->save();
+            if ($resource === 'students' && $placement) {
+                PenempatanSiswa::query()->updateOrCreate(
+                    ['siswa_id' => $model->id, 'tahun_ajaran_id' => (int) $placement['tahun_ajaran_id']],
+                    ['kelas_id' => (int) $placement['kelas_id']]
+                );
+            }
+        });
 
         return response()->json(['message' => 'Data berhasil diperbarui.', 'data' => $model->refresh()], 200);
     }
@@ -262,8 +307,8 @@ class MasterDataController extends Controller
     private function withRelations(string $resource, $query): void
     {
         $relations = match ($resource) {
-            'classes' => ['waliKelas:id,nama', 'siswas'],
-            'students' => ['kelas:id,nama_kelas'],
+            'classes' => ['waliKelas:id,nama', 'tahunAjaran:id,tahun_ajaran', 'penempatans'],
+            'students' => ['penempatans.kelas:id,nama_kelas', 'penempatans.tahunAjaran:id,tahun_ajaran'],
             'materials' => ['mataPelajaran:id,nama_mapel'],
             'schedules' => ['guru:id,nama', 'kelas:id,nama_kelas', 'mataPelajaran:id,nama_mapel', 'tahunAjaran:id,tahun_ajaran'],
             default => [],
@@ -285,6 +330,7 @@ class MasterDataController extends Controller
             ],
             'classes' => [
                 'nama_kelas' => $prefix.'required|string|max:255',
+                'tahun_ajaran_id' => $prefix.'required|exists:tahun_ajarans,id',
                 'tingkat' => $prefix.'required|string|max:50',
                 'jurusan' => $prefix.'required|string|max:100',
                 'wali_kelas_id' => $prefix.'nullable|exists:users,id',
@@ -292,7 +338,6 @@ class MasterDataController extends Controller
             'students' => [
                 'nisn' => $prefix.'required|string|max:255|'.$unique('siswas', 'nisn'),
                 'nama' => $prefix.'required|string|max:255',
-                'kelas_id' => $prefix.'required|exists:kelas,id',
                 'jenis_kelamin' => $prefix.'required|in:L,P',
             ],
             'subjects' => [
@@ -339,6 +384,10 @@ class MasterDataController extends Controller
     private function validateScheduleConflict(string $resource, array $data, ?int $ignoreId = null): void
     {
         if ($resource !== 'schedules') return;
+        $classMatchesYear = Kelas::query()->whereKey($data['kelas_id'] ?? 0)->where('tahun_ajaran_id', $data['tahun_ajaran_id'] ?? 0)->exists();
+        if (! $classMatchesYear) {
+            throw ValidationException::withMessages(['kelas_id' => 'Kelas harus berasal dari tahun ajaran yang sama dengan jadwal.']);
+        }
         $periodStart = $data['periode_mulai'] ?? null;
         $periodEnd = $data['periode_selesai'] ?? null;
         if (($periodStart === null) !== ($periodEnd === null)) {
@@ -405,7 +454,7 @@ class MasterDataController extends Controller
     {
         return match ($resource) {
             'academic-years' => $model->jadwalPelajarans()->exists(),
-            'classes' => $model->siswas()->exists() || $model->jadwalPelajarans()->exists(),
+            'classes' => $model->penempatans()->exists() || $model->jadwalPelajarans()->exists(),
             'subjects' => $model->materiPelajarans()->exists() || $model->jadwalPelajarans()->exists(),
             'materials' => $model->jurnalMengajars()->exists(),
             'schedules' => $model->jurnalMengajars()->exists(),

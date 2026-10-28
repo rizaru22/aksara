@@ -53,7 +53,7 @@ class LessonJournalController extends Controller
             ->first();
 
         return response()->json([
-            'data' => DB::table('siswas')->where('kelas_id', $jadwalPelajaran->kelas_id)->orderBy('nama')->get(['id', 'nisn', 'nama']),
+            'data' => DB::table('siswas')->join('penempatan_siswas', 'penempatan_siswas.siswa_id', '=', 'siswas.id')->where('penempatan_siswas.kelas_id', $jadwalPelajaran->kelas_id)->where('penempatan_siswas.tahun_ajaran_id', $jadwalPelajaran->tahun_ajaran_id)->orderBy('siswas.nama')->get(['siswas.id', 'siswas.nisn', 'siswas.nama']),
             'draft' => $draft,
         ]);
     }
@@ -103,7 +103,7 @@ class LessonJournalController extends Controller
             }
         }
 
-        $expectedStudents = DB::table('siswas')->where('kelas_id', $schedule->kelas_id)->pluck('id')->map(fn ($id) => (int) $id)->sort()->values();
+        $expectedStudents = DB::table('penempatan_siswas')->where('kelas_id', $schedule->kelas_id)->where('tahun_ajaran_id', $schedule->tahun_ajaran_id)->pluck('siswa_id')->map(fn ($id) => (int) $id)->sort()->values();
         $submittedStudents = collect($data['presensi'])->pluck('siswa_id')->map(fn ($id) => (int) $id)->sort()->values();
         if ($expectedStudents->isEmpty() || $expectedStudents->all() !== $submittedStudents->all()) {
             throw ValidationException::withMessages(['presensi' => 'Daftar presensi harus mencakup seluruh siswa kelas dan tidak boleh memuat siswa dari kelas lain.']);
@@ -284,7 +284,8 @@ class LessonJournalController extends Controller
         $data = $journals->getCollection()->map(function (JurnalMengajar $journal): array {
             $kelas = $journal->jadwalPelajaran?->kelas;
             $mataPelajaran = $journal->jadwalPelajaran?->mataPelajaran;
-            $totalSiswa = $kelas ? DB::table('siswas')->where('kelas_id', $kelas->id)->count() : 0;
+            $scheduleForJournal = $journal->jadwalPelajaran;
+            $totalSiswa = $kelas && $scheduleForJournal ? DB::table('penempatan_siswas')->where('kelas_id', $kelas->id)->where('tahun_ajaran_id', $scheduleForJournal->tahun_ajaran_id)->count() : 0;
             $presensiCount = (int) ($journal->presensi_siswas_count ?? $journal->presensiSiswas->count());
             $lengkap = $totalSiswa > 0 && $presensiCount === $totalSiswa;
 
@@ -396,7 +397,7 @@ class LessonJournalController extends Controller
             $this->authorizeSchedule($request, $schedule, $now, $cycles, $calendarResolver);
         }
 
-        $expectedIds = DB::table('siswas')->where('kelas_id', $schedule->kelas_id)->pluck('id')->map(fn ($id) => (int) $id)->sort()->values();
+        $expectedIds = DB::table('penempatan_siswas')->where('kelas_id', $schedule->kelas_id)->where('tahun_ajaran_id', $schedule->tahun_ajaran_id)->pluck('siswa_id')->map(fn ($id) => (int) $id)->sort()->values();
         $draftIds = $jurnalMengajar->presensiSiswas()->pluck('siswa_id')->map(fn ($id) => (int) $id)->sort()->values();
         if ($expectedIds->isEmpty() || $expectedIds->all() !== $draftIds->all()) {
             throw ValidationException::withMessages(['presensi' => 'Perbarui draf agar mencakup seluruh siswa kelas sebelum finalisasi.']);

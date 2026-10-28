@@ -18,6 +18,7 @@ use App\Services\CycleScheduleService;
 use App\Services\KalenderJamPelajaranResolver;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class DashboardController extends Controller
@@ -102,7 +103,7 @@ class DashboardController extends Controller
             $meta = ['tahun_ajaran' => $year?->tahun_ajaran, 'semester' => $semester, 'siklus_minggu' => $cycle, 'hari' => $cycles->getHariIndo($now)];
             $overrides = AgendaSekolah::query()->whereDate('tanggal', $date)->where('scope', 'SEKOLAH')->where('override_kbm', true)->get();
             $schedules = JadwalPelajaran::query()
-                ->with(['guru:id,nama,nip', 'kelas:id,nama_kelas', 'kelas.siswas:id,kelas_id', 'mataPelajaran:id,nama_mapel'])
+                ->with(['guru:id,nama,nip', 'kelas:id,nama_kelas', 'mataPelajaran:id,nama_mapel'])
                 ->with(['jurnalMengajars' => fn ($query) => $query->whereDate('tanggal', $date)->withCount('presensiSiswas')])
                 ->where('tahun_ajaran_id', $year->id)
                 ->where('semester', $semester)
@@ -136,7 +137,7 @@ class DashboardController extends Controller
                 /** @var JadwalPelajaran $schedule */
                 $schedule = $item['schedule'];
                 $journal = $schedule->jurnalMengajars->first();
-                $expectedStudents = $schedule->kelas?->siswas->count() ?? 0;
+                $expectedStudents = DB::table('penempatan_siswas')->where('kelas_id', $schedule->kelas_id)->where('tahun_ajaran_id', $schedule->tahun_ajaran_id)->count();
                 $markedStudents = (int) ($journal?->presensi_siswas_count ?? 0);
                 return [
                     'schedule_id' => $schedule->id,

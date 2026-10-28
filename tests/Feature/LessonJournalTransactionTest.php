@@ -420,7 +420,7 @@ class LessonJournalTransactionTest extends TestCase
         $year = TahunAjaran::query()->create(['tahun_ajaran' => '2026/2027', 'is_active' => true]);
         Setting::query()->create(['key' => 'active_tahun_ajaran', 'value' => $year->tahun_ajaran, 'group' => 'academic', 'type' => 'string', 'label' => 'Tahun aktif']);
         Setting::query()->create(['key' => 'semester_start_date', 'value' => '2026-07-13', 'group' => 'academic', 'type' => 'date', 'label' => 'Awal semester']);
-        $class = Kelas::query()->create(['nama_kelas' => 'X RPL Test', 'tingkat' => 'X', 'jurusan' => 'RPL']);
+        $class = Kelas::query()->create(['nama_kelas' => 'X RPL Test', 'tingkat' => 'X', 'jurusan' => 'RPL', 'tahun_ajaran_id' => $year->id]);
         $subject = MataPelajaran::query()->create(['kode_mapel' => 'DB-TEST', 'nama_mapel' => 'Basis Data']);
         $now = Carbon::now(config('app.timezone'));
         $semester = $now->month >= 7 ? 'Ganjil' : 'Genap';
@@ -436,9 +436,12 @@ class LessonJournalTransactionTest extends TestCase
             'jam_selesai' => $now->copy()->addMinutes(20)->format('H:i'),
         ]);
         $students = collect([
-            Siswa::query()->create(['nisn' => 'TEST000001', 'nama' => 'Siswa Satu', 'kelas_id' => $class->id, 'jenis_kelamin' => 'L']),
-            Siswa::query()->create(['nisn' => 'TEST000002', 'nama' => 'Siswa Dua', 'kelas_id' => $class->id, 'jenis_kelamin' => 'P']),
+            Siswa::query()->create(['nisn' => 'TEST000001', 'nama' => 'Siswa Satu', 'jenis_kelamin' => 'L']),
+            Siswa::query()->create(['nisn' => 'TEST000002', 'nama' => 'Siswa Dua', 'jenis_kelamin' => 'P']),
         ]);
+        $students->each(fn (Siswa $student) => \App\Models\PenempatanSiswa::query()->create([
+            'siswa_id' => $student->id, 'kelas_id' => $class->id, 'tahun_ajaran_id' => $year->id,
+        ]));
 
         return [$teacher, $schedule, $students];
     }

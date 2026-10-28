@@ -1,12 +1,14 @@
 window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setFeatureError, showToast, token }) {
     const masterDefinitions = {
         'academic-years': { title: 'Tahun Ajaran', columns: ['tahun_ajaran', 'is_active'], columnLabels: { tahun_ajaran: 'Tahun Ajaran', is_active: 'Status' }, fields: [{ name: 'tahun_ajaran', label: 'Tahun ajaran', required: true }] },
-        classes: { title: 'Kelas', columns: ['nama_kelas', 'tingkat', 'jurusan', 'wali_kelas.nama'], columnLabels: { nama_kelas: 'Nama Kelas', tingkat: 'Tingkat', jurusan: 'Jurusan', 'wali_kelas.nama': 'Nama Wali Kelas' }, fields: [
+        classes: { title: 'Kelas', columns: ['nama_kelas', 'tingkat', 'jurusan', 'tahun_ajaran.tahun_ajaran', 'wali_kelas.nama'], columnLabels: { nama_kelas: 'Nama Kelas', tingkat: 'Tingkat', jurusan: 'Jurusan', 'tahun_ajaran.tahun_ajaran': 'Tahun Ajaran', 'wali_kelas.nama': 'Nama Wali Kelas' }, fields: [
+            { name: 'tahun_ajaran_id', label: 'Tahun ajaran', type: 'select', options: 'academic-years', required: true, value: 'tahun_ajaran' },
             { name: 'nama_kelas', label: 'Nama kelas', required: true }, { name: 'tingkat', label: 'Tingkat', required: true }, { name: 'jurusan', label: 'Jurusan', required: true },
             { name: 'wali_kelas_id', label: 'Wali kelas', type: 'select', options: 'teachers', optional: true },
         ] },
-        students: { title: 'Siswa', columns: ['nisn', 'nama', 'kelas_id', 'jenis_kelamin'], columnLabels: { nisn: 'NISN', nama: 'Nama Siswa', kelas_id: 'Kelas', jenis_kelamin: 'Jenis Kelamin' }, fields: [
+        students: { title: 'Siswa', columns: ['nisn', 'nama', 'kelas_aktif', 'tahun_ajaran_aktif', 'jenis_kelamin'], columnLabels: { nisn: 'NISN', nama: 'Nama Siswa', kelas_aktif: 'Kelas aktif', tahun_ajaran_aktif: 'Tahun ajaran', jenis_kelamin: 'Jenis Kelamin' }, fields: [
             { name: 'nisn', label: 'NISN', required: true }, { name: 'nama', label: 'Nama siswa', required: true },
+            { name: 'tahun_ajaran_id', label: 'Tahun ajaran penempatan', type: 'select', options: 'academic-years', required: true, value: 'tahun_ajaran' },
             { name: 'kelas_id', label: 'Kelas', type: 'select', options: 'classes', required: true, value: 'nama_kelas' },
             { name: 'jenis_kelamin', label: 'Jenis kelamin', type: 'select', required: true, options: [['L', 'Laki-laki'], ['P', 'Perempuan']] },
         ] },
@@ -80,11 +82,12 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             const required = field.required ? 'required' : '';
             let control;
             if (field.type === 'select' || field.type === 'period') {
-                const options = field.type === 'period'
-                    ? []
-                    : typeof field.options === 'string'
-                    ? (references[field.options] || []).map((item) => [item.id, item[field.value || 'nama']])
-                    : field.options;
+                const optionItems = typeof field.options === 'string' ? (references[field.options] || []) : [];
+                const scopedItems = resource === 'students' && field.name === 'kelas_id'
+                    ? optionItems.filter((item) => String(item.tahun_ajaran_id) === String(current?.tahun_ajaran_id ?? current?.penempatans?.find((p) => p.tahunAjaran?.is_active)?.tahun_ajaran_id ?? ''))
+                    : resource === 'classes' && field.name === 'tahun_ajaran_id' ? optionItems : optionItems;
+                const options = field.type === 'period' ? [] : typeof field.options === 'string'
+                    ? scopedItems.map((item) => [item.id, item[field.value || 'nama']]) : field.options;
                 control = `<select class="form-select" name="${field.name}" ${required}><option value="">Pilih…</option>${options.map(([value, label]) => `<option value="${htmlSafe(value)}" ${String(oldValue) === String(value) ? 'selected' : ''}>${htmlSafe(label)}</option>`).join('')}</select>`;
             } else {
                 const isCoordinate = field.type === 'number' && /lat|long|latitude|longitude/i.test(field.name);
@@ -102,15 +105,55 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
         }).join('');
         const heading = current ? `Ubah ${definition.title}` : `Tambah ${definition.title}`;
         const importable = ['classes', 'students', 'subjects', 'materials', 'schedules'].includes(resource);
+        const studentYears = references['academic-years'] || [];
         const studentClasses = references.classes || [];
+        const studentImportYearSelect = resource === 'students'
+            ? `<div><label class="form-label small mb-1" for="studentImportYear">Tahun ajaran tujuan</label><select class="form-select" id="studentImportYear"><option value="">Pilih tahun ajaran</option>${studentYears.map((item) => `<option value="${htmlSafe(item.id)}" ${item.is_active ? 'selected' : ''}>${htmlSafe(item.tahun_ajaran)}${item.is_active ? ' (aktif)' : ''}</option>`).join('')}</select></div>` : '';
         const studentImportClassSelect = resource === 'students'
-            ? `<div><label class="form-label small mb-1" for="studentImportClass">Kelas tujuan impor</label><select class="form-select" id="studentImportClass" ${studentClasses.length ? '' : 'disabled'}><option value="">${studentClasses.length ? 'Pilih kelas' : 'Belum ada kelas tersedia'}</option>${studentClasses.map((item) => `<option value="${htmlSafe(item.id)}">${htmlSafe(item.nama_kelas)}</option>`).join('')}</select></div>`
-            : '';
-        const importActions = importable ? `${studentImportClassSelect}<button class="btn btn-outline-success align-self-end" type="button" id="masterImportButton"><i class="bi bi-upload"></i> Import Excel</button><button class="btn btn-outline-primary align-self-end" type="button" id="masterTemplateButton"><i class="bi bi-download"></i> Template Excel</button><input class="d-none" type="file" id="masterImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">` : '';
+            ? `<div><label class="form-label small mb-1" for="studentImportClass">Kelas tujuan impor</label><select class="form-select" id="studentImportClass" disabled><option value="">Pilih tahun ajaran terlebih dahulu</option></select></div>` : '';
+        const importActions = importable ? `${studentImportYearSelect}${studentImportClassSelect}<button class="btn btn-outline-success align-self-end" type="button" id="masterImportButton"><i class="bi bi-upload"></i> Import Excel</button><button class="btn btn-outline-primary align-self-end" type="button" id="masterTemplateButton"><i class="bi bi-download"></i> Template Excel</button><input class="d-none" type="file" id="masterImportFile" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">` : '';
         const calendarNotice = resource === 'schedules' ? (activeCalendar ? `<div class="alert alert-info small">Kalender aktif: <strong>${htmlSafe(activeCalendar.nama)}</strong>. Pilih hari, lalu tentukan periode mulai dan selesai. Jam jadwal dihitung otomatis dari detail kalender.</div>` : '<div class="alert alert-warning small">Belum ada kalender jam pelajaran aktif. Aktifkan kalender terlebih dahulu sebelum menambahkan jadwal.</div>') : '';
-        setFeature(definition.title, `${calendarNotice}<div class="d-flex flex-wrap align-items-end gap-2 mb-3"><button class="btn btn-success align-self-end" id="showMasterForm" ${current ? 'hidden' : ''}><i class="bi bi-plus-lg"></i> Tambah data</button>${importActions}</div>${resource === 'students' ? '<div class="form-text mb-3">Semua siswa dalam file akan dimasukkan ke kelas yang dipilih.</div>' : ''}<div id="masterImportResult" class="mb-3"></div><form class="card mb-4 admin-form-card" id="masterForm" ${current ? `data-id="${current.id}"` : ''} ${current ? '' : 'hidden'}><div class="card-body"><h3 class="h6 mb-3">${heading}</h3><div class="row g-3 admin-form-grid">${fieldMarkup}<div class="col-sm-12 d-flex gap-2 form-actions"><button class="btn btn-primary" type="submit">Simpan</button><button class="btn btn-outline-secondary" type="button" id="cancelMasterForm">Batal</button></div></div></div></form>${resource === 'schedules' ? `<div class="row g-2 mb-3" id="scheduleTableFilters"><div class="col-md-4"><label class="form-label small mb-1" for="scheduleFilterClass">Filter Kelas</label><select class="form-select form-select-sm" id="scheduleFilterClass"><option value="">Semua kelas</option>${[...new Set(items.map((item) => item.kelas?.nama_kelas).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id')).map((name) => `<option value="${htmlSafe(name)}">${htmlSafe(name)}</option>`).join('')}</select></div><div class="col-md-4"><label class="form-label small mb-1" for="scheduleFilterTeacher">Filter Nama Guru</label><select class="form-select form-select-sm" id="scheduleFilterTeacher"><option value="">Semua guru</option>${[...new Set(items.map((item) => item.guru?.nama).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id')).map((name) => `<option value="${htmlSafe(name)}">${htmlSafe(name)}</option>`).join('')}</select></div><div class="col-md-4"><label class="form-label small mb-1" for="scheduleFilterDay">Filter Hari</label><select class="form-select form-select-sm" id="scheduleFilterDay"><option value="">Semua hari</option>${[...new Set(items.map((item) => item.hari).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id')).map((day) => `<option value="${htmlSafe(day)}">${htmlSafe(day)}</option>`).join('')}</select></div><div class="col-12"><button class="btn btn-sm btn-outline-secondary" type="button" id="resetScheduleFilters"><i class="bi bi-arrow-counterclockwise"></i> Reset filter</button><span class="small text-secondary ms-2" id="scheduleFilterCount"></span></div></div>` : ''}
-<div class="table-responsive"><table class="table table-sm align-middle mobile-table"><thead><tr><th>No.</th>${definition.columns.map((column) => `<th>${htmlSafe(definition.columnLabels?.[column] || column.split('.').pop().replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase()))}</th>`).join('')}<th>Aksi</th></tr></thead><tbody>${items.map((item, index) => `<tr ${resource === 'schedules' ? `data-schedule-class="${htmlSafe(item.kelas?.nama_kelas || '')}" data-schedule-teacher="${htmlSafe(item.guru?.nama || '')}" data-schedule-day="${htmlSafe(item.hari || '')}"` : ''}><td>${index + 1}</td>${definition.columns.map((column) => `<td>${htmlSafe((resource === 'schedules' && column === 'jam_mulai' ? (item.jam_mulai_resolved ?? 'Tidak tersedia') : resource === 'schedules' && column === 'jam_selesai' ? (item.jam_selesai_resolved ?? 'Tidak tersedia') : nestedValue(item, column) ?? item[column] ?? '—'))}</td>`).join('')}<td class="d-flex gap-1">${resource === 'academic-years' ? `<button class="btn btn-sm btn-outline-success" data-activate="${item.id}" ${item.is_active ? 'disabled' : ''}>${item.is_active ? 'Aktif' : 'Aktifkan'}</button>` : ''}<button class="btn btn-sm btn-outline-primary" data-edit="${item.id}">Ubah</button><button class="btn btn-sm btn-outline-danger" data-delete="${item.id}">Hapus</button></td></tr>`).join('') || `<tr><td colspan="${definition.columns.length + 2}" class="text-center text-secondary py-4">Belum ada data.</td></tr>`}</tbody></table></div>${resource === 'agendas' ? '<div class="alert alert-warning small">Scope tingkat/kelas belum tersedia karena skema tidak memiliki target kelas/tingkat.</div>' : ''}`);
+        setFeature(definition.title, `${calendarNotice}<div class="d-flex flex-wrap align-items-end gap-2 mb-3"><button class="btn btn-success align-self-end" id="showMasterForm" ${current ? 'hidden' : ''}><i class="bi bi-plus-lg"></i> Tambah data</button>${importActions}</div>${resource === 'students' ? '<div class="alert alert-info small mb-3">Template siswa memakai kolom wajib: tahun_ajaran, nisn, nama, jenis_kelamin. Nilai tahun_ajaran pada setiap baris harus sama dengan tahun ajaran penempatan dan kelas tujuan yang dipilih. Jenis kelamin gunakan L atau P. Perubahan penempatan tidak menghapus riwayat presensi.</div>' : resource === 'classes' ? '<div class="alert alert-info small mb-3">Template kelas wajib memuat kolom tahun_ajaran. Isi dengan nama tahun ajaran yang sudah terdaftar, misalnya 2026/2027. Nama kelas yang sama diperbolehkan pada tahun ajaran berbeda.</div>' : ''}<div id="masterImportResult" class="mb-3"></div><form class="card mb-4 admin-form-card" id="masterForm" ${current ? `data-id="${current.id}"` : ''} ${current ? '' : 'hidden'}><div class="card-body"><h3 class="h6 mb-3">${heading}</h3><div class="row g-3 admin-form-grid">${fieldMarkup}<div class="col-sm-12 d-flex gap-2 form-actions"><button class="btn btn-primary" type="submit">Simpan</button><button class="btn btn-outline-secondary" type="button" id="cancelMasterForm">Batal</button></div></div></div></form>${resource === 'schedules' ? `<div class="row g-2 mb-3" id="scheduleTableFilters"><div class="col-md-4"><label class="form-label small mb-1" for="scheduleFilterClass">Filter Kelas</label><select class="form-select form-select-sm" id="scheduleFilterClass"><option value="">Semua kelas</option>${[...new Set(items.map((item) => item.kelas?.nama_kelas).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id')).map((name) => `<option value="${htmlSafe(name)}">${htmlSafe(name)}</option>`).join('')}</select></div><div class="col-md-4"><label class="form-label small mb-1" for="scheduleFilterTeacher">Filter Nama Guru</label><select class="form-select form-select-sm" id="scheduleFilterTeacher"><option value="">Semua guru</option>${[...new Set(items.map((item) => item.guru?.nama).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id')).map((name) => `<option value="${htmlSafe(name)}">${htmlSafe(name)}</option>`).join('')}</select></div><div class="col-md-4"><label class="form-label small mb-1" for="scheduleFilterDay">Filter Hari</label><select class="form-select form-select-sm" id="scheduleFilterDay"><option value="">Semua hari</option>${[...new Set(items.map((item) => item.hari).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id')).map((day) => `<option value="${htmlSafe(day)}">${htmlSafe(day)}</option>`).join('')}</select></div><div class="col-12"><button class="btn btn-sm btn-outline-secondary" type="button" id="resetScheduleFilters"><i class="bi bi-arrow-counterclockwise"></i> Reset filter</button><span class="small text-secondary ms-2" id="scheduleFilterCount"></span></div></div>` : ''}
+<div class="table-responsive"><table class="table table-sm align-middle mobile-table"><thead><tr><th>No.</th>${definition.columns.map((column) => `<th>${htmlSafe(definition.columnLabels?.[column] || column.split('.').pop().replaceAll('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase()))}</th>`).join('')}<th>Aksi</th></tr></thead><tbody>${items.map((item, index) => `<tr ${resource === 'schedules' ? `data-schedule-class="${htmlSafe(item.kelas?.nama_kelas || '')}" data-schedule-teacher="${htmlSafe(item.guru?.nama || '')}" data-schedule-day="${htmlSafe(item.hari || '')}"` : ''}><td>${index + 1}</td>${definition.columns.map((column) => `<td>${htmlSafe((resource === 'schedules' && column === 'jam_mulai' ? (item.jam_mulai_resolved ?? 'Tidak tersedia') : resource === 'schedules' && column === 'jam_selesai' ? (item.jam_selesai_resolved ?? 'Tidak tersedia') : (resource === 'students' && column === 'kelas_aktif' ? (item.penempatans?.find((p) => p.tahunAjaran?.is_active)?.kelas?.nama_kelas || 'Belum ditempatkan') : resource === 'students' && column === 'tahun_ajaran_aktif' ? (item.penempatans?.find((p) => p.tahunAjaran?.is_active)?.tahunAjaran?.tahun_ajaran || '—') : nestedValue(item, column)) ?? item[column] ?? '—'))}</td>`).join('')}<td class="d-flex gap-1">${resource === 'academic-years' ? `<button class="btn btn-sm btn-outline-success" data-activate="${item.id}" ${item.is_active ? 'disabled' : ''}>${item.is_active ? 'Aktif' : 'Aktifkan'}</button>` : ''}<button class="btn btn-sm btn-outline-primary" data-edit="${item.id}">Ubah</button><button class="btn btn-sm btn-outline-danger" data-delete="${item.id}">Hapus</button></td></tr>`).join('') || `<tr><td colspan="${definition.columns.length + 2}" class="text-center text-secondary py-4">Belum ada data.</td></tr>`}</tbody></table></div>${resource === 'agendas' ? '<div class="alert alert-warning small">Scope tingkat/kelas belum tersedia karena skema tidak memiliki target kelas/tingkat.</div>' : ''}`);
+        if (resource === 'students') {
+            const yearField = $('masterForm')?.querySelector('[name="tahun_ajaran_id"]');
+            const classField = $('masterForm')?.querySelector('[name="kelas_id"]');
+            const refreshClasses = () => {
+                if (!classField) return;
+                const selected = classField.value;
+                const filtered = studentClasses.filter((item) => String(item.tahun_ajaran_id) === String(yearField?.value || ''));
+                classField.innerHTML = `<option value="">Pilih kelas…</option>${filtered.map((item) => `<option value="${htmlSafe(item.id)}">${htmlSafe(item.nama_kelas)}</option>`).join('')}`;
+                if (filtered.some((item) => String(item.id) === String(selected))) classField.value = selected;
+                classField.disabled = !yearField?.value || filtered.length === 0;
+            };
+            yearField?.addEventListener('change', refreshClasses);
+            refreshClasses();
+            const importYear = $('studentImportYear');
+            const importClass = $('studentImportClass');
+            const refreshImportClasses = async () => {
+                if (!importClass) return;
+                const yearId = importYear?.value || '';
+                const filtered = studentClasses.filter((item) => String(item.tahun_ajaran_id) === String(yearId));
+                importClass.innerHTML = `<option value="">${yearId ? (filtered.length ? 'Pilih kelas' : 'Belum ada kelas untuk tahun ini') : 'Pilih tahun ajaran terlebih dahulu'}</option>${filtered.map((item) => `<option value="${htmlSafe(item.id)}">${htmlSafe(item.nama_kelas)}</option>`).join('')}`;
+                importClass.disabled = !yearId || filtered.length === 0;
+            };
+            importYear?.addEventListener('change', refreshImportClasses);
+            refreshImportClasses();
+            document.querySelectorAll('tbody tr').forEach((row) => { /* keep table rows untouched */ });
+        }
         if (resource === 'schedules') {
+            const yearField = $('masterForm')?.querySelector('[name="tahun_ajaran_id"]');
+            const classField = $('masterForm')?.querySelector('[name="kelas_id"]');
+            const refreshScheduleClasses = () => {
+                if (!classField) return;
+                const selected = classField.value;
+                const filtered = (references.classes || []).filter((item) => String(item.tahun_ajaran_id) === String(yearField?.value || ''));
+                classField.innerHTML = `<option value="">Pilih kelas…</option>${filtered.map((item) => `<option value="${htmlSafe(item.id)}">${htmlSafe(item.nama_kelas)}</option>`).join('')}`;
+                if (filtered.some((item) => String(item.id) === String(selected))) classField.value = selected;
+                classField.disabled = !yearField?.value || filtered.length === 0;
+            };
+            yearField?.addEventListener('change', refreshScheduleClasses);
+            refreshScheduleClasses();
             const filterClass = $('scheduleFilterClass');
             const filterTeacher = $('scheduleFilterTeacher');
             const filterDay = $('scheduleFilterDay');
@@ -157,14 +200,15 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             if (!file) return;
             const resultBox = $('masterImportResult');
             const classId = resource === 'students' ? $('studentImportClass')?.value : null;
-            if (resource === 'students' && !classId) {
-                resultBox.innerHTML = '<div class="alert alert-warning mb-0">Pilih kelas tujuan terlebih dahulu.</div>';
+            const yearId = resource === 'students' ? $('studentImportYear')?.value : null;
+            if (resource === 'students' && (!yearId || !classId)) {
+                resultBox.innerHTML = '<div class="alert alert-warning mb-0">Pilih tahun ajaran dan kelas tujuan terlebih dahulu.</div>';
                 event.currentTarget.value = '';
                 return;
             }
             resultBox.innerHTML = '<div class="alert alert-info mb-0">Memeriksa dan mengimpor file Excel...</div>';
             try {
-                const result = await api(`/api/v1/academic/imports/${resource}`, { method: 'POST', body: (() => { const data = new FormData(); data.append('file', file); if (classId) data.append('class_id', classId); return data; })() });
+                const result = await api(`/api/v1/academic/imports/${resource}`, { method: 'POST', body: (() => { const data = new FormData(); data.append('file', file); if (classId) data.append('class_id', classId); if (yearId) data.append('tahun_ajaran_id', yearId); return data; })() });
                 await openMaster(resource);
                 $('masterImportResult').innerHTML = `<div class="alert alert-success mb-0">${htmlSafe(result.message)}</div>`;
             } catch (error) {
@@ -223,18 +267,35 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
             delete values.mode_waktu;
             if (values.siklus_minggu === '') values.siklus_minggu = null;
             if (values.wali_kelas_id === '') values.wali_kelas_id = null;
+            if (values.tahun_ajaran_id === '') values.tahun_ajaran_id = null;
             if (values.lat_temporary === '') values.lat_temporary = null;
             if (values.long_temporary === '') values.long_temporary = null;
             if (values.radius_meters === '') values.radius_meters = null;
             if ('override_kbm' in values) values.override_kbm = values.override_kbm === '1';
             const id = event.currentTarget.dataset.id;
             try {
-                await api(`/api/v1/academic/${resource}${id ? `/${id}` : ''}`, { method: id ? 'PATCH' : 'POST', body: values });
+                if (resource === 'students') {
+                    const placement = { kelas_id: Number(values.kelas_id), tahun_ajaran_id: Number(values.tahun_ajaran_id) };
+                    delete values.kelas_id; delete values.tahun_ajaran_id;
+                    if (id) {
+                        await api(`/api/v1/academic/${resource}/${id}`, { method: 'PATCH', body: { ...values, ...placement } });
+                    } else {
+                        await api(`/api/v1/academic/${resource}`, { method: 'POST', body: { ...values, ...placement } });
+                    }
+                } else {
+                    await api(`/api/v1/academic/${resource}${id ? `/${id}` : ''}`, { method: id ? 'PATCH' : 'POST', body: values });
+                }
                 showToast('Data berhasil disimpan.');
                 openMaster(resource);
             } catch (error) { setFeatureError(error); }
         });
-        document.querySelectorAll('[data-edit]').forEach((button) => button.addEventListener('click', () => openMaster(resource, items.find((item) => String(item.id) === button.dataset.edit))));
+        document.querySelectorAll('[data-edit]').forEach((button) => button.addEventListener('click', () => {
+            const item = items.find((entry) => String(entry.id) === button.dataset.edit);
+            if (resource === 'students' && item) {
+                const activePlacement = item.penempatans?.find((p) => p.tahunAjaran?.is_active) || item.penempatans?.[0];
+                openMaster(resource, { ...item, kelas_id: activePlacement?.kelas_id || '', tahun_ajaran_id: activePlacement?.tahun_ajaran_id || '' });
+            } else openMaster(resource, item);
+        }));
         document.querySelectorAll('[data-delete]').forEach((button) => button.addEventListener('click', async () => {
             if (!confirm('Hapus data ini? Data yang masih memiliki relasi akan ditolak server.')) return;
             try { await api(`/api/v1/academic/${resource}/${button.dataset.delete}`, { method: 'DELETE' }); openMaster(resource); }
@@ -388,5 +449,100 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
         return `<tr data-period-row="${htmlSafe(key)}"><td><select class="form-select form-select-sm" name="hari">${days.map((day) => `<option value="${day}" ${period.hari === day ? 'selected' : ''}>${day}</option>`).join('')}</select></td><td><input class="form-control form-control-sm" type="number" name="nomor_periode" min="1" max="30" value="${htmlSafe(period.nomor_periode || 1)}" required></td><td><input class="form-control form-control-sm" type="time" name="jam_mulai" value="${htmlSafe(period.jam_mulai || '')}" required></td><td><input class="form-control form-control-sm" type="time" name="jam_selesai" value="${htmlSafe(period.jam_selesai || '')}" required></td><td><input class="form-control form-control-sm" name="label" maxlength="50" value="${htmlSafe(period.label || '')}"></td><td><button class="btn btn-sm btn-outline-danger" type="button" data-period-remove aria-label="Hapus periode">Hapus</button></td></tr>`;
     }
 
-    return { loadOptions, openMaster, openCalendars };
+
+    // Alur kenaikan kelas: siapkan pemetaan sebagai draf, periksa hasilnya, lalu konfirmasi sebelum menyimpan.
+    async function openPromotions() {
+        setFeature('Kenaikan Kelas', `
+            <div class="alert alert-info">Pilih tahun ajaran asal dan tujuan. Periksa setiap kelas tujuan terlebih dahulu; belum ada perubahan yang disimpan sampai Anda menekan Konfirmasi Kenaikan Kelas.</div>
+            <form id="promotionSetup" class="card admin-form-card mb-3"><div class="card-body"><div class="row g-3">
+                <div class="col-md-5"><label class="form-label" for="promotionSourceYear">Tahun ajaran asal</label><select class="form-select" id="promotionSourceYear" required><option value="">Memuat tahun ajaran…</option></select></div>
+                <div class="col-md-5"><label class="form-label" for="promotionTargetYear">Tahun ajaran tujuan</label><select class="form-select" id="promotionTargetYear" required><option value="">Pilih tahun ajaran tujuan</option></select></div>
+                <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-primary w-100" type="submit">Siapkan draf</button></div>
+            </div></div></form>
+            <div id="promotionDraft" aria-live="polite"><div class="text-secondary">Pilih tahun ajaran untuk menyiapkan daftar siswa.</div></div>`);
+        const sourceSelect = $('promotionSourceYear');
+        const targetSelect = $('promotionTargetYear');
+        const draft = $('promotionDraft');
+        try {
+            const yearResult = await api('/api/v1/academic/students/academic-years');
+            const years = yearResult.data || [];
+            const options = years.map((year) => `<option value="${htmlSafe(year.id)}">${htmlSafe(year.tahun_ajaran)}${year.is_active ? ' (aktif)' : ''}</option>`).join('');
+            sourceSelect.innerHTML = '<option value="">Pilih tahun ajaran asal</option>' + options;
+            targetSelect.innerHTML = '<option value="">Pilih tahun ajaran tujuan</option>' + options;
+            const activeYear = years.find((year) => year.is_active);
+            if (activeYear) sourceSelect.value = String(activeYear.id);
+        } catch (error) {
+            draft.innerHTML = `<div class="alert alert-danger">${htmlSafe(error.message)}</div>`;
+            return;
+        }
+
+        const loadDraft = async () => {
+            const sourceYearId = sourceSelect.value;
+            const targetYearId = targetSelect.value;
+            if (!sourceYearId || !targetYearId) {
+                draft.innerHTML = '<div class="alert alert-warning">Pilih kedua tahun ajaran terlebih dahulu.</div>';
+                return;
+            }
+            if (sourceYearId === targetYearId) {
+                draft.innerHTML = '<div class="alert alert-warning">Tahun ajaran asal dan tujuan harus berbeda.</div>';
+                return;
+            }
+            draft.innerHTML = '<div class="text-secondary"><span class="spin"></span> Menyiapkan daftar siswa dan kelas tujuan…</div>';
+            try {
+                const [students, classesResponse] = await Promise.all([
+                    window.aksaraFetchAllPages(api, '/api/v1/academic/students', { tahun_ajaran_id: sourceYearId }),
+                    api(`/api/v1/academic/students/classes?tahun_ajaran_id=${encodeURIComponent(targetYearId)}`),
+                ]);
+                const targetClasses = classesResponse.data || [];
+                const eligible = students.filter((student) => !student.arsip && !student.penempatans?.some((placement) => String(placement.tahun_ajaran_id) === String(targetYearId)));
+                const rows = eligible.map((student) => {
+                    const sourcePlacement = student.penempatans?.find((placement) => String(placement.tahun_ajaran_id) === String(sourceYearId));
+                    const sourceClass = sourcePlacement?.kelas;
+                    const matchingClass = targetClasses.find((item) => item.nama_kelas === sourceClass?.nama_kelas) ||
+                        targetClasses.find((item) => String(item.tingkat) === String(sourceClass?.tingkat) && item.jurusan === sourceClass?.jurusan);
+                    const targetOptions = targetClasses.map((item) => `<option value="${htmlSafe(item.id)}" ${String(item.id) === String(matchingClass?.id || '') ? 'selected' : ''}>${htmlSafe(item.nama_kelas)} · Tingkat ${htmlSafe(item.tingkat)} · ${htmlSafe(item.jurusan)}</option>`).join('');
+                    return `<tr><td><input class="form-check-input" type="checkbox" data-promotion-student="${htmlSafe(student.id)}" ${matchingClass ? 'checked' : ''} ${targetClasses.length ? '' : 'disabled'} aria-label="Sertakan ${htmlSafe(student.nama)}"></td><td>${htmlSafe(student.nisn)}</td><td>${htmlSafe(student.nama)}</td><td>${htmlSafe(sourceClass?.nama_kelas || '—')}</td><td><select class="form-select form-select-sm" data-promotion-class="${htmlSafe(student.id)}" ${targetClasses.length ? '' : 'disabled'}><option value="">Pilih kelas tujuan</option>${targetOptions}</select></td></tr>`;
+                }).join('');
+                draft.innerHTML = `
+                    <div class="card mb-3"><div class="card-body">
+                        <div class="d-flex flex-wrap justify-content-between gap-2 align-items-center mb-2"><div><h3 class="h6 mb-1">Draf penempatan tahun ajaran tujuan</h3><p class="small text-secondary mb-0">Centang siswa yang akan diproses dan pastikan kelas tujuannya benar.</p></div><span class="badge text-bg-secondary">${eligible.length} siswa tersedia</span></div>
+                        ${targetClasses.length ? '' : '<div class="alert alert-warning">Belum ada kelas untuk tahun ajaran tujuan. Buat kelas terlebih dahulu melalui menu Kelas.</div>'}
+                        <div class="table-responsive"><table class="table table-sm align-middle"><thead><tr><th>Pilih</th><th>NISN</th><th>Nama siswa</th><th>Kelas asal</th><th>Kelas tujuan</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="text-center text-secondary py-3">Tidak ada siswa yang dapat diproses. Pastikan siswa sudah ditempatkan pada tahun asal dan belum memiliki penempatan tahun tujuan.</td></tr>'}</tbody></table></div>
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2"><span class="small text-secondary">Siswa yang sudah punya penempatan di tahun tujuan atau sudah diarsipkan tidak ditampilkan.</span><button class="btn btn-primary" type="button" id="confirmPromotions" ${targetClasses.length && eligible.length ? '' : 'disabled'}>Konfirmasi Kenaikan Kelas</button></div>
+                    </div></div>`;
+                $('confirmPromotions')?.addEventListener('click', async () => {
+                    const selected = Array.from(draft.querySelectorAll('[data-promotion-student]:checked')).map((checkbox) => {
+                        const studentId = checkbox.dataset.promotionStudent;
+                        return { siswa_id: Number(studentId), kelas_id: Number(draft.querySelector(`[data-promotion-class="${studentId}"]`)?.value || 0) };
+                    });
+                    if (!selected.length) { showToast('Pilih minimal satu siswa untuk diproses.'); return; }
+                    if (selected.some((item) => !item.kelas_id)) { showToast('Pilih kelas tujuan untuk setiap siswa yang dicentang.'); return; }
+                    if (!confirm(`Anda akan membuat penempatan untuk ${selected.length} siswa pada tahun ajaran tujuan. Riwayat tahun sebelumnya tidak dihapus. Setelah dikonfirmasi, perubahan tersimpan. Lanjutkan?`)) return;
+                    const button = $('confirmPromotions');
+                    button.disabled = true;
+                    button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Menyimpan…';
+                    try {
+                        const result = await api('/api/v1/academic/students/promote', { method: 'POST', body: {
+                            tahun_ajaran_asal_id: Number(sourceYearId),
+                            tahun_ajaran_tujuan_id: Number(targetYearId),
+                            placements: selected,
+                        }});
+                        showToast(result.message || `Penempatan ${result.count || selected.length} siswa berhasil dibuat.`);
+                        await loadDraft();
+                    } catch (error) {
+                        setFeatureError(error);
+                        button.disabled = false;
+                        button.textContent = 'Konfirmasi Kenaikan Kelas';
+                    }
+                });
+            } catch (error) {
+                draft.innerHTML = `<div class="alert alert-danger">${htmlSafe(error.message)}</div>`;
+            }
+        };
+        $('promotionSetup')?.addEventListener('submit', (event) => { event.preventDefault(); loadDraft(); });
+        targetSelect.addEventListener('change', () => { if (sourceSelect.value && targetSelect.value) loadDraft(); });
+        sourceSelect.addEventListener('change', () => { if (sourceSelect.value && targetSelect.value) loadDraft(); });
+    }
+
+    return { loadOptions, openMaster, openCalendars, openPromotions };
 };

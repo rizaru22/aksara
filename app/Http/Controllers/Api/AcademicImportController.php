@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\JadwalPelajaran;
 use App\Models\Kelas;
 use App\Models\MataPelajaran;
+use App\Models\PenempatanSiswa;
 use App\Models\MateriPelajaran;
 use App\Models\Siswa;
 use App\Models\TahunAjaran;
@@ -24,8 +25,8 @@ use Throwable;
 class AcademicImportController extends Controller
 {
     private const TEMPLATES = [
-        'classes' => ['Kelas', ['nama_kelas', 'tingkat', 'jurusan', 'wali_kelas_nip']],
-        'students' => ['Siswa', ['nisn', 'nama', 'jenis_kelamin']],
+        'classes' => ['Kelas', ['tahun_ajaran', 'nama_kelas', 'tingkat', 'jurusan', 'wali_kelas_nip']],
+        'students' => ['Siswa', ['tahun_ajaran', 'nisn', 'nama', 'jenis_kelamin']],
         'subjects' => ['Mata_Pelajaran', ['kode_mapel', 'nama_mapel']],
         'materials' => ['Materi_Pelajaran', ['kode_mapel', 'urutan_bab', 'judul_bab', 'target_jjp']],
         'schedules' => ['Jadwal_Pelajaran', ['tahun_ajaran', 'semester', 'nip_guru', 'nama_kelas', 'kode_mapel', 'siklus_minggu', 'hari', 'periode_mulai', 'periode_selesai']],
@@ -59,8 +60,15 @@ class AcademicImportController extends Controller
         abort_unless(isset(self::TEMPLATES[$resource]), 404);
         $request->validate(['file' => 'required|file|mimes:xlsx|max:10240']);
         $classId = $resource === 'students'
-            ? $request->validate(['class_id' => 'required|integer|exists:kelas,id'])['class_id']
+            ? $request->validate([
+                'class_id' => 'required|integer|exists:kelas,id',
+                'tahun_ajaran_id' => 'required|integer|exists:tahun_ajarans,id',
+            ])['class_id']
             : null;
+        $placementYearId = $resource === 'students' ? (int) $request->input('tahun_ajaran_id') : null;
+        if ($resource === 'students' && (int) Kelas::query()->findOrFail($classId)->tahun_ajaran_id !== $placementYearId) {
+            throw ValidationException::withMessages(['class_id' => 'Kelas harus berasal dari tahun ajaran yang dipilih.']);
+        }
         if (! class_exists(\ZipArchive::class)) return response()->json(['message' => 'Aktifkan ekstensi PHP zip untuk mengimpor file Excel.'], 503);
 
         try {
@@ -70,12 +78,16 @@ class AcademicImportController extends Controller
             $missing = array_values(array_diff($expected, $headers));
             if ($missing) throw ValidationException::withMessages(['file' => 'Kolom template tidak lengkap: '.implode(', ', $missing).'. Unduh template terbaru.']);
             if (count($rows) > 2000) throw ValidationException::withMessages(['file' => 'Maksimum 2.000 baris data per impor.']);
-            $records = $this->mapRows($resource, $rows, $classId);
-            DB::transaction(function () use ($resource, $records): void {
+            $records = $this->mapRows($resource, $rows, $classId, $placementYearId);
+            DB::transaction(function () use ($resource, $records, $classId, $placementYearId): void {
                 foreach ($records as $record) {
                     match ($resource) {
                         'classes' => Kelas::query()->create($record),
-                        'students' => Siswa::query()->create($record),
+                        'students' => (function () use ($record, $classId, $placementYearId) {
+                            $student = Siswa::query()->create($record);
+                            PenempatanSiswa::query()->create(['siswa_id' => $student->id, 'kelas_id' => $classId, 'tahun_ajaran_id' => $placementYearId]);
+                            return $student;
+                        })(),
                         'subjects' => MataPelajaran::query()->create($record),
                         'materials' => MateriPelajaran::query()->create($record),
                         'schedules' => JadwalPelajaran::query()->create($record),
@@ -97,7 +109,7 @@ class AcademicImportController extends Controller
      * Memetakan semua baris Excel dari satu resource ke struktur data yang siap divalidasi sebelum disimpan.
      * Setiap baris diperiksa satu per satu agar error bisa diidentifikasi dengan nomor baris yang tepat.
      */
-    private function mapRows(string $resource, array $rows, ?int $classId = null): array
+    private function mapRows(string $resource, array $rows, ?int $classId = null, ?int $placementYearId = null): array
     {
         $mapped = [];
         $errors = [];
@@ -106,7 +118,7 @@ class AcademicImportController extends Controller
             try {
                 $record = match ($resource) {
                     'classes' => $this->classRow($row),
-                    'students' => $this->studentRow($row, $classId),
+                    'students' => $this->studentRow($row, $classId, $placementYearId),
                     'subjects' => $this->subjectRow($row),
                     'materials' => $this->materialRow($row),
                     'schedules' => $this->scheduleRow($row),
@@ -132,15 +144,33 @@ class AcademicImportController extends Controller
     private function classRow(array $row): array
     {
         $wali = $this->optionalTeacher($row['wali_kelas_nip'] ?? '');
-        return ['nama_kelas' => $row['nama_kelas'] ?? '', 'tingkat' => $row['tingkat'] ?? '', 'jurusan' => $row['jurusan'] ?? '', 'wali_kelas_id' => $wali?->id];
+        $year = TahunAjaran::query()->where('tahun_ajaran', trim($row['tahun_ajaran'] ?? ''))->first();
+        if (! $year) throw new RuntimeException('Tahun ajaran kelas tidak ditemukan.');
+        return ['tahun_ajaran_id' => $year->id, 'nama_kelas' => trim($row['nama_kelas'] ?? ''), 'tingkat' => trim($row['tingkat'] ?? ''), 'jurusan' => trim($row['jurusan'] ?? ''), 'wali_kelas_id' => $wali?->id];
     }
 
     /**
      * Mengubah baris siswa menjadi payload yang sesuai schema model Siswa serta mengikat ke kelas tujuan.
      */
-    private function studentRow(array $row, ?int $classId): array
+    private function studentRow(array $row, ?int $classId, ?int $placementYearId): array
     {
-        return ['nisn' => trim($row['nisn'] ?? ''), 'nama' => trim($row['nama'] ?? ''), 'kelas_id' => $classId, 'jenis_kelamin' => strtoupper(trim($row['jenis_kelamin'] ?? ''))];
+        $yearName = trim($row['tahun_ajaran'] ?? '');
+        $year = $yearName !== '' ? TahunAjaran::query()->where('tahun_ajaran', $yearName)->first() : null;
+        if (! $year) {
+            throw new RuntimeException('Tahun ajaran penempatan siswa tidak ditemukan atau kosong.');
+        }
+        if ($placementYearId === null || (int) $year->id !== $placementYearId) {
+            throw new RuntimeException('Tahun ajaran pada file siswa harus sama dengan tahun ajaran penempatan yang dipilih.');
+        }
+        if ($classId === null || (int) Kelas::query()->findOrFail($classId)->tahun_ajaran_id !== (int) $year->id) {
+            throw new RuntimeException('Kelas tujuan harus berada pada tahun ajaran penempatan yang tercantum di file.');
+        }
+
+        return [
+            'nisn' => trim($row['nisn'] ?? ''),
+            'nama' => trim($row['nama'] ?? ''),
+            'jenis_kelamin' => strtoupper(trim($row['jenis_kelamin'] ?? '')),
+        ];
     }
 
     private function subjectRow(array $row): array
@@ -159,11 +189,11 @@ class AcademicImportController extends Controller
     {
         $year = TahunAjaran::query()->where('tahun_ajaran', trim($row['tahun_ajaran'] ?? ''))->first();
         $teacher = User::query()->where('nip', trim($row['nip_guru'] ?? ''))->role(['guru', 'admin', 'kurikulum', 'kepsek'])->first();
-        $class = Kelas::query()->where('nama_kelas', trim($row['nama_kelas'] ?? ''))->first();
+        $class = $year ? Kelas::query()->where('tahun_ajaran_id', $year->id)->where('nama_kelas', trim($row['nama_kelas'] ?? ''))->first() : null;
         $subject = MataPelajaran::query()->where('kode_mapel', trim($row['kode_mapel'] ?? ''))->first();
         if (! $year) throw new RuntimeException('Tahun ajaran tidak ditemukan; gunakan format yang sama seperti data master.');
         if (! $teacher) throw new RuntimeException('Guru dengan NIP tersebut tidak ditemukan.');
-        if (! $class) throw new RuntimeException('Kelas tidak ditemukan.');
+        if (! $class) throw new RuntimeException('Kelas tidak ditemukan pada tahun ajaran yang dipilih.');
         if (! $subject) throw new RuntimeException('Mata pelajaran tidak ditemukan.');
         $periodeMulai = filter_var($row['periode_mulai'] ?? null, FILTER_VALIDATE_INT);
         $periodeSelesai = filter_var($row['periode_selesai'] ?? null, FILTER_VALIDATE_INT);
@@ -217,8 +247,8 @@ class AcademicImportController extends Controller
     private function rules(string $resource): array
     {
         return match ($resource) {
-            'classes' => ['nama_kelas' => 'required|string|max:255|unique:kelas,nama_kelas', 'tingkat' => 'required|string|max:50', 'jurusan' => 'required|string|max:100', 'wali_kelas_id' => 'nullable|exists:users,id'],
-            'students' => ['nisn' => 'required|string|max:255|unique:siswas,nisn', 'nama' => 'required|string|max:255', 'kelas_id' => 'required|exists:kelas,id', 'jenis_kelamin' => 'required|in:L,P'],
+            'classes' => ['tahun_ajaran_id' => 'required|exists:tahun_ajarans,id', 'nama_kelas' => 'required|string|max:255', 'tingkat' => 'required|string|max:50', 'jurusan' => 'required|string|max:100', 'wali_kelas_id' => 'nullable|exists:users,id'],
+            'students' => ['nisn' => 'required|string|max:255|unique:siswas,nisn', 'nama' => 'required|string|max:255', 'jenis_kelamin' => 'required|in:L,P'],
             'subjects' => ['kode_mapel' => 'required|string|max:255|unique:mata_pelajarans,kode_mapel', 'nama_mapel' => 'required|string|max:255'],
             'materials' => ['mata_pelajaran_id' => 'required|exists:mata_pelajarans,id', 'urutan_bab' => 'required|integer|min:1', 'judul_bab' => 'required|string|max:255', 'target_jjp' => 'required|integer|min:1'],
             'schedules' => ['tahun_ajaran_id' => 'required|exists:tahun_ajarans,id', 'semester' => 'required|in:Ganjil,Genap', 'user_id' => 'required|exists:users,id', 'kelas_id' => 'required|exists:kelas,id', 'mata_pelajaran_id' => 'required|exists:mata_pelajarans,id', 'siklus_minggu' => 'nullable|integer|in:1,2,3', 'hari' => 'required|in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu', 'periode_mulai' => 'required|integer|min:1', 'periode_selesai' => 'required|integer|gte:periode_mulai'],
@@ -227,15 +257,31 @@ class AcademicImportController extends Controller
 
     private function validateDuplicate(string $resource, array $record, array $previous): void
     {
-        $unique = match ($resource) { 'classes' => ['nama_kelas'], 'students' => ['nisn'], 'subjects' => ['kode_mapel'], default => null };
-        if ($unique && $this->duplicateInDatabase($resource, $record[$unique[0]])) throw ValidationException::withMessages([$unique[0] => 'nilai sudah digunakan']);
-        if ($unique) foreach ($previous as $item) if ($item[$unique[0]] === $record[$unique[0]]) throw ValidationException::withMessages([$unique[0] => 'nilai duplikat pada file']);
+        if ($resource === 'classes') {
+            foreach ($previous as $item) {
+                if ((int) $item['tahun_ajaran_id'] === (int) $record['tahun_ajaran_id'] && $item['nama_kelas'] === $record['nama_kelas']) {
+                    throw ValidationException::withMessages(['nama_kelas' => 'nama kelas duplikat pada tahun ajaran yang sama dalam file']);
+                }
+            }
+            if (Kelas::query()->where('tahun_ajaran_id', $record['tahun_ajaran_id'])->where('nama_kelas', $record['nama_kelas'])->exists()) {
+                throw ValidationException::withMessages(['nama_kelas' => 'nama kelas sudah digunakan pada tahun ajaran yang sama']);
+            }
+            return;
+        }
+        $unique = match ($resource) { 'students' => 'nisn', 'subjects' => 'kode_mapel', default => null };
+        if (! $unique) return;
+        if ($this->duplicateInDatabase($resource, $record[$unique])) {
+            throw ValidationException::withMessages([$unique => 'nilai sudah digunakan']);
+        }
+        foreach ($previous as $item) {
+            if ($item[$unique] === $record[$unique]) throw ValidationException::withMessages([$unique => 'nilai duplikat pada file']);
+        }
     }
 
     private function duplicateInDatabase(string $resource, string $value): bool
     {
         return match ($resource) {
-            'classes' => Kelas::query()->where('nama_kelas', $value)->exists(),
+            'classes' => false,
             'students' => Siswa::query()->where('nisn', $value)->exists(),
             'subjects' => MataPelajaran::query()->where('kode_mapel', $value)->exists(),
             default => false,
