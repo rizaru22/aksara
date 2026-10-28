@@ -154,12 +154,27 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
                 const year = studentYears.find((item) => String(item.id) === String(yearId));
                 const klass = studentClasses.find((item) => String(item.id) === String(classId));
                 const rows = items.filter((student) => (student.penempatans || []).some((placement) => String(placement.tahun_ajaran_id) === String(yearId) && String(placement.kelas_id) === String(classId))).sort((a, b) => String(a.nama || '').localeCompare(String(b.nama || ''), 'id'));
-                const printWindow = window.open('', '_blank');
-                if (!printWindow) { $('masterImportResult').innerHTML = '<div class="alert alert-warning mb-0">Jendela cetak diblokir browser. Izinkan pop-up untuk situs AKSARA, lalu coba lagi.</div>'; return; }
                 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
                 const tableRows = rows.map((student, index) => '<tr><td>' + (index + 1) + '</td><td>' + esc(student.nisn) + '</td><td>' + esc(formatPersonName(student.nama)) + '</td><td>' + esc(student.jenis_kelamin) + '</td></tr>').join('') || '<tr><td colspan="4" style="text-align:center">Tidak ada siswa pada kelas ini.</td></tr>';
-                printWindow.document.write('<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Daftar Siswa</title><style>body{font-family:Arial,sans-serif;color:#111;margin:24px}h2,p{text-align:center;margin:4px}table{width:100%;border-collapse:collapse;margin-top:22px;font-size:12px}th,td{border:1px solid #333;padding:6px 8px}th{background:#eee}.signature{margin:36px 30px 0 auto;width:220px;text-align:center}@media print{body{margin:10mm}}</style></head><body><h2>DAFTAR SISWA</h2><p>TAHUN AJARAN ' + esc(year?.tahun_ajaran || '') + '</p><p>Kelas: <strong>' + esc(klass?.nama_kelas || '') + '</strong></p><p>Jumlah siswa: ' + rows.length + '</p><table><thead><tr><th>No.</th><th>NISN</th><th>Nama Siswa</th><th>L/P</th></tr></thead><tbody>' + tableRows + '</tbody></table><div class="signature"><p>Mengetahui,</p><p>Wali Kelas</p><br><br><p>(' + esc(klass?.wali_kelas?.nama ? formatPersonName(klass.wali_kelas.nama) : 'Belum ditentukan') + ')</p></div><script>window.onload=function(){window.print();};<\/script></body></html>');
-                printWindow.document.close();
+                const printFrame = document.createElement('iframe');
+                printFrame.setAttribute('title', 'Pratinjau cetak daftar siswa');
+                printFrame.style.position = 'fixed';
+                printFrame.style.right = '0';
+                printFrame.style.bottom = '0';
+                printFrame.style.width = '0';
+                printFrame.style.height = '0';
+                printFrame.style.border = '0';
+                document.body.appendChild(printFrame);
+                const printDocument = printFrame.contentDocument;
+                printDocument.open();
+                printDocument.write('<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Daftar Siswa</title><style>body{font-family:Arial,sans-serif;color:#111;margin:24px}h2,p{text-align:center;margin:4px}table{width:100%;border-collapse:collapse;margin-top:22px;font-size:12px}th,td{border:1px solid #333;padding:6px 8px}th{background:#eee}.signature{margin:36px 30px 0 auto;width:220px;text-align:center}@media print{body{margin:10mm}}</style></head><body><h2>DAFTAR SISWA</h2><p>TAHUN AJARAN ' + esc(year?.tahun_ajaran || '') + '</p><p>Kelas: <strong>' + esc(klass?.nama_kelas || '') + '</strong></p><p>Jumlah siswa: ' + rows.length + '</p><table><thead><tr><th>No.</th><th>NISN</th><th>Nama Siswa</th><th>L/P</th></tr></thead><tbody>' + tableRows + '</tbody></table><div class="signature"><p>Mengetahui,</p><p>Wali Kelas</p><br><br><p>(' + esc(klass?.wali_kelas?.nama ? formatPersonName(klass.wali_kelas.nama) : 'Belum ditentukan') + ')</p></div></body></html>');
+                printDocument.close();
+                const cleanupPrintFrame = () => { printFrame.remove(); };
+                printFrame.onload = () => {
+                    printFrame.contentWindow.focus();
+                    printFrame.contentWindow.print();
+                    printFrame.contentWindow.addEventListener('afterprint', cleanupPrintFrame, { once: true });
+                };
             });
             const importYear = $('studentImportYear');
             const importClass = $('studentImportClass');
