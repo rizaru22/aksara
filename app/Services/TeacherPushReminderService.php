@@ -45,7 +45,7 @@ class TeacherPushReminderService
 
         $onLeave = PengajuanIzin::query()
             ->whereIn('user_id', $recipients->modelKeys())
-            ->where('jenis_pengajuan', 'CUTI')
+            ->whereIn('jenis_pengajuan', ['CUTI', 'DINAS'])
             ->where('status_approval', 'APPROVED')
             ->whereDate('tanggal_mulai', '<=', $now->toDateString())
             ->whereDate('tanggal_selesai', '>=', $now->toDateString())
@@ -71,10 +71,10 @@ class TeacherPushReminderService
         $checkInStartAt = $schedule?->jam_masuk_mulai
             ? $this->atTime($now, $schedule->jam_masuk_mulai)
             : $this->atTime($now, '07:00:00');
-        $checkInEndsAt = $this->atTime(
-            $now,
-            $schedule?->jam_masuk_akhir ?? Setting::value('jam_masuk_batas', '07:15:00'),
-        );
+        // Keep reminding until the end of the day if check-in is still missing.
+        // The configured late boundary (for example 08:45) determines lateness,
+        // but must not stop attendance reminders.
+        $checkInEndsAt = $this->atTime($now, '23:59:59');
 
         $checkOutStartsAt = $schedule?->jam_pulang_mulai
             ? $this->atTime($now, $schedule->jam_pulang_mulai)
