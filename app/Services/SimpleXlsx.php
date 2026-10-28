@@ -47,7 +47,7 @@ class SimpleXlsx
     }
 
     /** @return list<array<string, string>> */
-    public function read(string $path, bool $dapodikRombel = false): array
+    public function read(string $path, bool $dapodikRombel = false, bool $dapodikSiswa = false): array
     {
         $zip = new ZipArchive();
         if ($zip->open($path) !== true) throw new RuntimeException('Berkas tidak terbaca sebagai Excel .xlsx yang valid.');
@@ -99,6 +99,44 @@ class SimpleXlsx
             if (count($rows) > 2001) { $zip->close(); throw new RuntimeException('Maksimum 2.000 baris data per impor.'); }
         }
         $zip->close();
+
+        if ($dapodikSiswa) {
+            $headerIndex = null;
+            foreach ($rows as $index => $values) {
+                $normalized = array_map(fn ($value) => mb_strtolower(trim((string) $value)), $values);
+                if (in_array('nama', $normalized, true)
+                    && in_array('nisn', $normalized, true)
+                    && in_array('jk', $normalized, true)
+                    && in_array('rombel saat ini', $normalized, true)) {
+                    $headerIndex = $index;
+                    break;
+                }
+            }
+            if ($headerIndex === null) {
+                throw new RuntimeException('Format Dapodik peserta didik tidak dikenali. Pastikan file memuat kolom Nama, NISN, JK, dan Rombel Saat Ini.');
+            }
+            $headers = [];
+            foreach ($rows[$headerIndex] as $index => $header) {
+                $key = mb_strtolower(trim((string) $header));
+                if ($key !== '') $headers[$index] = $key;
+            }
+            foreach (['nama', 'nisn', 'jk', 'rombel saat ini'] as $required) {
+                if (! in_array($required, $headers, true)) {
+                    throw new RuntimeException('Kolom wajib Dapodik peserta didik tidak ditemukan: '.$required.'.');
+                }
+            }
+            $result = [];
+            foreach (array_slice($rows, $headerIndex + 1) as $values) {
+                // Export peserta didik menggunakan nomor urut numerik di kolom pertama.
+                if (! isset($values[0]) || ! ctype_digit((string) $values[0])) continue;
+                $item = [];
+                foreach ($headers as $index => $header) $item[$header] = trim((string) ($values[$index] ?? ''));
+                if (($item['nama'] ?? '') !== '' || ($item['nisn'] ?? '') !== '') $result[] = $item;
+                if (count($result) > 2000) throw new RuntimeException('Maksimum 2.000 siswa per impor.');
+            }
+            if (! $result) throw new RuntimeException('Tidak ada baris peserta didik yang valid pada file Dapodik.');
+            return $result;
+        }
 
         if ($dapodikRombel) {
             $headerIndex = null;
