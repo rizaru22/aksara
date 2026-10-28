@@ -165,16 +165,16 @@ window.createAksaraAcademicData = function ({ $, api, htmlSafe, setFeature, setF
                 printFrame.style.height = '0';
                 printFrame.style.border = '0';
                 document.body.appendChild(printFrame);
-                const printDocument = printFrame.contentDocument;
-                printDocument.open();
-                printDocument.write('<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Daftar Siswa</title><style>body{font-family:Arial,sans-serif;color:#111;margin:24px}h2,p{text-align:center;margin:4px}table{width:100%;border-collapse:collapse;margin-top:22px;font-size:12px}th,td{border:1px solid #333;padding:6px 8px}th{background:#eee}.signature{margin:36px 30px 0 auto;width:220px;text-align:center}@media print{body{margin:10mm}}</style></head><body><h2>DAFTAR SISWA</h2><p>TAHUN AJARAN ' + esc(year?.tahun_ajaran || '') + '</p><p>Kelas: <strong>' + esc(klass?.nama_kelas || '') + '</strong></p><p>Jumlah siswa: ' + rows.length + '</p><table><thead><tr><th>No.</th><th>NISN</th><th>Nama Siswa</th><th>L/P</th></tr></thead><tbody>' + tableRows + '</tbody></table><div class="signature"><p>Mengetahui,</p><p>Wali Kelas</p><br><br><p>(' + esc(klass?.wali_kelas?.nama ? formatPersonName(klass.wali_kelas.nama) : 'Belum ditentukan') + ')</p></div></body></html>');
-                printDocument.close();
                 const cleanupPrintFrame = () => { printFrame.remove(); };
                 printFrame.onload = () => {
                     printFrame.contentWindow.focus();
                     printFrame.contentWindow.print();
                     printFrame.contentWindow.addEventListener('afterprint', cleanupPrintFrame, { once: true });
                 };
+                const printDocument = printFrame.contentDocument;
+                printDocument.open();
+                printDocument.write('<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Daftar Siswa</title><style>body{font-family:Arial,sans-serif;color:#111;margin:24px}h2,p{text-align:center;margin:4px}table{width:100%;border-collapse:collapse;margin-top:22px;font-size:12px}th,td{border:1px solid #333;padding:6px 8px}th{background:#eee}.signature{margin:36px 30px 0 auto;width:220px;text-align:center}@media print{body{margin:10mm}}</style></head><body><h2>DAFTAR SISWA</h2><p>TAHUN AJARAN ' + esc(year?.tahun_ajaran || '') + '</p><p>Kelas: <strong>' + esc(klass?.nama_kelas || '') + '</strong></p><p>Jumlah siswa: ' + rows.length + '</p><table><thead><tr><th>No.</th><th>NISN</th><th>Nama Siswa</th><th>L/P</th></tr></thead><tbody>' + tableRows + '</tbody></table><div class="signature"><p>Mengetahui,</p><p>Wali Kelas</p><br><br><p>(' + esc(klass?.wali_kelas?.nama ? formatPersonName(klass.wali_kelas.nama) : 'Belum ditentukan') + ')</p></div></body></html>');
+                printDocument.close();
             });
             const importYear = $('studentImportYear');
             const importClass = $('studentImportClass');
