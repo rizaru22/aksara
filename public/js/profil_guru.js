@@ -5,16 +5,19 @@
     const passwordSubmit = byId('changePasswordSubmit');
     const passwordModal = byId('changePasswordModal');
 
-    document.querySelectorAll('[data-toggle-password]').forEach((button) => {
-        button.addEventListener('click', () => {
-            const input = byId(button.dataset.togglePassword);
-            if (!input) return;
-            const visible = input.type === 'password';
-            input.type = visible ? 'text' : 'password';
-            button.setAttribute('aria-pressed', String(visible));
-            button.setAttribute('aria-label', `${visible ? 'Sembunyikan' : 'Lihat'} ${button.dataset.togglePassword === 'currentPassword' ? 'kata sandi saat ini' : button.dataset.togglePassword === 'newPassword' ? 'kata sandi baru' : 'konfirmasi kata sandi baru'}`);
-            button.innerHTML = `<i class="bi bi-eye${visible ? '-slash' : ''}" aria-hidden="true"></i>`;
-        });
+    // Event delegation menjaga tombol show/hide tetap berfungsi meski form profil dirender ulang.
+    document.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-toggle-password]');
+        if (!button) return;
+
+        const input = byId(button.dataset.togglePassword);
+        if (!input) return;
+
+        const visible = input.type === 'password';
+        input.type = visible ? 'text' : 'password';
+        button.setAttribute('aria-pressed', String(visible));
+        button.setAttribute('aria-label', `${visible ? 'Sembunyikan' : 'Lihat'} ${button.dataset.togglePassword === 'currentPassword' ? 'kata sandi saat ini' : button.dataset.togglePassword === 'newPassword' ? 'kata sandi baru' : 'konfirmasi kata sandi baru'}`);
+        button.innerHTML = `<i class="bi bi-eye${visible ? '-slash' : ''}" aria-hidden="true"></i>`;
     });
 
     // Mengambil token login aktif dari storage browser untuk request protected endpoint profile dan password.
