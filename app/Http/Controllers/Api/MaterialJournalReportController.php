@@ -1,13 +1,13 @@
 <?php
 
-namespace App\\Http\\Controllers\\Api;
+namespace App\Http\Controllers\Api;
 
-use App\\Http\\Controllers\\Controller;
-use App\\Models\\JadwalPelajaran;
-use App\\Models\\JurnalMengajar;
-use App\\Models\\TahunAjaran;
-use Illuminate\\Http\\JsonResponse;
-use Illuminate\\Http\\Request;
+use App\Http\Controllers\Controller;
+use App\Models\JadwalPelajaran;
+use App\Models\JurnalMengajar;
+use App\Models\TahunAjaran;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class MaterialJournalReportController extends Controller
 {
@@ -85,9 +85,9 @@ class MaterialJournalReportController extends Controller
                 ->get()
                 ->map(fn (JurnalMengajar $journal) => [
                     'id' => $journal->id,
-                    'tanggal' => $journal->tanggal instanceof \\Carbon\\Carbon ? $journal->tanggal->toDateString() : (string) $journal->tanggal,
-                    'jam_mulai' => $journal->waktu_rencana_mulai?->format('H:i') ?? ($journal->jam_mulai_realisasi ? \\Carbon\\Carbon::parse($journal->jam_mulai_realisasi)->format('H:i') : null) ?? $journal->jadwalPelajaran?->jam_mulai,
-                    'jam_selesai' => $journal->waktu_rencana_selesai?->format('H:i') ?? ($journal->jam_selesai_realisasi ? \\Carbon\\Carbon::parse($journal->jam_selesai_realisasi)->format('H:i') : null) ?? $journal->jadwalPelajaran?->jam_selesai,
+                    'tanggal' => $journal->tanggal instanceof \Carbon\Carbon ? $journal->tanggal->toDateString() : (string) $journal->tanggal,
+                    'jam_mulai' => $journal->waktu_rencana_mulai?->format('H:i') ?? ($journal->jam_mulai_realisasi ? \Carbon\Carbon::parse($journal->jam_mulai_realisasi)->format('H:i') : null) ?? $journal->jadwalPelajaran?->jam_mulai,
+                    'jam_selesai' => $journal->waktu_rencana_selesai?->format('H:i') ?? ($journal->jam_selesai_realisasi ? \Carbon\Carbon::parse($journal->jam_selesai_realisasi)->format('H:i') : null) ?? $journal->jadwalPelajaran?->jam_selesai,
                     'materi' => $journal->materi_pembahasan,
                     'catatan' => $journal->catatan_kejadian_kelas,
                     'status' => $journal->status_sesi,
