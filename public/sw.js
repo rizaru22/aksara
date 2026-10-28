@@ -56,8 +56,8 @@ self.addEventListener('push', (event) => {
     const title = payload.title || 'Pengingat AKSARA';
     const options = {
         body: payload.body || 'Anda memiliki pengingat baru.',
-        icon: payload.icon || '/favicon.ico',
-        badge: payload.badge || '/favicon.ico',
+        icon: payload.icon || '/favicon.svg',
+        badge: payload.badge || '/favicon.svg',
         tag: payload.tag || 'aksara-reminder',
         data: payload.data || { url: '/dashboard.html' },
         requireInteraction: true,
