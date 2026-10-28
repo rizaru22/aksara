@@ -1798,7 +1798,7 @@ renderStudentPage();
             $(elementId).innerHTML = items.map((module) => `<button class="admin-side-link" data-admin-action="${htmlSafe(module.key)}"><i class="bi ${htmlSafe(module.icon)}"></i> ${htmlSafe(module.title)}</button>`).join('');
         };
         const orderedModules = (keys) => keys.map((key) => modules.find((module) => module.key === key)).filter(Boolean);
-        renderSidebarGroup('adminSideOperational', orderedModules(['flagged', 'journal-monitoring', 'monitoring', 'substitute-approvals', 'leave-approvals', 'discrepancy', 'leave-submit']));
+        renderSidebarGroup('adminSideOperational', orderedModules(['wali-class-dashboard', 'wali-class-students', 'wali-class-schedules', 'wali-class-attendance', 'student-attendance', 'flagged', 'journal-monitoring', 'monitoring', 'substitute-approvals', 'leave-approvals', 'discrepancy', 'leave-submit']));
         renderSidebarGroup('adminSideCalendar', orderedModules(['years', 'lesson-calendar', 'agendas', 'holidays']));
         renderSidebarGroup('adminSideAdministration', orderedModules(['admin-users', 'settings']));
         ['adminSideOperational', 'adminSideCalendar', 'adminSideAdministration'].forEach((elementId) => {
