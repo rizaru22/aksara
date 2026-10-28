@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\JadwalPelajaran;
-use App\Models\JurnalMengajar;
 use App\Models\Kelas;
 use App\Models\PresensiSiswa;
 use App\Models\Siswa;
@@ -149,7 +148,8 @@ class WaliKelasController extends Controller
                 'month' => $filters['month'],
                 'summary' => [
                     'total_students' => $rows->count(),
-                    'total_sessions' => $records->count(),
+                    'total_sessions' => $records->pluck('jurnal_mengajar_id')->unique()->count(),
+                    'total_records' => $records->count(),
                     'hadir' => $records->where('status', 'HADIR')->count(),
                     'sakit' => $records->where('status', 'SAKIT')->count(),
                     'izin' => $records->where('status', 'IZIN')->count(),
