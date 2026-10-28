@@ -142,6 +142,133 @@ class AcademicImportController extends Controller
     }
 
     /**
+     * Import peserta didik dari export Dapodik ke kelas dengan nama Rombel Saat Ini pada tahun ajaran aktif.
+     * NISN yang sudah ada tidak diduplikasi; bila belum memiliki penempatan pada tahun aktif, penempatannya dibuat.
+     */
+    public function importDapodikSiswa(Request $request, SimpleXlsx $xlsx)
+    {
+        $request->validate(['file' => 'required|file|mimes:xlsx|max:10240']);
+        if (! class_exists(\ZipArchive::class)) {
+            return response()->json(['message' => 'Aktifkan ekstensi PHP zip untuk mengimpor file Excel.'], 503);
+        }
+
+        $year = TahunAjaran::query()->where('is_active', true)->first();
+        if (! $year) {
+            throw ValidationException::withMessages(['tahun_ajaran' => 'Tidak ada tahun ajaran aktif. Aktifkan tahun ajaran terlebih dahulu.']);
+        }
+
+        try {
+            $rows = $xlsx->read($request->file('file')->getRealPath(), false, true);
+            $classes = Kelas::query()->where('tahun_ajaran_id', $year->id)->get();
+            $classesByName = $classes->keyBy(fn ($class) => mb_strtolower(trim($class->nama_kelas)));
+            $seen = [];
+            $newStudents = [];
+            $placements = [];
+            $skippedDuplicateFile = 0;
+            $skippedExistingPlacement = 0;
+            $skippedInvalid = 0;
+            $unmatchedClasses = [];
+
+            foreach ($rows as $row) {
+                $name = trim((string) ($row['nama'] ?? ''));
+                $name = ltrim($name, "'");
+                $nisn = trim((string) ($row['nisn'] ?? ''));
+                $gender = strtoupper(trim((string) ($row['jk'] ?? '')));
+                $className = trim((string) ($row['rombel saat ini'] ?? ''));
+
+                if ($name === '' || $nisn === '' || ! in_array($gender, ['L', 'P'], true) || $className === '') {
+                    $skippedInvalid++;
+                    continue;
+                }
+
+                $nisnKey = $nisn;
+                if (isset($seen[$nisnKey])) {
+                    $skippedDuplicateFile++;
+                    continue;
+                }
+                $seen[$nisnKey] = true;
+
+                $class = $classesByName->get(mb_strtolower($className));
+                if (! $class) {
+                    $unmatchedClasses[$className] = true;
+                    continue;
+                }
+
+                $student = Siswa::query()->where('nisn', $nisn)->first();
+                if ($student) {
+                    $alreadyPlaced = PenempatanSiswa::query()
+                        ->where('siswa_id', $student->id)
+                        ->where('tahun_ajaran_id', $year->id)
+                        ->exists();
+                    if ($alreadyPlaced) {
+                        $skippedExistingPlacement++;
+                        continue;
+                    }
+                    $placements[] = ['siswa_id' => $student->id, 'kelas_id' => $class->id, 'tahun_ajaran_id' => $year->id];
+                    continue;
+                }
+
+                $newStudents[] = [
+                    'nisn' => $nisn,
+                    'nama' => $name,
+                    'jenis_kelamin' => $gender,
+                    'kelas_id' => $class->id,
+                    'tahun_ajaran_id' => $year->id,
+                ];
+            }
+
+            DB::transaction(function () use ($newStudents, $placements): void {
+                foreach ($newStudents as $record) {
+                    $student = Siswa::query()->create([
+                        'nisn' => $record['nisn'],
+                        'nama' => $record['nama'],
+                        'jenis_kelamin' => $record['jenis_kelamin'],
+                    ]);
+                    PenempatanSiswa::query()->create([
+                        'siswa_id' => $student->id,
+                        'kelas_id' => $record['kelas_id'],
+                        'tahun_ajaran_id' => $record['tahun_ajaran_id'],
+                    ]);
+                }
+                foreach ($placements as $placement) {
+                    PenempatanSiswa::query()->create($placement);
+                }
+            });
+
+            $message = count($newStudents).' siswa baru diimpor ke tahun ajaran '.$year->tahun_ajaran.'. ';
+            $message .= count($placements).' siswa yang sudah terdaftar diberi penempatan tahun aktif. ';
+            $message .= $skippedExistingPlacement.' siswa dilewati karena sudah memiliki penempatan pada tahun aktif; ';
+            $message .= $skippedDuplicateFile.' NISN duplikat dalam file dan '.$skippedInvalid.' baris tidak lengkap/tidak valid dilewati.';
+            if ($unmatchedClasses) {
+                $names = array_keys($unmatchedClasses);
+                $message .= ' Rombel tidak ditemukan pada tahun ajaran aktif: '.implode(', ', array_slice($names, 0, 10));
+                if (count($names) > 10) $message .= ' dan '.(count($names) - 10).' lainnya';
+                $message .= '. Pastikan import kelas Dapodik sudah dilakukan terlebih dahulu.';
+            }
+
+            return response()->json([
+                'message' => $message,
+                'data' => [
+                    'tahun_ajaran' => $year->tahun_ajaran,
+                    'imported' => count($newStudents),
+                    'placements_created' => count($placements),
+                    'skipped_existing_placement' => $skippedExistingPlacement,
+                    'skipped_duplicate_file' => $skippedDuplicateFile,
+                    'skipped_invalid' => $skippedInvalid,
+                    'unmatched_classes' => count($unmatchedClasses),
+                ],
+            ]);
+        } catch (ValidationException $exception) {
+            throw $exception;
+        } catch (RuntimeException $exception) {
+            throw ValidationException::withMessages(['file' => $exception->getMessage()]);
+        } catch (Throwable $exception) {
+            report($exception);
+            return response()->json(['message' => 'Import peserta didik dibatalkan. Periksa struktur file Dapodik dan data kelas.'], 422);
+        }
+    }
+
+    /**
      * Endpoint POST /api/v1/master-data/import/{resource}.
      * Memvalidasi file Excel, memetakan setiap baris ke struktur data backend, lalu mengeksekusi import dalam transaksi database.
      * Flow ini menahan semua proses jika ada data duplikat, konflik jadwal, atau format kolom tidak sesuai template.
