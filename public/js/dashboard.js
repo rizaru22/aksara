@@ -738,6 +738,16 @@ renderStudentPage();
         bindWaliActions();
     }
 
+    async function openWaliClassPicker(action) {
+        const result = await api('/api/v1/wali-class/overview');
+        const data = result.data || {};
+        const classes = Array.isArray(data.classes) ? data.classes : [];
+        const labels = { students: 'Data Siswa', schedules: 'Jadwal Kelas', attendance: 'Rekap Presensi' };
+        const cards = classes.map((item) => `<div class="col-md-6 col-xl-4"><div class="card h-100"><div class="card-body"><h3 class="h6">${htmlSafe(item.nama_kelas)}</h3><p class="small text-secondary">${htmlSafe(item.tingkat || '')} · ${htmlSafe(item.jurusan || '')}</p><button class="btn btn-primary btn-sm" data-wali-action="${action}" data-class-id="${item.id}">Buka ${labels[action] || 'fitur'}</button></div></div></div>`).join('');
+        setFeature(`Pilih Kelas · ${labels[action] || 'Wali Kelas'}`, `<p class="text-secondary">Pilih hanya dari kelas yang ditugaskan kepada Anda sebagai wali kelas pada tahun ajaran aktif.</p><div class="row g-3">${cards || '<div class="col-12"><div class="alert alert-info">Belum ada kelas perwalian pada tahun ajaran aktif.</div></div>'}</div><button class="btn btn-outline-secondary mt-3" data-wali-action="dashboard">Kembali ke dashboard wali kelas</button>`);
+        bindWaliActions();
+    }
+
     async function openWaliStudents(classId) {
         const result = await api(`/api/v1/wali-class/classes/${encodeURIComponent(classId)}/students`);
         const data = result.data || {};
@@ -1612,7 +1622,10 @@ renderStudentPage();
             if (module.key === 'leave-approvals' || module.key === 'leave-submit') return openLeave(module.key === 'leave-submit');
             if (module.key === 'substitute-approvals') return openSubstituteApprovals();
             if (module.key === 'journal-monitoring') return openJournalMonitoring();
-            if (['wali-class-dashboard', 'wali-class-students', 'wali-class-schedules', 'wali-class-attendance'].includes(module.key)) return openWaliDashboard();
+            if (module.key === 'wali-class-dashboard') return openWaliDashboard();
+            if (module.key === 'wali-class-students') return openWaliClassPicker('students');
+            if (module.key === 'wali-class-schedules') return openWaliClassPicker('schedules');
+            if (module.key === 'wali-class-attendance') return openWaliClassPicker('attendance');
             if (module.key === 'student-attendance') return openWaliSessions();
             if (module.key === 'student-attendance-report') return adminReports.open('student-monthly', { dedicatedStudent: true });
             if (module.key === 'settings') return openSettings();
@@ -1777,7 +1790,7 @@ renderStudentPage();
         $('roleIntro').hidden = hideRoleDashboard;
         $('roleModules').hidden = hideRoleDashboard;
         const sidebarGroups = {
-            operational: new Set(['student-attendance', 'student-attendance-report', 'substitute-approvals', 'monitoring', 'journal-monitoring', 'discrepancy', 'flagged', 'leave-approvals', 'leave-submit']),
+            operational: new Set(['wali-class-dashboard', 'wali-class-students', 'wali-class-schedules', 'wali-class-attendance', 'student-attendance', 'student-attendance-report', 'substitute-approvals', 'monitoring', 'journal-monitoring', 'discrepancy', 'flagged', 'leave-approvals', 'leave-submit']),
             calendar: new Set(['years', 'lesson-calendar', 'agendas', 'holidays']),
             administration: new Set(['admin-users', 'settings'])
         };
