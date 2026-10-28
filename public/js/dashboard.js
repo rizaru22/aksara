@@ -804,11 +804,7 @@ renderStudentPage();
         });
         $('printWaliAttendance')?.addEventListener('click', () => {
             // Cetak semua siswa dari data API, bukan hanya baris halaman DataTables yang sedang terlihat.
-            const printWindow = window.open('', '', 'width=1100,height=800');
-            if (!printWindow) {
-                showToast('Jendela cetak diblokir browser. Izinkan pop-up untuk situs ini lalu coba lagi.');
-                return;
-            }
+            // Cetak melalui halaman aktif: tidak membuat jendela baru, tab baru, modal, atau iframe.
             const printRows = (data.students || []).map((student, index) => `<tr>
                 <td>${index + 1}</td>
                 <td>${htmlSafe(student.nisn || '—')}</td>
@@ -880,7 +876,6 @@ renderStudentPage();
             const cleanupPrint = () => {
                 printContent.remove();
                 printStyles.remove();
-                window.removeEventListener('afterprint', cleanupPrint);
             };
             window.addEventListener('afterprint', cleanupPrint, { once: true });
             window.print();
