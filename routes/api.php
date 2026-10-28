@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\KalenderJamPelajaranController;
 use App\Http\Controllers\Api\JournalMonitoringController;
 use App\Http\Controllers\Api\LessonJournalController;
 use App\Http\Controllers\Api\MasterDataController;
+use App\Http\Controllers\Api\MaterialJournalReportController;
 use App\Http\Controllers\Api\NotificationInboxController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PushSubscriptionController;
