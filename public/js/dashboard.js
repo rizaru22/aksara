@@ -803,8 +803,7 @@ renderStudentPage();
             openWaliAttendance(classId, $('waliAttendanceMonth').value).catch((error) => setWaliPage('Rekap Presensi Wali Kelas', `<div class="alert alert-danger">${htmlSafe(error.message)}</div>`));
         });
         $('printWaliAttendance')?.addEventListener('click', () => {
-            // Cetak semua siswa dari data API, bukan hanya baris halaman DataTables yang sedang terlihat.
-            // Cetak melalui halaman aktif: tidak membuat jendela baru, tab baru, modal, atau iframe.
+            // Cetak semua siswa dari data API, bukan hanya baris halaman DataTables yang terlihat.
             const printRows = (data.students || []).map((student, index) => `<tr>
                 <td>${index + 1}</td>
                 <td>${htmlSafe(student.nisn || '—')}</td>
@@ -817,52 +816,13 @@ renderStudentPage();
                 <td>${Number(student.persentase_hadir || 0)}%</td>
             </tr>`).join('');
 
-            const printContentId = 'waliAttendancePrintContent';
-            const styleId = 'waliAttendancePrintStyles';
-            document.getElementById(printContentId)?.remove();
-            document.getElementById(styleId)?.remove();
-
-            const printStyles = document.createElement('style');
-            printStyles.id = styleId;
-            printStyles.textContent = `
-                #${printContentId} { display: none; }
-                @media print {
-                    @page { size: auto; margin: 0; }
-                    body * { visibility: hidden !important; }
-                    #${printContentId}, #${printContentId} * { visibility: visible !important; }
-                    #${printContentId} {
-                        display: block !important;
-                        position: absolute;
-                        left: 0;
-                        top: 0;
-                        width: 100%;
-                        box-sizing: border-box;
-                        padding: 12mm;
-                        color: #111;
-                        background: #fff;
-                        font-family: Arial, sans-serif;
-                        font-size: 11px;
-                    }
-                    #${printContentId} h1 { font-size: 18px; margin: 0 0 5px; }
-                    #${printContentId} .meta { margin-bottom: 14px; font-size: 11px; }
-                    #${printContentId} .summary { display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 14px; }
-                    #${printContentId} .summary span { display: inline-block; }
-                    #${printContentId} table { width: 100%; border-collapse: collapse; }
-                    #${printContentId} th, #${printContentId} td { border: 1px solid #777; padding: 5px 6px; text-align: center; }
-                    #${printContentId} th { background: #e9eeee !important; font-weight: bold; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-                    #${printContentId} th:nth-child(3), #${printContentId} td:nth-child(3) { text-align: left; }
-                    #${printContentId} thead { display: table-header-group; }
-                    #${printContentId} tr { break-inside: avoid; page-break-inside: avoid; }
-                }
-            `;
-            document.head.appendChild(printStyles);
-
-            const printContent = document.createElement('section');
-            printContent.id = printContentId;
-            printContent.innerHTML = `
+            document.getElementById('waliAttendancePrintArea')?.remove();
+            const printArea = document.createElement('section');
+            printArea.id = 'waliAttendancePrintArea';
+            printArea.innerHTML = `
                 <h1>Rekap Presensi Siswa</h1>
-                <div class="meta">Kelas: ${htmlSafe(data.class?.nama_kelas || '—')} &nbsp; | &nbsp; Bulan: ${htmlSafe(month)}</div>
-                <div class="summary">
+                <div class="wali-print-meta">Kelas: ${htmlSafe(data.class?.nama_kelas || '—')} &nbsp; | &nbsp; Bulan: ${htmlSafe(month)}</div>
+                <div class="wali-print-summary">
                     <span>Jumlah siswa: <strong>${Number(summary.total_students || (data.students || []).length)}</strong></span>
                     <span>Catatan presensi: <strong>${Number(summary.total_sessions || 0)}</strong></span>
                     <span>Hadir: <strong>${Number(summary.hadir || 0)}</strong></span>
@@ -873,11 +833,12 @@ renderStudentPage();
                     <tbody>${printRows || '<tr><td colspan="9">Belum ada data presensi pada bulan ini.</td></tr>'}</tbody>
                 </table>
             `;
-            document.body.appendChild(printContent);
+            document.body.appendChild(printArea);
+            document.body.classList.add('wali-attendance-printing');
 
             const cleanupPrint = () => {
-                printContent.remove();
-                printStyles.remove();
+                document.body.classList.remove('wali-attendance-printing');
+                printArea.remove();
             };
             window.addEventListener('afterprint', cleanupPrint, { once: true });
             window.print();
