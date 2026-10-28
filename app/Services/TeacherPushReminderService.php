@@ -68,6 +68,7 @@ class TeacherPushReminderService
 
     private function sendAttendanceReminders($teachers, array $onLeave, ?JadwalPresensiHarian $schedule, CarbonImmutable $now, int &$sent): void
     {
+        $slotMinutes = max(1, (int) config('aksara.push_reminders.interval_minutes', 30));
         $checkInStartAt = $schedule?->jam_masuk_mulai
             ? $this->atTime($now, $schedule->jam_masuk_mulai)
             : $this->atTime($now, '07:00:00');
@@ -95,7 +96,7 @@ class TeacherPushReminderService
 
             if (! $attendance?->jam_masuk
                 && $this->within($now, $checkInStartAt, $checkInEndsAt)) {
-                $slot = intdiv(max(0, (int) $checkInStartAt->diffInMinutes($now)), 30);
+                $slot = intdiv(max(0, (int) $checkInStartAt->diffInMinutes($now)), $slotMinutes);
                 $sent += $this->sendOnce(
                     $teacher,
                     "check-in:{$now->toDateString()}:{$teacher->id}:{$slot}",
@@ -109,7 +110,7 @@ class TeacherPushReminderService
             if ($attendance?->jam_masuk && ! $attendance->jam_pulang
                 && $checkOutStartsAt && $checkOutEndsAt
                 && $this->within($now, $checkOutStartsAt, $checkOutEndsAt)) {
-                $slot = intdiv(max(0, (int) $checkOutStartsAt->diffInMinutes($now)), 30);
+                $slot = intdiv(max(0, (int) $checkOutStartsAt->diffInMinutes($now)), $slotMinutes);
                 $sent += $this->sendOnce(
                     $teacher,
                     "check-out:{$now->toDateString()}:{$teacher->id}:{$slot}",
