@@ -839,9 +839,16 @@ renderStudentPage();
             const cleanupPrint = () => {
                 document.body.classList.remove('wali-attendance-printing');
                 printArea.remove();
+                window.removeEventListener('afterprint', cleanupPrint);
             };
+
+            // afterprint is not equally reliable in every browser; also clean up when print() returns.
             window.addEventListener('afterprint', cleanupPrint, { once: true });
-            window.print();
+            try {
+                window.print();
+            } finally {
+                cleanupPrint();
+            }
         });
         bindWaliActions();
     }
