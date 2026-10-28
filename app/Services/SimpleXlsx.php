@@ -47,7 +47,7 @@ class SimpleXlsx
     }
 
     /** @return list<array<string, string>> */
-    public function read(string $path): array
+    public function read(string $path, bool $dapodikRombel = false): array
     {
         $zip = new ZipArchive();
         if ($zip->open($path) !== true) throw new RuntimeException('Berkas tidak terbaca sebagai Excel .xlsx yang valid.');
@@ -99,6 +99,37 @@ class SimpleXlsx
             if (count($rows) > 2001) { $zip->close(); throw new RuntimeException('Maksimum 2.000 baris data per impor.'); }
         }
         $zip->close();
+
+        if ($dapodikRombel) {
+            $headerIndex = null;
+            foreach ($rows as $index => $values) {
+                $normalized = array_map(fn ($value) => strtolower(trim((string) $value)), $values);
+                if (in_array('nama rombel', $normalized, true) && in_array('tingkat kelas', $normalized, true)) {
+                    $headerIndex = $index;
+                    break;
+                }
+            }
+            if ($headerIndex === null) throw new RuntimeException('Format Dapodik tidak dikenali. Pastikan file memuat kolom Nama Rombel dan Tingkat Kelas.');
+            $headers = [];
+            foreach ($rows[$headerIndex] as $index => $header) {
+                $key = strtolower(trim((string) $header));
+                if ($key !== '') $headers[$index] = $key;
+            }
+            foreach (['nama rombel', 'tingkat kelas'] as $required) {
+                if (! in_array($required, $headers, true)) throw new RuntimeException('Kolom wajib Dapodik tidak ditemukan: '.$required.'.');
+            }
+            $result = [];
+            foreach (array_slice($rows, $headerIndex + 1) as $values) {
+                // Export Dapodik menyertakan baris sub-header L/P/Total; hanya baris dengan nomor rombel yang diproses.
+                if (! isset($values[0]) || ! ctype_digit((string) $values[0])) continue;
+                $item = [];
+                foreach ($headers as $index => $header) $item[$header] = trim((string) ($values[$index] ?? ''));
+                if (($item['nama rombel'] ?? '') !== '') $result[] = $item;
+                if (count($result) > 2000) throw new RuntimeException('Maksimum 2.000 rombel per impor.');
+            }
+            if (! $result) throw new RuntimeException('Tidak ada baris rombel yang valid pada file Dapodik.');
+            return $result;
+        }
 
         if (count($rows) < 2) throw new RuntimeException('Sheet harus berisi baris judul dan minimal satu baris data.');
         $headers = array_map(fn ($header) => strtolower(trim((string) $header)), $rows[0]);
