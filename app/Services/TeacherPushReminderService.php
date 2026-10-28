@@ -69,20 +69,23 @@ class TeacherPushReminderService
     private function sendAttendanceReminders($teachers, array $onLeave, ?JadwalPresensiHarian $schedule, CarbonImmutable $now, int &$sent): void
     {
         $slotMinutes = max(1, (int) config('aksara.push_reminders.interval_minutes', 30));
+        $checkInEndTime = config('aksara.push_reminders.check_in_end_time', '18:00:00');
+        $checkOutEndTime = config('aksara.push_reminders.check_out_end_time', '18:00:00');
+
         $checkInStartAt = $schedule?->jam_masuk_mulai
             ? $this->atTime($now, $schedule->jam_masuk_mulai)
             : $this->atTime($now, '07:00:00');
         // Keep reminding until the end of the day if check-in is still missing.
         // The configured late boundary (for example 08:45) determines lateness,
         // but must not stop attendance reminders.
-        $checkInEndsAt = $this->atTime($now, '18:00:00');
+        $checkInEndsAt = $this->atTime($now, $checkInEndTime);
 
         $checkOutStartsAt = $schedule?->jam_pulang_mulai
             ? $this->atTime($now, $schedule->jam_pulang_mulai)
             : null;
         // Keep reminding about check-out until 18:00 even when the configured
         // school dismissal time is earlier.
-        $checkOutEndsAt = $this->atTime($now, '18:00:00');
+        $checkOutEndsAt = $this->atTime($now, $checkOutEndTime);
 
         foreach ($teachers as $teacher) {
             if (in_array((int) $teacher->id, $onLeave, true)) {

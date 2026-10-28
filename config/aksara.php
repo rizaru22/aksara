@@ -28,6 +28,8 @@ return [
     */
     'push_reminders' => [
         'interval_minutes' => max(1, (int) env('PUSH_REMINDER_INTERVAL_MINUTES', 30)),
+        'check_in_end_time' => env('PUSH_REMINDER_CHECK_IN_END_TIME', '18:00:00'),
+        'check_out_end_time' => env('PUSH_REMINDER_CHECK_OUT_END_TIME', '18:00:00'),
     ],
 
     /*
