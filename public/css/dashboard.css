@@ -603,3 +603,39 @@ body.kepsek-dashboard .module-card .btn { min-height: 42px; padding: 7px 12px; f
         font-size: 23px;
     }
 }
+
+
+/* Print-only layout for wali kelas attendance recap. */
+@media print {
+    body.wali-attendance-printing * {
+        visibility: hidden !important;
+    }
+    body.wali-attendance-printing #waliAttendancePrintArea,
+    body.wali-attendance-printing #waliAttendancePrintArea * {
+        visibility: visible !important;
+    }
+    body.wali-attendance-printing #waliAttendancePrintArea {
+        position: absolute !important;
+        inset: 0 auto auto 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: #111 !important;
+        background: #fff !important;
+    }
+    body.wali-attendance-printing #waliAttendancePrintArea .table-responsive {
+        overflow: visible !important;
+    }
+    body.wali-attendance-printing #waliAttendancePrintArea table {
+        width: 100% !important;
+        font-size: 9pt !important;
+        color: #111 !important;
+    }
+    body.wali-attendance-printing #waliAttendancePrintArea th {
+        color: #111 !important;
+        background: #eee !important;
+    }
+    body.wali-attendance-printing #waliAttendancePrintArea tr {
+        break-inside: avoid;
+    }
+}
