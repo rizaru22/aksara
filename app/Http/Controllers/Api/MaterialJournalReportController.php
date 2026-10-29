@@ -78,7 +78,7 @@ class MaterialJournalReportController extends Controller
             $scheduleIds = (clone $scheduleQuery)->select('jadwal_pelajarans.id')->pluck('jadwal_pelajarans.id');
             $journals = JurnalMengajar::query()
                 ->whereIn('jadwal_pelajaran_id', $scheduleIds)
-                ->with(['guru:id,nama,nip', 'jadwalPelajaran:id,semester,jam_mulai,jam_selesai,kelas_id,mata_pelajaran_id,user_id', 'jadwalPelajaran.kelas:id,nama_kelas', 'jadwalPelajaran.mataPelajaran:id,nama_mapel'])
+                ->with(['guru:id,nama,nip', 'jadwalPelajaran:id,semester,jam_mulai,jam_selesai,kelas_id,mata_pelajaran_id,user_id', 'jadwalPelajaran.kelas:id,nama_kelas', 'jadwalPelajaran.mataPelajaran:id,nama_mapel', 'materiPelajaran:id,urutan_bab,judul_bab'])
                 ->orderBy('tanggal')
                 ->orderByRaw('COALESCE(waktu_rencana_mulai, jam_mulai_realisasi) ASC')
                 ->orderBy('id')
@@ -88,7 +88,8 @@ class MaterialJournalReportController extends Controller
                     'tanggal' => $journal->tanggal instanceof \Carbon\Carbon ? $journal->tanggal->toDateString() : (string) $journal->tanggal,
                     'jam_mulai' => $journal->waktu_rencana_mulai?->format('H:i') ?? ($journal->jam_mulai_realisasi ? \Carbon\Carbon::parse($journal->jam_mulai_realisasi)->format('H:i') : null) ?? $journal->jadwalPelajaran?->jam_mulai,
                     'jam_selesai' => $journal->waktu_rencana_selesai?->format('H:i') ?? ($journal->jam_selesai_realisasi ? \Carbon\Carbon::parse($journal->jam_selesai_realisasi)->format('H:i') : null) ?? $journal->jadwalPelajaran?->jam_selesai,
-                    'materi' => $journal->materi_pembahasan,
+                    'materi_pelajaran' => $journal->materiPelajaran ? trim(($journal->materiPelajaran->urutan_bab ? 'Bab '.$journal->materiPelajaran->urutan_bab.' — ' : '').$journal->materiPelajaran->judul_bab) : null,
+                    'materi_pembahasan' => $journal->materi_pembahasan,
                     'catatan' => $journal->catatan_kejadian_kelas,
                     'status' => $journal->status_sesi,
                     'guru' => $journal->guru?->nama,
