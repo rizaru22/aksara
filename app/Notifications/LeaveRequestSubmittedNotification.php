@@ -29,7 +29,7 @@ class LeaveRequestSubmittedNotification extends Notification
             ->title($this->title)
             ->body($this->body)
             ->icon('/favicon.svg')
-            ->badge('/favicon.svg')
+            ->badge('/aksara-notification.svg')
             ->tag($this->tag)
             ->data(['url' => '/dashboard.html'])
             ->options(['TTL' => 3600]);

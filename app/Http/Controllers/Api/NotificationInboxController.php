@@ -17,7 +17,7 @@ class NotificationInboxController extends Controller
             ->get();
 
         $recentRead = $user->readNotifications()
-            ->where('created_at',today())
+            ->whereDate('created_at',today())
             ->latest()
             ->limit(10)
             ->get();
