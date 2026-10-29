@@ -80,13 +80,14 @@ class TeacherPushReminderService
         // but must not stop attendance reminders.
         $checkInEndsAt = $this->atTime($now, $checkInEndTime);
 
-        // Use the actual end of the daily check-out window (e.g. 14:30).
-        // The .env time is only a fallback when the schedule has no end time.
-        $checkOutEndsAt = $schedule?->jam_pulang_akhir
+        // Start checkout reminders before the scheduled checkout cutoff,
+        // but keep sending until the configured end time (e.g. 18:05).
+        $scheduledCheckOutEnd = $schedule?->jam_pulang_akhir
             ? $this->atTime($now, $schedule->jam_pulang_akhir)
             : $this->atTime($now, $checkOutEndTime);
         $checkOutLeadMinutes = max(0, (int) config('aksara.push_reminders.check_out_lead_minutes', 30));
-        $checkOutStartsAt = $checkOutEndsAt->subMinutes($checkOutLeadMinutes);
+        $checkOutStartsAt = $scheduledCheckOutEnd->subMinutes($checkOutLeadMinutes);
+        $checkOutEndsAt = $this->atTime($now, $checkOutEndTime);
 
         foreach ($teachers as $teacher) {
             if (in_array((int) $teacher->id, $onLeave, true)) {
