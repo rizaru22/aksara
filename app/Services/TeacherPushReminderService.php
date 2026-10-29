@@ -207,12 +207,23 @@ class TeacherPushReminderService
                 continue;
             }
 
-            if (! $journal && $this->within($now, $start->addMinutes(15), $end)) {
+            $journalReminderStartsAt = $start->addMinutes(15);
+            $journalReminderInterval = max(1, (int) config('aksara.push_reminders.interval_minutes', 15));
+
+            // Repeat the reminder while the lesson is in progress and the journal
+            // has not reached draft status. Each interval gets its own dedupe key.
+            if ((! $journal || $journal->status_sesi !== JurnalMengajar::STATUS_DRAFT)
+                && $this->within($now, $journalReminderStartsAt, $end)) {
+                $slot = intdiv(
+                    max(0, (int) $journalReminderStartsAt->diffInMinutes($now)),
+                    $journalReminderInterval,
+                );
+
                 $sent += $this->sendOnce(
                     $teacher,
-                    "journal:{$now->toDateString()}:{$schedule->id}:{$teacher->id}",
-                    'Pengingat jurnal dan presensi siswa',
-                    'Pelajaran sudah berjalan 15 menit. Silakan isi jurnal mengajar dan presensi siswa.',
+                    "journal:{$now->toDateString()}:{$schedule->id}:{$teacher->id}:{$slot}",
+                    'Pengingat jurnal mengajar',
+                    'Jurnal mengajar sesi ini belum berstatus draft. Silakan lengkapi jurnal mengajar.',
                     "journal-{$now->toDateString()}-{$schedule->id}-{$teacher->id}",
                     $now,
                 );
