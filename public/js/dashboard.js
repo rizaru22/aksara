@@ -159,6 +159,8 @@
         if (schedule.kbm_ditangguhkan) return `<span class="badge text-bg-warning">KBM ditangguhkan</span>`;
         const journal = schedule.jurnal_hari_ini;
         if (journal?.status_sesi === 'final') return `<span class="badge text-bg-success">Jurnal selesai</span>`;
+        if (journal?.status_sesi === 'finalisasi_susulan') return `<span class="badge text-bg-info">Jurnal selesai (susulan)</span>`;
+        if (journal?.status_sesi === 'kedaluwarsa') return `<span class="badge text-bg-danger">Jurnal kedaluwarsa</span>`;
         if (journal?.status_sesi === 'draft') {
             if (schedule.can_finalize_journal) return `<button class="btn btn-sm btn-success" data-journal="${schedule.id}">Selesaikan jurnal</button>`;
             if (schedule.can_fill_journal) return `<span class="text-end"><button class="btn btn-sm btn-outline-primary" data-journal="${schedule.id}">Lanjutkan draf</button><small class="d-block text-secondary mt-1">${htmlSafe(schedule.journal_finalization_message)}</small></span>`;
