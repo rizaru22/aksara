@@ -81,10 +81,10 @@ window.createAksaraMaterialReport = function ({ api, htmlSafe, setAdminPanel }) 
                             <span class="badge text-bg-light border align-self-start">${rows.length} jurnal</span>
                         </div>
                         <div class="table-responsive"><table class="table table-sm table-bordered align-middle">
-                            <thead><tr><th style="width:48px">No.</th><th style="width:120px">Tanggal</th><th style="width:120px">Waktu</th><th>Materi yang Diajarkan</th><th>Catatan</th><th>Status</th></tr></thead>
-                            <tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${escape(row.tanggal || '—')}</td><td>${escape([row.jam_mulai, row.jam_selesai].filter(Boolean).join('–') || '—')}</td><td>${escape(row.materi || '—')}</td><td>${escape(row.catatan || '—')}</td><td>${escape(statusLabel(row.status))}</td></tr>`).join('')}</tbody>
+                            <thead><tr><th style="width:48px">No.</th><th style="width:110px">Tanggal</th><th style="width:105px">Waktu</th><th>Materi Pelajaran (Referensi)</th><th>Materi Pembahasan (Aktual)</th><th>Catatan</th><th>Status</th></tr></thead>
+                            <tbody>${rows.map((row, index) => `<tr><td>${index + 1}</td><td>${escape(row.tanggal || '—')}</td><td>${escape([row.jam_mulai, row.jam_selesai].filter(Boolean).join('–') || '—')}</td><td>${escape(row.materi_pelajaran || '—')}</td><td>${escape(row.materi_pembahasan || '—')}</td><td>${escape(row.catatan || '—')}</td><td>${escape(statusLabel(row.status))}</td></tr>`).join('')}</tbody>
                         </table></div>
-                        <p class="small text-secondary mb-0">Diurutkan dari tanggal dan waktu pembelajaran paling lama hingga terbaru.</p>
+                        <p class="small text-secondary mb-0">Materi Pelajaran adalah referensi bab kurikulum yang dipilih (opsional); Materi Pembahasan mencatat materi yang benar-benar diajarkan. Diurutkan dari tanggal dan waktu pembelajaran paling lama hingga terbaru.</p>
                     </div>
                 </section>`;
             printButton.disabled = false;
@@ -150,7 +150,7 @@ window.createAksaraMaterialReport = function ({ api, htmlSafe, setAdminPanel }) 
                 <h2>Rekap Materi Pembelajaran</h2>
                 <p class="meta"><strong>Tahun Ajaran:</strong> ${escape(activeYear)}<br><strong>Guru:</strong> ${escape(teacher.selectedOptions[0]?.textContent || '')}<br><strong>Mata Pelajaran:</strong> ${escape(subject.selectedOptions[0]?.textContent || '')}<br><strong>Kelas:</strong> ${escape(klass.selectedOptions[0]?.textContent || '')}<br><strong>Semester:</strong> ${escape(semester.value)}</p>
                 ${results.querySelector('table')?.outerHTML || ''}
-                <p>Materi diurutkan dari tanggal dan waktu pembelajaran paling lama hingga terbaru.</p>
+                <p>Materi Pelajaran merupakan referensi bab kurikulum (opsional), sedangkan Materi Pembahasan mencatat pelaksanaan aktual. Diurutkan dari tanggal dan waktu pembelajaran paling lama hingga terbaru.</p>
             `;
             document.body.appendChild(printable);
             document.body.classList.add('aksara-material-printing');

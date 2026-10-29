@@ -68,6 +68,14 @@ class JurnalMengajar extends Model
     }
 
     /**
+     * Referensi bab/materi kurikulum yang dikaitkan ke jurnal (opsional).
+     */
+    public function materiPelajaran(): BelongsTo
+    {
+        return $this->belongsTo(MateriPelajaran::class, 'materi_pelajaran_id');
+    }
+
+    /**
      * Semua presensi siswa yang terkait dengan jurnal ini.
      * Relasi ini dipakai untuk memastikan kelengkapan daftar siswa sebelum finalisasi.
      */

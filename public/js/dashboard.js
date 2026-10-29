@@ -465,6 +465,7 @@
     async function openJournalForm(scheduleId, schedule = null) {
         const rosterResult = await api(`/api/v1/teacher/schedules/${scheduleId}/students`);
         const students = rosterResult.data || [];
+        const materials = rosterResult.materials || [];
         if (!students.length) return showToast('Kelas ini belum memiliki data siswa.');
         const draft = rosterResult.draft;
         let draftSaved = Boolean(draft);
@@ -473,7 +474,7 @@
         setFeature('Isi E-Jurnal & Presensi Siswa', `<form id="journalForm">
             <input type="hidden" name="jadwal_pelajaran_id" value="${htmlSafe(scheduleId)}">
             <div class="alert alert-info small">Tahap 1: isi jurnal dan presensi siswa sebagai draf selama pelajaran. Tahap 2: pada 30 menit terakhir, ambil foto langsung dan verifikasi lokasi sekolah untuk menyelesaikan jurnal.</div>
-            <div class="mb-3"><label class="form-label" for="journalMaterial">ID materi pelajaran (opsional)</label><input class="form-control" id="journalMaterial" name="materi_pelajaran_id" type="number" min="1" value="${htmlSafe(draft?.materi_pelajaran_id || '')}"><div class="form-text">Materi harus berasal dari mata pelajaran pada jadwal.</div></div>
+            <div class="mb-3"><label class="form-label" for="journalMaterial">Materi Pelajaran (opsional)</label><select class="form-select" id="journalMaterial" name="materi_pelajaran_id"><option value="">Tidak memilih materi referensi</option>${materials.map((item) => { const label = (item.urutan_bab ? 'Bab ' + item.urutan_bab + ' — ' : '') + item.judul_bab; return `<option value="${htmlSafe(item.id)}" ${String(item.id) === String(draft?.materi_pelajaran_id || '') ? 'selected' : ''}>${htmlSafe(label)}</option>`; }).join('')}</select><div class="form-text">Opsional. Pilih bab/materi kurikulum yang sesuai dengan pembahasan hari ini.</div></div>
             <div class="mb-3"><label class="form-label" for="journalSummary">Materi pembahasan</label><textarea class="form-control" id="journalSummary" name="materi_pembahasan" rows="3" required>${htmlSafe(draft?.materi_pembahasan || '')}</textarea></div>
             <div class="mb-3"><label class="form-label" for="journalNotes">Catatan kejadian kelas (opsional)</label><textarea class="form-control" id="journalNotes" name="catatan_kejadian_kelas" rows="2">${htmlSafe(draft?.catatan_kejadian_kelas || '')}</textarea></div>
             

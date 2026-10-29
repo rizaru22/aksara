@@ -54,6 +54,11 @@ class LessonJournalController extends Controller
 
         return response()->json([
             'data' => DB::table('siswas')->join('penempatan_siswas', 'penempatan_siswas.siswa_id', '=', 'siswas.id')->where('penempatan_siswas.kelas_id', $jadwalPelajaran->kelas_id)->where('penempatan_siswas.tahun_ajaran_id', $jadwalPelajaran->tahun_ajaran_id)->orderBy('siswas.nama')->get(['siswas.id', 'siswas.nisn', 'siswas.nama']),
+            'materials' => DB::table('materi_pelajarans')
+                ->where('mata_pelajaran_id', $jadwalPelajaran->mata_pelajaran_id)
+                ->orderBy('urutan_bab')
+                ->orderBy('judul_bab')
+                ->get(['id', 'urutan_bab', 'judul_bab']),
             'draft' => $draft,
         ]);
     }
