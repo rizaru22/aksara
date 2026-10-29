@@ -80,13 +80,13 @@ class TeacherPushReminderService
         // but must not stop attendance reminders.
         $checkInEndsAt = $this->atTime($now, $checkInEndTime);
 
-        // Start check-out reminders a configurable number of minutes before
-        // the reminder end time, independent of the schedule's check-out opening time.
-        $checkOutEndsAt = $this->atTime($now, $checkOutEndTime);
+        // Use the actual end of the daily check-out window (e.g. 14:30).
+        // The .env time is only a fallback when the schedule has no end time.
+        $checkOutEndsAt = $schedule?->jam_pulang_akhir
+            ? $this->atTime($now, $schedule->jam_pulang_akhir)
+            : $this->atTime($now, $checkOutEndTime);
         $checkOutLeadMinutes = max(0, (int) config('aksara.push_reminders.check_out_lead_minutes', 30));
         $checkOutStartsAt = $checkOutEndsAt->subMinutes($checkOutLeadMinutes);
-        // Treat the configured end time as exclusive: do not send at or after it.
-        $checkOutLastMoment = $checkOutEndsAt->subSecond();
 
         foreach ($teachers as $teacher) {
             if (in_array((int) $teacher->id, $onLeave, true)) {
@@ -113,7 +113,7 @@ class TeacherPushReminderService
 
             if ($attendance?->jam_masuk && ! $attendance->jam_pulang
                 && $checkOutStartsAt && $checkOutEndsAt
-                && $this->within($now, $checkOutStartsAt, $checkOutLastMoment)) {
+                && $this->within($now, $checkOutStartsAt, $checkOutEndsAt)) {
                 $slot = intdiv(max(0, (int) $checkOutStartsAt->diffInMinutes($now)), $slotMinutes);
                 $sent += $this->sendOnce(
                     $teacher,
@@ -211,10 +211,9 @@ class TeacherPushReminderService
             $journalReminderStartsAt = $start->addMinutes(15);
             $journalReminderInterval = max(1, (int) config('aksara.push_reminders.interval_minutes', 15));
 
-            // Repeat the reminder while the lesson is in progress and the journal
-            // is missing or still draft (not finalized). Each interval gets its own dedupe key.
-            if ((! $journal || $journal->status_sesi === JurnalMengajar::STATUS_DRAFT)
-                && $this->within($now, $journalReminderStartsAt, $end)) {
+            // This reminder is only for a journal that has not been created yet.
+            // Once a draft exists, only the finalization reminder should be sent.
+            if (! $journal && $this->within($now, $journalReminderStartsAt, $end)) {
                 $slot = intdiv(
                     max(0, (int) $journalReminderStartsAt->diffInMinutes($now)),
                     $journalReminderInterval,
@@ -224,7 +223,7 @@ class TeacherPushReminderService
                     $teacher,
                     "journal:{$now->toDateString()}:{$schedule->id}:{$teacher->id}:{$slot}",
                     'Pengingat jurnal mengajar',
-                    'Jurnal mengajar sesi ini belum berstatus draft. Silakan lengkapi jurnal mengajar.',
+                    'Jurnal mengajar sesi ini belum diisi. Silakan isi jurnal mengajar.',
                     "journal-{$now->toDateString()}-{$schedule->id}-{$teacher->id}",
                     $now,
                 );
