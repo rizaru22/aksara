@@ -241,30 +241,26 @@ class TeacherPushReminderService
                 );
             }
 
-            if ($journal && $journal->status_sesi === JurnalMengajar::STATUS_DRAFT) {
-                // Cron runs every 15 minutes: keep a window around the planned end so
-                // the main reminder is not missed due to scheduler timing.
-                if ($this->within($now, $end->subMinutes(15), $end->subSecond())) {
-                    $sent += $this->sendOnce(
-                        $teacher,
-                        "journal-finalize:{$now->toDateString()}:{$schedule->id}:{$teacher->id}:main",
-                        'Pengingat finalisasi jurnal',
-                        'Pelajaran akan berakhir dalam sekitar 15 menit. Silakan finalkan jurnal mengajar Anda.',
-                        "journal-finalize-{$now->toDateString()}-{$schedule->id}-{$teacher->id}-main",
-                        $now,
-                    );
-                }
+            $finalizationReminderStartsAt = $end->subMinutes(15);
+            $finalizationReminderInterval = max(1, (int) config('aksara.push_reminders.interval_minutes', 15));
 
-                if ($this->within($now, $end, $end->addMinutes(15))) {
-                    $sent += $this->sendOnce(
-                        $teacher,
-                        "journal-finalize:{$now->toDateString()}:{$schedule->id}:{$teacher->id}:follow-up",
-                        'Tindak lanjut finalisasi jurnal',
-                        'Jurnal sesi pelajaran ini masih berstatus draft. Silakan selesaikan finalisasi jurnal.',
-                        "journal-finalize-{$now->toDateString()}-{$schedule->id}-{$teacher->id}-follow-up",
-                        $now,
-                    );
-                }
+            // Start 15 minutes before the lesson ends and repeat at each configured
+            // interval until the journal is finalized (status is no longer draft).
+            if ($journal && $journal->status_sesi === JurnalMengajar::STATUS_DRAFT
+                && $now->greaterThanOrEqualTo($finalizationReminderStartsAt)) {
+                $slot = intdiv(
+                    max(0, (int) $finalizationReminderStartsAt->diffInMinutes($now)),
+                    $finalizationReminderInterval,
+                );
+
+                $sent += $this->sendOnce(
+                    $teacher,
+                    "journal-finalize:{$now->toDateString()}:{$schedule->id}:{$teacher->id}:{$slot}",
+                    'Pengingat finalisasi jurnal',
+                    'Jurnal mengajar sesi ini masih berstatus draft. Silakan finalkan jurnal Anda.',
+                    "journal-finalize-{$now->toDateString()}-{$schedule->id}-{$teacher->id}",
+                    $now,
+                );
             }
         }
     }
