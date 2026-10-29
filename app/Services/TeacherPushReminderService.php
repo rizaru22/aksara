@@ -211,8 +211,8 @@ class TeacherPushReminderService
             $journalReminderInterval = max(1, (int) config('aksara.push_reminders.interval_minutes', 15));
 
             // Repeat the reminder while the lesson is in progress and the journal
-            // has not reached draft status. Each interval gets its own dedupe key.
-            if ((! $journal || $journal->status_sesi !== JurnalMengajar::STATUS_DRAFT)
+            // is missing or still draft (not finalized). Each interval gets its own dedupe key.
+            if ((! $journal || $journal->status_sesi === JurnalMengajar::STATUS_DRAFT)
                 && $this->within($now, $journalReminderStartsAt, $end)) {
                 $slot = intdiv(
                     max(0, (int) $journalReminderStartsAt->diffInMinutes($now)),
