@@ -80,12 +80,13 @@ class TeacherPushReminderService
         // but must not stop attendance reminders.
         $checkInEndsAt = $this->atTime($now, $checkInEndTime);
 
-        $checkOutStartsAt = $schedule?->jam_pulang_mulai
-            ? $this->atTime($now, $schedule->jam_pulang_mulai)
-            : null;
-        // Keep reminding about check-out until 18:00 even when the configured
-        // school dismissal time is earlier.
+        // Start check-out reminders a configurable number of minutes before
+        // the reminder end time, independent of the schedule's check-out opening time.
         $checkOutEndsAt = $this->atTime($now, $checkOutEndTime);
+        $checkOutLeadMinutes = max(0, (int) config('aksara.push_reminders.check_out_lead_minutes', 30));
+        $checkOutStartsAt = $checkOutEndsAt->subMinutes($checkOutLeadMinutes);
+        // Treat the configured end time as exclusive: do not send at or after it.
+        $checkOutLastMoment = $checkOutEndsAt->subSecond();
 
         foreach ($teachers as $teacher) {
             if (in_array((int) $teacher->id, $onLeave, true)) {
@@ -112,7 +113,7 @@ class TeacherPushReminderService
 
             if ($attendance?->jam_masuk && ! $attendance->jam_pulang
                 && $checkOutStartsAt && $checkOutEndsAt
-                && $this->within($now, $checkOutStartsAt, $checkOutEndsAt)) {
+                && $this->within($now, $checkOutStartsAt, $checkOutLastMoment)) {
                 $slot = intdiv(max(0, (int) $checkOutStartsAt->diffInMinutes($now)), $slotMinutes);
                 $sent += $this->sendOnce(
                     $teacher,
